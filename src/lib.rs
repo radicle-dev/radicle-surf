@@ -1,70 +1,78 @@
-use chrono::prelude::*;
+// use chrono::prelude::*;
 
-struct Repo {
-    histories: Vec<CommitHistory>,
+trait RepoI {
+    type History;
+    type Commit;
+
+    fn new() -> Self;
+
+    fn add_commit_history(&mut self, history: Self::History) -> Self;
+
+    fn get_commit_history(&self) -> Self::History;
+
+    fn get_commit(&self, hash: String) -> Option<Self::Commit>;
 }
 
-impl Repo {
-    fn new() -> Repo {
-        Repo { histories: Vec::new() }
-    }
+trait CommitHistoryI {
+    type Commit: CommitI;
 
-    fn add_commit_history(&mut self, history: CommitHistory) {
-        self.histories.push(history)
-    }
+    fn new() -> Self;
+
+    fn add_commit(&mut self, commit: Self::Commit) -> Self;
+
+    fn get_commits(&self) -> Vec<Self::Commit>;
+
+    fn get_up_to_commit(&self, commit: Self::Commit) -> Vec<Self::Commit>;
 }
 
-struct CommitHistory {
-    commits: Vec<Commit>,
+trait CommitI {
+    type Repo: RepoI;
+    type History: CommitHistoryI;
+    type Change;
+    type Signature;
+
+    fn parents(&self) -> Vec<Self> where Self: Sized;
+
+    fn children(&self, repo: Self::Repo) -> Vec<Self> where Self: Sized;
+
+    fn find_author_commits(&self, author: String) -> Vec<Self> where Self: Sized;
+
+    fn find_commit_by_hash(&self, hash: String) -> Option<Self> where Self: Sized;
+
+    fn get_changes(&self) -> Vec<Self::Change>;
+
+    fn sign_commit(&mut self, key: Self::Signature);
 }
 
-struct Branch {
-    name: String,
-    commit_history: CommitHistory,
+trait FileI {
+    type FileContents;
+    type FileName;
+    type Commit: CommitI;
+    type Directory: DirectoryI;
+
+    fn history(&self) -> Vec<Self::Commit>;
+
+    fn directory(&self) -> Self::Directory;
+
+    fn get_files(commits: Vec<Self::Commit>) -> Vec<Self> where Self: Sized;
+
+    fn directory_view(directory: Self::Directory, files: Vec<Self>)
+        -> Vec<Self> where Self: Sized;
+
+    fn get_contents(file_name: Self::FileName, commits: Vec<Self::Commit>)
+        -> Self::FileContents;
 }
 
-struct Tag {
-    name: String,
-    commit_history: CommitHistory,
-}
+trait DirectoryI {
+    type History: CommitHistoryI;
 
-struct Commit {
-    author: String,
-    hash: String,
-    date: DateTime<Utc>,
-    message: String,
-    signature: Option<String>,
-    parent_commits: Vec<Commit>,
-    changes: Vec<Change>,
-}
+    fn history(&self, history: Self::History)
+        -> Vec<<<Self as DirectoryI>::History as CommitHistoryI>::Commit>;
 
-enum Change {
-    Addition(FileName, Location, FileContents),
-    Removal(FileName, Location),
-    Move(FileName, FileName),
-    Create(FileName),
-    Delete(FileName),
-}
+    fn get_directories(history: Self::History) -> Vec<Self> where Self: Sized;
 
-// type Location = Location(uint32);
-struct Location {}
+    fn is_prefix_of(&self, directory: &Self) -> bool;
 
-struct File {
-    name: FileName,
-    commits: Vec<Commit>,
-}
-
-struct FileContents {
-    contents: String
-}
-
-struct FileName {
-    directory: Directory,
-    name: String,
-}
-
-struct Directory {
-    path: Vec<String>,
 }
 
 #[cfg(test)]
