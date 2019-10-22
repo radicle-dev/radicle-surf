@@ -1,0 +1,9 @@
+env:
+  DOCKER_FILE: .docker/build/Dockerfile
+
+steps:
+- label: "Tests"
+  command: "cargo test --all"
+  agents:
+    production: "true"
+    platform: "linux"
