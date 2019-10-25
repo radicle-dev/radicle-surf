@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use std::hash::Hash;
 
 pub trait RepoI {
     type Commit: CommitI;
@@ -66,15 +68,58 @@ pub fn get_files<File>(commits: Vec<File::Commit>) -> Vec<File>
     panic!("Unimplemented!")
 }
 
-pub trait DirectoryI {
-    type History: CommitHistoryI;
+pub fn insert_change_map<File>(
+    commit: File::Commit,
+    change: <File::Commit as CommitI>::Change,
+    change_map: HashMap<File::FileName, Vec<File::Commit>>
+    ) -> HashMap<File::FileName, Vec<File::Commit>>
+    where File: FileI
+{
+    /* TODO(fintan): What do we do here?
+    match change {
+        Change::Addition(_, _, _, _) => panic!("Unimplemented!"),
+        Change::Removal(_, _,  _) => panic!("Unimplemented!"),
+        Change::Move(_, _) => panic!("Unimplemented!"),
+        Change::Create(_) => panic!("Unimplemented!"),
+        Change::Delete(_) => panic!("Unimplemented!"),
+    }
+    */
+    panic!("Unimplemented!")
+}
 
-    // Let's be honest the return result is Self::History::Commit
-    fn history(&self, history: Self::History)
-        -> Vec<<<Self as DirectoryI>::History as CommitHistoryI>::Commit>;
+pub fn directory_commits<File>(history: File::CommitHistory, directory: File::Directory)
+    -> Vec<File::Commit>
+    where File: FileI,
+{
+    get_directory_view(directory, get_files(history.get_commits()))
+        .into_iter()
+        .flat_map(|file: File| file.history().into_iter())
+        .collect()
+}
 
-    fn get_directories(history: Self::History) -> Vec<Self> where Self: Sized;
+pub fn directory_history<File>(history: File::CommitHistory) -> Vec<File::Directory>
+    where File: FileI,
+          File::Directory: Clone + Eq + Hash
+{
+    // Used to get unique directories
+    use itertools::Itertools;
 
-    fn is_prefix_of(&self, directory: &Self) -> bool;
+    get_files(history.get_commits())
+        .into_iter()
+        .map(|file: File| file.directory())
+        .unique()
+        .collect()
+}
 
+pub fn get_directory_view<File: FileI>(directory: File::Directory, files: Vec<File>)
+    -> Vec<File>
+    where File: FileI + Sized,
+{
+    files.into_iter().filter(|file| directory.is_prefix_of(&file.directory())).collect()
+}
+
+pub fn find_author_commits<Commit>(commits: Vec<Commit>, author: String) -> Vec<Commit>
+    where Commit: CommitI,
+{
+    commits.into_iter().filter(|commit| commit.author() == author).collect()
 }
