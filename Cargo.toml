@@ -1,5 +1,5 @@
 [package]
-name = "radicle-peruse"
+name = "radicle-surf"
 version = "0.1.0"
 authors = ["Fintan Halpenny <fintan.halpenny@gmail.com>"]
 edition = "2018"
