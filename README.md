@@ -1,2 +1,2 @@
-# radicle-peruse
-A code browsing library for VCS file systems
+# radicle-surf
+A code surfing library for VCS file systems 🏄‍♀️🏄‍♂️
