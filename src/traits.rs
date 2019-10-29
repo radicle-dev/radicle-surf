@@ -28,7 +28,7 @@ pub trait CommitHistoryI {
 
 pub trait CommitI where Self: Sized {
     type Repo: RepoI<Commit = Self>;
-    type Change;
+    type Change: ChangeI<Commit = Self>;
     type Signature;
 
     fn author(&self) -> String;
@@ -44,18 +44,37 @@ pub trait CommitI where Self: Sized {
     fn sign_commit(&mut self, key: Self::Signature);
 }
 
+pub trait ChangeI {
+    type FileName;
+    type Commit;
+
+    fn get_filename(&self) -> Self::FileName;
+
+    fn add_change(
+        &self,
+        commit: Self::Commit,
+        change_map: &mut HashMap<Self::FileName, Vec<Self::Commit>>,
+    );
+}
+
 pub trait FileI {
     type FileContents;
     type FileName;
     type Directory: DirectoryI;
-    type Commit: CommitI;
+    type Change: ChangeI<FileName = Self::FileName, Commit = Self::Commit>;
+    type Commit: CommitI<Change = Self::Change>;
     type CommitHistory: CommitHistoryI<Commit = Self::Commit>;
 
     fn history(&self) -> Vec<Self::Commit>;
 
     fn directory(&self) -> Self::Directory;
 
-    fn get_contents(&self, commits: Vec<Self::Commit>) -> Self::FileContents;
+    fn build_contents(
+        filename: Self::FileName,
+        commits: Vec<Self::Commit>,
+    ) -> Self::FileContents;
+
+    fn to_file(filename: Self::FileName, commits: Vec<Self::Commit>) -> Self;
 }
 
 pub trait DirectoryI {
@@ -64,32 +83,28 @@ pub trait DirectoryI {
 
 pub fn get_files<File>(commits: Vec<File::Commit>) -> Vec<File>
     where File: FileI,
+          File::FileName: Hash + Eq,
+          File::Commit: Clone,
 {
-    panic!("Unimplemented!")
-}
-
-pub fn insert_change_map<File>(
-    commit: File::Commit,
-    change: <File::Commit as CommitI>::Change,
-    change_map: HashMap<File::FileName, Vec<File::Commit>>
-    ) -> HashMap<File::FileName, Vec<File::Commit>>
-    where File: FileI
-{
-    /* TODO(fintan): What do we do here?
-    match change {
-        Change::Addition(_, _, _, _) => panic!("Unimplemented!"),
-        Change::Removal(_, _,  _) => panic!("Unimplemented!"),
-        Change::Move(_, _) => panic!("Unimplemented!"),
-        Change::Create(_) => panic!("Unimplemented!"),
-        Change::Delete(_) => panic!("Unimplemented!"),
+    let mut commit_map = HashMap::new();
+    for commit in commits {
+        for change in commit.get_changes() {
+            change.add_change(commit.clone(), &mut commit_map)
+        }
     }
-    */
-    panic!("Unimplemented!")
+
+    let mut files = Vec::new();
+    for (filename, commits) in commit_map {
+        files.push(File::to_file(filename, commits));
+    }
+    files
 }
 
 pub fn directory_commits<File>(history: File::CommitHistory, directory: File::Directory)
     -> Vec<File::Commit>
     where File: FileI,
+          File::FileName: Hash + Eq,
+          File::Commit: Clone,
 {
     get_directory_view(directory, get_files(history.get_commits()))
         .into_iter()
@@ -99,7 +114,9 @@ pub fn directory_commits<File>(history: File::CommitHistory, directory: File::Di
 
 pub fn directory_history<File>(history: File::CommitHistory) -> Vec<File::Directory>
     where File: FileI,
-          File::Directory: Clone + Eq + Hash
+          File::Directory: Clone + Hash + Eq,
+          File::FileName: Hash + Eq,
+          File::Commit: Clone,
 {
     // Used to get unique directories
     use itertools::Itertools;

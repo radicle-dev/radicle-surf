@@ -1,5 +1,4 @@
 
-
 pub mod repo {
     use super::commit_history;
     use super::commit;
@@ -92,9 +91,12 @@ pub mod commit_history {
 
 pub mod commit {
     use chrono::prelude::{DateTime, Utc,};
+    use std::collections::HashMap;
+    use std::hash::Hash;
+
     use super::file;
     use super::repo;
-    use crate::traits::{CommitI, RepoI, CommitHistoryI};
+    use crate::traits::{CommitI, ChangeI, RepoI, CommitHistoryI};
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct Commit {
@@ -139,23 +141,64 @@ pub mod commit {
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub enum Change {
-        Addition(file::FileName, file::Location, file::FileContents),
-        Removal(file::FileName, file::Location),
+        Addition(file::FileName, file::FileContents),
+        Removal(file::FileName, file::FileContents),
         Move(file::FileName, file::FileName),
         Create(file::FileName),
         Delete(file::FileName),
     }
 
-    impl Change {
-        pub fn get_filename(&self) -> file::FileName
+    impl ChangeI for Change {
+        type FileName = file::FileName;
+        type Commit = Commit;
+
+        fn get_filename(&self) -> Self::FileName
+            where Self::FileName: Hash,
         {
             match self {
-                Change::Addition(filename, _, _)  => filename,
-                Change::Removal(filename, _)      => filename,
-                Change::Move(filename, filename_) => filename,
-                Change::Create(filename)          => filename,
-                Change::Delete(filename)          => filename,
+                Change::Addition(filename, _) => filename,
+                Change::Removal(filename, _)  => filename,
+                Change::Move(_, new_filename) => new_filename,
+                Change::Create(filename)      => filename,
+                Change::Delete(filename)      => filename,
             }.clone()
+        }
+
+        fn add_change(
+            &self,
+            commit: Self::Commit,
+            change_map: &mut HashMap<Self::FileName, Vec<Self::Commit>>
+        ) {
+            let singleton = vec![commit.clone()];
+            match self {
+                Change::Addition(filename, _) => {
+                    change_map.entry(filename.clone())
+                        .and_modify(|commits| commits.push(commit))
+                        .or_insert(singleton);
+                },
+                Change::Removal(filename, _) => {
+                    change_map.entry(filename.clone())
+                        .and_modify(|commits| commits.push(commit))
+                        .or_insert(singleton);
+                }
+                Change::Move(filename, new_filename) => {
+                    if let Some((_, commits)) = change_map.remove_entry(filename) {
+                        let mut new_commits = commits;
+                        new_commits.push(commit);
+                        change_map.insert(new_filename.clone(), new_commits);
+                    } else {
+                        change_map.insert(new_filename.clone(), singleton);
+                    }
+                },
+                Change::Create(filename) => {
+                    change_map.entry(filename.clone())
+                        .and_modify(|commits| commits.push(commit))
+                        .or_insert(singleton);
+                }
+                Change::Delete(filename) => {
+                    change_map.remove(filename);
+                }
+            }
         }
     }
 }
@@ -165,10 +208,7 @@ pub mod file {
     use super::commit;
     use super::commit_history;
     use super::directory;
-    use crate::traits::{FileI, CommitI};
-
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    pub struct Location {}
+    use crate::traits::{FileI, CommitI, ChangeI};
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct File {
@@ -183,6 +223,7 @@ pub mod file {
         type Directory = directory::Directory;
         type CommitHistory = commit_history::CommitHistory;
         type Commit = commit::Commit;
+        type Change = commit::Change;
 
         fn history(&self) -> Vec<Self::Commit> {
             self.commits.clone()
@@ -192,21 +233,27 @@ pub mod file {
             self.name.directory.clone()
         }
 
-        fn get_contents(
-            &self,
-            commits: Vec<Self::Commit>
-            ) -> Self::FileContents
+        fn build_contents(
+            filename: Self::FileName,
+            commits: Vec<Self::Commit>,
+        ) -> Self::FileContents
         {
             let mut file_contents = FileContents::empty_file_contents();
             for commit in commits {
                 let changes = commit.get_changes();
                 changes.into_iter().filter(|change| {
-                    change.get_filename() == self.name
+                    change.get_filename() == filename
                 }).for_each(|file_change| {
                     file_contents.apply_file_change(file_change)
                 })
             }
             file_contents
+        }
+
+        fn to_file(name: Self::FileName, commits: Vec<Self::Commit>) -> File
+        {
+            let contents = File::build_contents(name.clone(), commits.clone());
+            File { name, commits, contents }
         }
     }
 
@@ -223,21 +270,20 @@ pub mod file {
         fn apply_file_change(&mut self, change: <commit::Commit as CommitI>::Change)
         {
             match change {
-                commit::Change::Addition(filename, _, _)  =>
-                    panic!("Unimplemented!"),
-                commit::Change::Removal(filename, _)      =>
-                    panic!("Unimplemented!"),
-                commit::Change::Move(filename, filename_) =>
-                    panic!("Unimplemented!"),
-                commit::Change::Create(filename)          =>
-                    panic!("Unimplemented!"),
-                commit::Change::Delete(filename)          =>
-                    panic!("Unimplemented!"),
+                commit::Change::Addition(_, file_contents)  => {
+                    self.contents = file_contents.contents;
+                },
+                commit::Change::Removal(_, file_contents) => {
+                    self.contents = file_contents.contents;
+                },
+                commit::Change::Move(_, _) => {},
+                commit::Change::Create(_)  => {},
+                commit::Change::Delete(_)  => {},
             };
         }
     }
 
-    #[derive(Debug, Clone, PartialEq, Eq)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub struct FileName {
         directory: directory::Directory,
         name: String,
