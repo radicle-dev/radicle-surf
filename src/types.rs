@@ -37,13 +37,25 @@ pub mod repo {
                 .find_map(|commit| commit)
         }
     }
+
+    #[cfg(test)]
+    pub mod repo_tests {
+        use super::Repo;
+        use crate::traits::properties;
+
+        quickcheck! {
+          fn prop_new_repo_has_empty_history() -> bool {
+              properties::prop_new_repo_has_empty_history::<Repo>()
+          }
+        }
+    }
 }
 
 pub mod commit_history {
     use super::commit;
     use crate::traits::CommitHistoryI;
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq)]
     pub struct CommitHistory {
         commits: Vec<commit::Commit>,
     }
