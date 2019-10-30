@@ -300,9 +300,24 @@ pub mod file {
         directory: directory::Directory,
         name: String,
     }
+
+    #[cfg(test)]
+    pub mod file_tests {
+        use super::File;
+        use crate::traits::properties;
+
+        quickcheck! {
+          fn prop_no_commits_no_files() -> bool {
+              properties::prop_no_commits_no_files::<File>()
+          }
+        }
+    }
 }
 
 pub mod directory {
+    use quickcheck::Arbitrary;
+    use quickcheck::Gen;
+
     use crate::traits::{DirectoryI};
 
     #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -315,5 +330,24 @@ pub mod directory {
             directory.path.starts_with(&self.path)
         }
 
+    }
+
+    impl Arbitrary for Directory {
+      fn arbitrary<G: Gen>(g: &mut G) -> Self {
+          let path = Arbitrary::arbitrary(g);
+          Directory { path }
+      }
+    }
+
+    #[cfg(test)]
+    pub mod directory_tests {
+        use super::Directory;
+        use crate::traits::properties;
+
+        quickcheck! {
+          fn prop_is_prefix_identity(directory: Directory) -> bool {
+              properties::prop_is_prefix_identity(directory)
+          }
+        }
     }
 }
