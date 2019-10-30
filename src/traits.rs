@@ -140,3 +140,30 @@ pub fn find_author_commits<Commit>(commits: Vec<Commit>, author: String) -> Vec<
 {
     commits.into_iter().filter(|commit| commit.author() == author).collect()
 }
+
+pub(crate) mod properties {
+    use super::*;
+
+    pub(crate) fn prop_new_repo_has_empty_history<Repo>() -> bool
+        where Repo: RepoI,
+              Repo::CommitHistory: CommitHistoryI + PartialEq,
+    {
+        let repo: Repo = RepoI::new();
+        let commit_history: Vec<Repo::CommitHistory> = repo.get_commit_histories();
+        commit_history == Vec::new()
+    }
+
+    pub(crate) fn prop_is_prefix_identity<Directory>(directory: Directory) -> bool
+        where Directory: DirectoryI,
+    {
+        directory.is_prefix_of(&directory)
+    }
+
+    pub(crate) fn prop_no_commits_no_files<File>() -> bool
+        where File: FileI + PartialEq,
+              File::FileName: Hash + Eq + Clone,
+              File::Commit: Clone,
+    {
+        get_files::<File>(Vec::new()) == Vec::new()
+    }
+}
