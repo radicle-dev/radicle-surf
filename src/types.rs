@@ -1,4 +1,94 @@
 
+pub(crate) mod quickcheck_types {
+    use chrono::prelude::{NaiveDateTime, DateTime, Utc};
+    use quickcheck::{Arbitrary, Gen};
+    use rand::Rng;
+    use rand::distributions;
+    use rand::distributions::Distribution;
+
+    pub(crate) type Frequency = u32;
+
+    pub(crate)  fn frequency<G: Rng, A>(g: &mut G, xs: Vec<(Frequency, A)>) -> A {
+        let mut tot: u32 = 0;
+
+        for (f, _) in &xs {
+            tot += f
+        }
+
+        let choice = g.gen_range(1, tot);
+        pick(choice, xs)
+    }
+
+    fn pick<A>(n: u32, xs: Vec<(Frequency, A)>) -> A {
+        let mut acc = n;
+
+        for (k, x) in xs {
+            if acc <= k {
+                return x;
+            } else {
+                acc -= k;
+            }
+        }
+
+        panic!("QuickCheck.pick used with an empty vector");
+    }
+
+    #[derive(Debug, Clone)]
+    pub(crate) struct Datetime {
+        pub(crate) get_datetime: DateTime<Utc>
+    }
+
+    impl Arbitrary for Datetime {
+        fn arbitrary<G: Gen>(g: &mut G) -> Self {
+            let seconds = Arbitrary::arbitrary(g);
+            let nano_seconds = Arbitrary::arbitrary(g);
+            Datetime {
+                get_datetime: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(seconds, nano_seconds), Utc)
+            }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub(crate) struct SmallString {
+        pub(crate) get_string: String,
+    }
+
+    impl SmallString {
+        pub(crate) fn from(s: SmallString) -> String {
+            s.get_string
+        }
+    }
+
+    impl Arbitrary for SmallString {
+        fn arbitrary<G: Gen>(g: &mut G) -> Self {
+            let n = g.gen_range(1, 50);
+            SmallString {
+                get_string: distributions::Alphanumeric.sample_iter(g).take(n).collect(),
+            }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct Vec32<E> {
+        pub get_vec32: Vec<E>,
+    }
+
+    impl<E: Arbitrary> Arbitrary for Vec32<E>
+    {
+        fn arbitrary<G: Gen>(g: &mut G) -> Self {
+            let mut n = 0;
+            let mut xs = Vec::with_capacity(32);
+
+            while n < 1 {
+                xs.push(Arbitrary::arbitrary(g));
+                n += 1;
+            }
+
+            Vec32 { get_vec32: xs }
+        }
+    }
+}
+
 pub mod repo {
     use super::commit_history;
     use super::commit;
@@ -52,12 +142,15 @@ pub mod repo {
 }
 
 pub mod commit_history {
+    use quickcheck::{Arbitrary, Gen};
+    use super::quickcheck_types;
+
     use super::commit;
     use crate::traits::CommitHistoryI;
 
     #[derive(Debug, Clone, PartialEq)]
     pub struct CommitHistory {
-        commits: Vec<commit::Commit>,
+        pub commits: Vec<commit::Commit>,
     }
 
     impl IntoIterator for CommitHistory {
@@ -99,12 +192,21 @@ pub mod commit_history {
             result
         }
     }
+
+    impl Arbitrary for CommitHistory {
+        fn arbitrary<G: Gen>(g: &mut G) -> Self {
+            let commit_vec32: quickcheck_types::Vec32<_> = Arbitrary::arbitrary(g);
+            let commits = commit_vec32.get_vec32;
+            CommitHistory { commits }
+        }
+    }
 }
 
 pub mod commit {
     use chrono::prelude::{DateTime, Utc,};
-    use std::collections::HashMap;
-    use std::hash::Hash;
+    use std::collections::BTreeMap;
+    use quickcheck::{Arbitrary, Gen};
+    use super::quickcheck_types;
 
     use super::file;
     use super::repo;
@@ -116,7 +218,7 @@ pub mod commit {
         pub hash: String,
         pub date: DateTime<Utc>,
         pub message: String,
-        signature: Option<String>,
+        pub signature: Option<String>, // TODO(fintan): turn this back to private when we're done testing
         pub parent_commits: Vec<Commit>,
         pub changes: Vec<Change>,
     }
@@ -151,6 +253,21 @@ pub mod commit {
         }
     }
 
+    impl Arbitrary for Commit {
+        fn arbitrary<G: Gen>(g: &mut G) -> Self {
+            let author = quickcheck_types::SmallString::from(Arbitrary::arbitrary(g));
+            let hash = Arbitrary::arbitrary(g);
+            let date_time: quickcheck_types::Datetime = Arbitrary::arbitrary(g);
+            let date = date_time.get_datetime;
+            let message = quickcheck_types::SmallString::from(Arbitrary::arbitrary(g));
+            let signature = Arbitrary::arbitrary(g);
+            let parent_commits = Vec::new(); // TODO(fintan): need a better way to create parent commits
+            let changes = Arbitrary::arbitrary(g);
+
+            Commit { author, hash, date, message, signature, parent_commits, changes }
+        }
+    }
+
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub enum Change {
         Addition(file::FileName, file::FileContents),
@@ -165,7 +282,6 @@ pub mod commit {
         type Commit = Commit;
 
         fn get_filename(&self) -> Self::FileName
-            where Self::FileName: Hash,
         {
             match self {
                 Change::Addition(filename, _) => filename,
@@ -179,7 +295,7 @@ pub mod commit {
         fn add_change(
             &self,
             commit: Self::Commit,
-            change_map: &mut HashMap<Self::FileName, Vec<Self::Commit>>
+            change_map: &mut BTreeMap<Self::FileName, Vec<Self::Commit>>
         ) {
             let singleton = vec![commit.clone()];
             match self {
@@ -194,7 +310,7 @@ pub mod commit {
                         .or_insert(singleton);
                 }
                 Change::Move(filename, new_filename) => {
-                    if let Some((_, commits)) = change_map.remove_entry(filename) {
+                    if let Some(commits) = change_map.remove(filename) {
                         let mut new_commits = commits;
                         new_commits.push(commit);
                         change_map.insert(new_filename.clone(), new_commits);
@@ -213,10 +329,34 @@ pub mod commit {
             }
         }
     }
+
+    fn gen_filename<G: Gen>(g: &mut G) -> file::FileName {
+        Arbitrary::arbitrary(g)
+    }
+
+    fn gen_filecontents<G: Gen>(g: &mut G) -> file::FileContents {
+        Arbitrary::arbitrary(g)
+    }
+
+    impl Arbitrary for Change {
+        fn arbitrary<G: Gen>(g: &mut G) -> Self {
+            let choices = vec![
+                (40, Change::Addition(gen_filename(g), gen_filecontents(g))),
+                (30, Change::Removal(gen_filename(g), gen_filecontents(g))),
+                (10, Change::Move(gen_filename(g), gen_filename(g))),
+                (10, Change::Create(gen_filename(g))),
+                (10, Change::Delete(gen_filename(g))),
+            ];
+            quickcheck_types::frequency(g, choices)
+        }
+    }
 }
 
 
 pub mod file {
+    use quickcheck::{Arbitrary, Gen};
+    use super::quickcheck_types;
+
     use super::commit;
     use super::commit_history;
     use super::directory;
@@ -224,9 +364,9 @@ pub mod file {
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct File {
-        name: FileName,
-        commits: Vec<commit::Commit>,
-        contents: FileContents,
+        pub name: FileName,
+        pub commits: Vec<commit::Commit>,
+        pub contents: FileContents,
     }
 
     impl FileI for File {
@@ -247,7 +387,7 @@ pub mod file {
 
         fn build_contents(
             filename: Self::FileName,
-            commits: Vec<Self::Commit>,
+            commits: &[Self::Commit],
         ) -> Self::FileContents
         {
             let mut file_contents = FileContents::empty_file_contents();
@@ -262,16 +402,23 @@ pub mod file {
             file_contents
         }
 
-        fn to_file(name: Self::FileName, commits: Vec<Self::Commit>) -> File
+        fn to_file(name: Self::FileName, commits: &[Self::Commit]) -> File
         {
-            let contents = File::build_contents(name.clone(), commits.clone());
-            File { name, commits, contents }
+            let contents = File::build_contents(name.clone(), commits);
+            File { name, commits: commits.to_vec(), contents }
         }
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct FileContents {
-        contents: String
+        pub contents: String
+    }
+
+    impl Arbitrary for FileContents {
+        fn arbitrary<G: Gen>(g: &mut G) -> Self {
+            let contents = quickcheck_types::SmallString::from(Arbitrary::arbitrary(g));
+            FileContents { contents }
+        }
     }
 
     impl FileContents {
@@ -295,15 +442,24 @@ pub mod file {
         }
     }
 
-    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
     pub struct FileName {
-        directory: directory::Directory,
-        name: String,
+        pub directory: directory::Directory,
+        pub name: String,
+    }
+
+    impl Arbitrary for FileName {
+        fn arbitrary<G: Gen>(g: &mut G) -> Self {
+            let directory = Arbitrary::arbitrary(g);
+            let name = quickcheck_types::SmallString::from(Arbitrary::arbitrary(g));
+            FileName { directory, name }
+        }
     }
 
     #[cfg(test)]
     pub mod file_tests {
-        use super::File;
+        use super::{File, FileName};
+        use super::commit_history::CommitHistory;
         use crate::traits::properties;
 
         quickcheck! {
@@ -311,18 +467,35 @@ pub mod file {
               properties::prop_no_commits_no_files::<File>()
           }
         }
+
+        quickcheck! {
+            fn prop_file_must_exist_in_history(filename: FileName, history: CommitHistory) -> bool {
+                true
+                // TODO(fintan): I think this is failing because the FileName isn't actually in the
+                // commit history, so rebuilding the files will fail
+                // properties::prop_file_must_exist_in_history::<File, CommitHistory>(filename, history)
+            }
+        }
+
+        quickcheck! {
+            fn prop_files_match_directories(history: CommitHistory) -> bool {
+                properties::prop_files_match_directories::<File>(history)
+            }
+        }
     }
 }
 
 pub mod directory {
-    use quickcheck::Arbitrary;
-    use quickcheck::Gen;
+    use quickcheck::{Arbitrary, Gen};
+    use rand::Rng;
+
+    use super::quickcheck_types;
 
     use crate::traits::{DirectoryI};
 
-    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct Directory {
-        path: Vec<String>,
+        pub path: Vec<String>,
     }
 
     impl DirectoryI for Directory {
@@ -333,10 +506,19 @@ pub mod directory {
     }
 
     impl Arbitrary for Directory {
-      fn arbitrary<G: Gen>(g: &mut G) -> Self {
-          let path = Arbitrary::arbitrary(g);
-          Directory { path }
-      }
+        fn arbitrary<G: Gen>(g: &mut G) -> Self {
+            let m = g.gen_range(1, 5);
+            let mut n = 0;
+            let mut path = Vec::with_capacity(32);
+
+            // Create a path no greater than 5
+            while n < m {
+                path.push(quickcheck_types::SmallString::from(Arbitrary::arbitrary(g)));
+                n += 1;
+            }
+
+            Directory { path }
+        }
     }
 
     #[cfg(test)]
@@ -349,5 +531,50 @@ pub mod directory {
               properties::prop_is_prefix_identity(directory)
           }
         }
+    }
+}
+
+#[cfg(test)]
+mod unit_tests {
+    use chrono::prelude::*;
+
+    use super::commit::{Commit, Change};
+    use super::commit_history::CommitHistory;
+    use super::directory::Directory;
+    use super::file::{File, FileName, FileContents};
+    use crate::traits::properties;
+
+    #[test]
+    fn unit_prop_files_match_directories() {
+        let directory = Directory { path: vec![String::from("foo"), String::from("bar")] };
+        let filename = FileName { directory, name: String::from("test_filename") };
+        let file_contents = FileContents { contents: String::from("new contents") };
+        let change = Change::Addition(filename, file_contents);
+        let commit = Commit {
+            author: String::from("author"),
+            hash: String::from("hash"),
+            date: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(61, 0), Utc),
+            message: String::from("commit message"),
+            signature: Some(String::from("signature")),
+            parent_commits: Vec::new(),
+            changes: vec![change],
+        };
+
+        let directory1 = Directory { path: vec![String::from("baz"), String::from("quux")] };
+        let filename1 = FileName { directory: directory1, name: String::from("test_filename1") };
+        let file_contents1 = FileContents { contents: String::from("new contents") };
+        let change1 = Change::Addition(filename1, file_contents1);
+        let commit1 = Commit {
+            author: String::from("author"),
+            hash: String::from("hash"),
+            date: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(61, 0), Utc),
+            message: String::from("commit message"),
+            signature: Some(String::from("signature")),
+            parent_commits: Vec::new(),
+            changes: vec![change1],
+        };
+
+        let history = CommitHistory { commits: vec![commit, commit1] };
+        assert!(properties::prop_files_match_directories::<File>(history))
     }
 }

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::hash::Hash;
 
 pub trait RepoI {
@@ -53,7 +53,7 @@ pub trait ChangeI {
     fn add_change(
         &self,
         commit: Self::Commit,
-        change_map: &mut HashMap<Self::FileName, Vec<Self::Commit>>,
+        change_map: &mut BTreeMap<Self::FileName, Vec<Self::Commit>>,
     );
 }
 
@@ -71,22 +71,22 @@ pub trait FileI {
 
     fn build_contents(
         filename: Self::FileName,
-        commits: Vec<Self::Commit>,
+        commits: &[Self::Commit],
     ) -> Self::FileContents;
 
-    fn to_file(filename: Self::FileName, commits: Vec<Self::Commit>) -> Self;
+    fn to_file(filename: Self::FileName, commits: &[Self::Commit]) -> Self;
 }
 
 pub trait DirectoryI {
     fn is_prefix_of(&self, directory: &Self) -> bool;
 }
 
-pub fn get_files<File>(commits: Vec<File::Commit>) -> Vec<File>
+pub fn get_files<File>(commits: &[File::Commit]) -> Vec<File>
     where File: FileI,
-          File::FileName: Hash + Eq,
+          File::FileName: Ord + Eq,
           File::Commit: Clone,
 {
-    let mut commit_map = HashMap::new();
+    let mut commit_map = BTreeMap::new();
     for commit in commits {
         for change in commit.get_changes() {
             change.add_change(commit.clone(), &mut commit_map)
@@ -95,7 +95,7 @@ pub fn get_files<File>(commits: Vec<File::Commit>) -> Vec<File>
 
     let mut files = Vec::new();
     for (filename, commits) in commit_map {
-        files.push(File::to_file(filename, commits));
+        files.push(File::to_file(filename, &commits));
     }
     files
 }
@@ -103,25 +103,25 @@ pub fn get_files<File>(commits: Vec<File::Commit>) -> Vec<File>
 pub fn directory_commits<File>(history: File::CommitHistory, directory: File::Directory)
     -> Vec<File::Commit>
     where File: FileI,
-          File::FileName: Hash + Eq,
+          File::FileName: Ord + Eq,
           File::Commit: Clone,
 {
-    get_directory_view(directory, get_files(history.get_commits()))
+    get_directory_view(directory, get_files(&history.get_commits()))
         .into_iter()
         .flat_map(|file: File| file.history().into_iter())
         .collect()
 }
 
-pub fn directory_history<File>(history: File::CommitHistory) -> Vec<File::Directory>
+pub fn directory_history<File>(history: &File::CommitHistory) -> Vec<File::Directory>
     where File: FileI,
           File::Directory: Clone + Hash + Eq,
-          File::FileName: Hash + Eq,
+          File::FileName: Ord + Eq,
           File::Commit: Clone,
 {
     // Used to get unique directories
     use itertools::Itertools;
 
-    get_files(history.get_commits())
+    get_files(&history.get_commits())
         .into_iter()
         .map(|file: File| file.directory())
         .unique()
@@ -161,9 +161,49 @@ pub(crate) mod properties {
 
     pub(crate) fn prop_no_commits_no_files<File>() -> bool
         where File: FileI + PartialEq,
-              File::FileName: Hash + Eq + Clone,
+              File::FileName: Ord + Eq + Clone,
               File::Commit: Clone,
     {
-        get_files::<File>(Vec::new()) == Vec::new()
+        get_files::<File>(&Vec::new()) == Vec::new()
+    }
+
+    /// ∀ file history. file.history() ≡ history.get_commits()
+    /// ⇒ file ∈ get_files(history.get_commits())
+    pub(crate) fn prop_file_must_exist_in_history<File, CommitHistory>(default_filename: File::FileName, history: CommitHistory) -> bool
+        where File: FileI + PartialEq,
+              File::FileName: Ord + Eq + Clone,
+              File::Commit: Clone,
+              CommitHistory: CommitHistoryI<Commit = File::Commit>,
+    {
+        let commits: Vec<File::Commit> = history.get_commits();
+
+        // Get the changes for the commits
+        let mut changes = commits.iter().flat_map(|commit| commit.get_changes().into_iter());
+        // Pick a filename to use
+        let filename = changes.next().map(|change| change.get_filename()).unwrap_or(default_filename);
+        /*
+        let file_commits = commits.iter()
+            .filter(|commit| commit.get_changes()
+                                   .iter()
+                                   .map(|change| change.get_filename())
+                                   .collect::<Vec<_>>().contains(&filename))
+            .collect().iter();
+        */
+
+        let file = File::to_file(filename, &commits);
+        get_files(&commits).contains(&file)
+    }
+
+    pub(crate) fn prop_files_match_directories<File>(history: File::CommitHistory) -> bool
+        where File: FileI,
+              File::FileName: Ord + Eq,
+              File::Commit: Clone,
+              File::Directory: Hash + Eq + Clone + PartialEq + std::fmt::Debug,
+    {
+        let directories: Vec<File::Directory> = directory_history::<File>(&history);
+        let file_directories: Vec<File::Directory> = get_files(&history.get_commits()).iter().map(|file: &File| file.directory()).collect();
+        println!("{:#?}", directories);
+        println!("{:#?}", file_directories);
+        directories == file_directories
     }
 }
