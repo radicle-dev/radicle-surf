@@ -23,7 +23,7 @@ pub trait CommitHistoryI {
 
     fn get_commits(&self) -> Vec<Self::Commit>;
 
-    fn get_up_to_commit(&self, commit: Self::Commit) -> Vec<Self::Commit>;
+    fn get_up_to_commit(&self, commit: &Self::Commit) -> Vec<Self::Commit>;
 }
 
 pub trait CommitI where Self: Sized {
@@ -35,7 +35,7 @@ pub trait CommitI where Self: Sized {
 
     fn parents(&self) -> Vec<Self>;
 
-    fn children(&self, repo: Self::Repo) -> Vec<Self>;
+    fn children(&self, repo: &Self::Repo) -> Vec<Self>;
 
     fn match_hash(&self, hash: String) -> Option<Self>;
 
@@ -70,7 +70,7 @@ pub trait FileI {
     fn directory(&self) -> Self::Directory;
 
     fn build_contents(
-        filename: Self::FileName,
+        filename: &Self::FileName,
         commits: &[Self::Commit],
     ) -> Self::FileContents;
 
@@ -100,13 +100,13 @@ pub fn get_files<File>(commits: &[File::Commit]) -> Vec<File>
     files
 }
 
-pub fn directory_commits<File>(history: File::CommitHistory, directory: File::Directory)
+pub fn directory_commits<File>(history: &File::CommitHistory, directory: &File::Directory)
     -> Vec<File::Commit>
-    where File: FileI,
+    where File: FileI + Clone,
           File::FileName: Ord + Eq,
           File::Commit: Clone,
 {
-    get_directory_view(directory, get_files(&history.get_commits()))
+    get_directory_view(directory, &get_files(&history.get_commits()))
         .into_iter()
         .flat_map(|file: File| file.history().into_iter())
         .collect()
@@ -128,17 +128,17 @@ pub fn directory_history<File>(history: &File::CommitHistory) -> Vec<File::Direc
         .collect()
 }
 
-pub fn get_directory_view<File: FileI>(directory: File::Directory, files: Vec<File>)
+pub fn get_directory_view<File: FileI>(directory: &File::Directory, files: &[File])
     -> Vec<File>
-    where File: FileI + Sized,
+    where File: FileI + Sized + Clone,
 {
-    files.into_iter().filter(|file| directory.is_prefix_of(&file.directory())).collect()
+    files.iter().filter(|file| directory.is_prefix_of(&file.directory())).cloned().collect()
 }
 
-pub fn find_author_commits<Commit>(commits: Vec<Commit>, author: String) -> Vec<Commit>
-    where Commit: CommitI,
+pub fn find_author_commits<Commit>(commits: &[Commit], author: String) -> Vec<Commit>
+    where Commit: CommitI + Clone,
 {
-    commits.into_iter().filter(|commit| commit.author() == author).collect()
+    commits.iter().filter(|commit| commit.author() == author).cloned().collect()
 }
 
 pub(crate) mod properties {

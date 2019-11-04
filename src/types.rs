@@ -177,13 +177,13 @@ pub mod commit_history {
             self.commits.clone()
         }
 
-        fn get_up_to_commit(&self, search_commit: Self::Commit) -> Vec<Self::Commit> {
+        fn get_up_to_commit(&self, search_commit: &Self::Commit) -> Vec<Self::Commit> {
             let mut result = Vec::new();
 
             // Drop commits at the head of the history since Vec is push oriented
             for commit in self.commits.iter() {
                 let current_commit = commit.clone();
-                if current_commit != search_commit {
+                if current_commit != *search_commit {
                     result.push(current_commit)
                 } else {
                     continue;
@@ -232,7 +232,7 @@ pub mod commit {
 
         fn parents(&self) -> Vec<Commit> { self.parent_commits.clone() }
 
-        fn children(&self, repo: Self::Repo) -> Vec<Self>
+        fn children(&self, repo: &Self::Repo) -> Vec<Self>
         {
             repo.get_commit_histories().iter().flat_map(|history| {
                 let commits = history.get_commits().into_iter();
@@ -386,7 +386,7 @@ pub mod file {
         }
 
         fn build_contents(
-            filename: Self::FileName,
+            filename: &Self::FileName,
             commits: &[Self::Commit],
         ) -> Self::FileContents
         {
@@ -394,7 +394,7 @@ pub mod file {
             for commit in commits {
                 let changes = commit.get_changes();
                 changes.into_iter().filter(|change| {
-                    change.get_filename() == filename
+                    change.get_filename() == *filename
                 }).for_each(|file_change| {
                     file_contents.apply_file_change(file_change)
                 })
