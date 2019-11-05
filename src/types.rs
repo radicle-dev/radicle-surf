@@ -1,99 +1,13 @@
 
-pub(crate) mod quickcheck_types {
-    use chrono::prelude::{NaiveDateTime, DateTime, Utc};
-    use quickcheck::{Arbitrary, Gen};
-    use rand::Rng;
-    use rand::distributions;
-    use rand::distributions::Distribution;
-
-    pub(crate) type Frequency = u32;
-
-    pub(crate)  fn frequency<G: Rng, A>(g: &mut G, xs: Vec<(Frequency, A)>) -> A {
-        let mut tot: u32 = 0;
-
-        for (f, _) in &xs {
-            tot += f
-        }
-
-        let choice = g.gen_range(1, tot);
-        pick(choice, xs)
-    }
-
-    fn pick<A>(n: u32, xs: Vec<(Frequency, A)>) -> A {
-        let mut acc = n;
-
-        for (k, x) in xs {
-            if acc <= k {
-                return x;
-            } else {
-                acc -= k;
-            }
-        }
-
-        panic!("QuickCheck.pick used with an empty vector");
-    }
-
-    #[derive(Debug, Clone)]
-    pub(crate) struct Datetime {
-        pub(crate) get_datetime: DateTime<Utc>
-    }
-
-    impl Arbitrary for Datetime {
-        fn arbitrary<G: Gen>(g: &mut G) -> Self {
-            let seconds = Arbitrary::arbitrary(g);
-            let nano_seconds = Arbitrary::arbitrary(g);
-            Datetime {
-                get_datetime: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(seconds, nano_seconds), Utc)
-            }
-        }
-    }
-
-    #[derive(Debug, Clone)]
-    pub(crate) struct SmallString {
-        pub(crate) get_string: String,
-    }
-
-    impl SmallString {
-        pub(crate) fn from(s: SmallString) -> String {
-            s.get_string
-        }
-    }
-
-    impl Arbitrary for SmallString {
-        fn arbitrary<G: Gen>(g: &mut G) -> Self {
-            let n = g.gen_range(1, 50);
-            SmallString {
-                get_string: distributions::Alphanumeric.sample_iter(g).take(n).collect(),
-            }
-        }
-    }
-
-    #[derive(Debug, Clone)]
-    pub struct Vec32<E> {
-        pub get_vec32: Vec<E>,
-    }
-
-    impl<E: Arbitrary> Arbitrary for Vec32<E>
-    {
-        fn arbitrary<G: Gen>(g: &mut G) -> Self {
-            let mut n = 0;
-            let mut xs = Vec::with_capacity(32);
-
-            while n < 1 {
-                xs.push(Arbitrary::arbitrary(g));
-                n += 1;
-            }
-
-            Vec32 { get_vec32: xs }
-        }
-    }
-}
-
 pub mod repo {
+    use quickcheck::{Arbitrary, Gen};
+
     use super::commit_history;
     use super::commit;
     use crate::traits::{RepoI, CommitHistoryI, CommitI};
+    use crate::smallcheck::SmallVec;
 
+    #[derive(Debug, Clone)]
     pub struct Repo {
         histories: Vec<commit_history::CommitHistory>,
     }
@@ -128,6 +42,13 @@ pub mod repo {
         }
     }
 
+    impl Arbitrary for Repo {
+        fn arbitrary<G: Gen>(g: &mut G) -> Self
+        {
+            Repo { histories: SmallVec::from(Arbitrary::arbitrary(g)) }
+        }
+    }
+
     #[cfg(test)]
     pub mod repo_tests {
         use super::Repo;
@@ -143,7 +64,8 @@ pub mod repo {
 
 pub mod commit_history {
     use quickcheck::{Arbitrary, Gen};
-    use super::quickcheck_types;
+
+    use crate::smallcheck::SmallVec;
 
     use super::commit;
     use crate::traits::CommitHistoryI;
@@ -195,9 +117,7 @@ pub mod commit_history {
 
     impl Arbitrary for CommitHistory {
         fn arbitrary<G: Gen>(g: &mut G) -> Self {
-            let commit_vec32: quickcheck_types::Vec32<_> = Arbitrary::arbitrary(g);
-            let commits = commit_vec32.get_vec32;
-            CommitHistory { commits }
+            CommitHistory { commits: SmallVec::from(Arbitrary::arbitrary(g)) }
         }
     }
 }
@@ -206,13 +126,15 @@ pub mod commit {
     use chrono::prelude::{DateTime, Utc,};
     use std::collections::BTreeMap;
     use quickcheck::{Arbitrary, Gen};
-    use super::quickcheck_types;
+
+
+    use crate::smallcheck::{SmallVec, SmallString, Datetime, frequency};
 
     use super::file;
     use super::repo;
     use crate::traits::{CommitI, ChangeI, RepoI, CommitHistoryI};
 
-    #[derive(Debug, Clone, PartialEq, Eq)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub struct Commit {
         pub author: String,
         pub hash: String,
@@ -255,20 +177,20 @@ pub mod commit {
 
     impl Arbitrary for Commit {
         fn arbitrary<G: Gen>(g: &mut G) -> Self {
-            let author = quickcheck_types::SmallString::from(Arbitrary::arbitrary(g));
+            let author = SmallString::from(Arbitrary::arbitrary(g));
             let hash = Arbitrary::arbitrary(g);
-            let date_time: quickcheck_types::Datetime = Arbitrary::arbitrary(g);
+            let date_time: Datetime = Arbitrary::arbitrary(g);
             let date = date_time.get_datetime;
-            let message = quickcheck_types::SmallString::from(Arbitrary::arbitrary(g));
+            let message = SmallString::from(Arbitrary::arbitrary(g));
             let signature = Arbitrary::arbitrary(g);
             let parent_commits = Vec::new(); // TODO(fintan): need a better way to create parent commits
-            let changes = Arbitrary::arbitrary(g);
+            let changes = SmallVec::from(Arbitrary::arbitrary(g));
 
             Commit { author, hash, date, message, signature, parent_commits, changes }
         }
     }
 
-    #[derive(Debug, Clone, PartialEq, Eq)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub enum Change {
         Addition(file::FileName, file::FileContents),
         Removal(file::FileName, file::FileContents),
@@ -355,8 +277,9 @@ pub mod commit {
 
 pub mod file {
     use quickcheck::{Arbitrary, Gen};
-    use super::quickcheck_types;
 
+
+    use crate::smallcheck::{SmallVec, SmallString};
     use super::commit;
     use super::commit_history;
     use super::directory;
@@ -409,14 +332,23 @@ pub mod file {
         }
     }
 
-    #[derive(Debug, Clone, PartialEq, Eq)]
+    impl Arbitrary for File {
+        fn arbitrary<G: Gen>(g: &mut G) -> Self {
+            let name = Arbitrary::arbitrary(g);
+            let commits = SmallVec::from(Arbitrary::arbitrary(g));
+            let contents = Arbitrary::arbitrary(g);
+            File { name, commits, contents }
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub struct FileContents {
         pub contents: String
     }
 
     impl Arbitrary for FileContents {
         fn arbitrary<G: Gen>(g: &mut G) -> Self {
-            let contents = quickcheck_types::SmallString::from(Arbitrary::arbitrary(g));
+            let contents = SmallString::from(Arbitrary::arbitrary(g));
             FileContents { contents }
         }
     }
@@ -451,7 +383,7 @@ pub mod file {
     impl Arbitrary for FileName {
         fn arbitrary<G: Gen>(g: &mut G) -> Self {
             let directory = Arbitrary::arbitrary(g);
-            let name = quickcheck_types::SmallString::from(Arbitrary::arbitrary(g));
+            let name = SmallString::from(Arbitrary::arbitrary(g));
             FileName { directory, name }
         }
     }
@@ -489,8 +421,7 @@ pub mod directory {
     use quickcheck::{Arbitrary, Gen};
     use rand::Rng;
 
-    use super::quickcheck_types;
-
+    use crate::smallcheck::SmallString;
     use crate::traits::{DirectoryI};
 
     #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -513,7 +444,7 @@ pub mod directory {
 
             // Create a path no greater than 5
             while n < m {
-                path.push(quickcheck_types::SmallString::from(Arbitrary::arbitrary(g)));
+                path.push(SmallString::from(Arbitrary::arbitrary(g)));
                 n += 1;
             }
 
