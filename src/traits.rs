@@ -141,9 +141,16 @@ pub fn find_author_commits<Commit>(commits: &[Commit], author: String) -> Vec<Co
     commits.iter().filter(|commit| commit.author() == author).cloned().collect()
 }
 
+#[cfg(test)]
 pub(crate) mod properties {
+    use std::collections::HashSet;
+
     use super::*;
 
+    /// A new repo should always contain an empty commit history.
+    ///
+    /// repo = ∅
+    /// repo.get_commit_histories() ≡ ∅
     pub(crate) fn prop_new_repo_has_empty_history<Repo>() -> bool
         where Repo: RepoI,
               Repo::CommitHistory: CommitHistoryI + PartialEq,
@@ -153,18 +160,36 @@ pub(crate) mod properties {
         commit_history == Vec::new()
     }
 
+    /// A directory should always be a prefix of itself.
+    ///
+    /// ∀ directory. directory.is_prefix_of(directory)
     pub(crate) fn prop_is_prefix_identity<Directory>(directory: Directory) -> bool
         where Directory: DirectoryI,
     {
         directory.is_prefix_of(&directory)
     }
 
+    /// Trying to create files with no commits should result in no files.
+    ///
+    /// get_files(∅) ≡ ∅
     pub(crate) fn prop_no_commits_no_files<File>() -> bool
         where File: FileI + PartialEq,
               File::FileName: Ord + Eq + Clone,
               File::Commit: Clone,
     {
         get_files::<File>(&Vec::new()) == Vec::new()
+    }
+
+    /// A file can be reconstructed from its own commit history.
+    ///
+    /// ∀ file. get_files(file.history()) ≡ [file]
+    pub(crate) fn prop_file_is_its_history<File>(file: File) -> bool
+        where File: FileI + PartialEq,
+              File::FileName: Ord + Eq,
+              File::Commit: Clone,
+    {
+        let files: Vec<File> = get_files(&file.history());
+        files == vec![file]
     }
 
     /// ∀ file history. file.history() ≡ history.get_commits()
@@ -191,19 +216,57 @@ pub(crate) mod properties {
         */
 
         let file = File::to_file(filename, &commits);
-        get_files(&commits).contains(&file)
+        let files: Vec<File> = get_files(&commits);
+
+        if files.is_empty() {
+            true // Our history is empty so there's no files in here
+        } else {
+            get_files(&commits).contains(&file)
+        }
     }
 
+    /// Constructing directories from the commit history is equivalent to constructing all
+    /// the files in that history and getting the directories of those files.
+    ///
+    /// ∀ history.
+    ///   directory_history(history) ≡ get_files(history.get_commits()).map(|file| file.directory)
     pub(crate) fn prop_files_match_directories<File>(history: File::CommitHistory) -> bool
         where File: FileI,
               File::FileName: Ord + Eq,
               File::Commit: Clone,
-              File::Directory: Hash + Eq + Clone + PartialEq + std::fmt::Debug,
+              File::Directory: Hash + Eq + Clone + PartialEq,
     {
         let directories: Vec<File::Directory> = directory_history::<File>(&history);
         let file_directories: Vec<File::Directory> = get_files(&history.get_commits()).iter().map(|file: &File| file.directory()).collect();
-        println!("{:#?}", directories);
-        println!("{:#?}", file_directories);
         directories == file_directories
+    }
+
+    /// ∀ repo.
+    ///   commit := pick_commit(repo) where commit.parents() != null
+    ///
+    ///   commit.children() ⊂ commit.parents().children()
+    /// ∧ commit ∈ commit.parents().children()
+    pub(crate) fn prop_children_of_commit_are_subset_of_parents_children<Commit>(repo: Commit::Repo) -> bool
+        where Commit: CommitI + Hash + Eq,
+    {
+        let commits: Vec<_> = repo.get_commit_histories().iter().flat_map(|history| history.get_commits().into_iter()).collect();
+
+        // Trivial case where the repo is empty
+        if commits.is_empty() {
+            return true
+        }
+
+        // Pick a commit
+        let commit = &commits[commits.len() / 2];
+        let parents = commit.parents();
+
+        // If we have no parents then everything is our children
+        if parents.is_empty() {
+            return true
+        }
+
+        let children_commits: HashSet<Commit> = commit.children(&repo).into_iter().collect();
+        let parents_children: HashSet<Commit> = parents.into_iter().flat_map(|c| c.children(&repo).into_iter()).collect();
+        parents_children.contains(&commit) && children_commits.is_subset(&parents_children)
     }
 }
