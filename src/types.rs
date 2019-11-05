@@ -269,7 +269,20 @@ pub mod commit {
                 (10, Change::Create(gen_filename(g))),
                 (10, Change::Delete(gen_filename(g))),
             ];
-            quickcheck_types::frequency(g, choices)
+            frequency(g, choices)
+        }
+    }
+
+    #[cfg(test)]
+    pub mod commit_tests {
+        use super::repo;
+        use super::Commit;
+        use crate::traits::properties;
+
+        quickcheck! {
+          fn prop_children_of_commit_are_subset_of_parents_children(repo: repo::Repo) -> bool {
+              properties::prop_children_of_commit_are_subset_of_parents_children::<Commit>(repo)
+          }
         }
     }
 }
@@ -327,7 +340,7 @@ pub mod file {
 
         fn to_file(name: Self::FileName, commits: &[Self::Commit]) -> File
         {
-            let contents = File::build_contents(name.clone(), commits);
+            let contents = File::build_contents(&name, commits);
             File { name, commits: commits.to_vec(), contents }
         }
     }
@@ -354,7 +367,7 @@ pub mod file {
     }
 
     impl FileContents {
-        fn empty_file_contents() -> FileContents {
+        pub fn empty_file_contents() -> FileContents {
             FileContents { contents: String::from("") }
         }
 
@@ -374,7 +387,7 @@ pub mod file {
         }
     }
 
-    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct FileName {
         pub directory: directory::Directory,
         pub name: String,
@@ -405,6 +418,9 @@ pub mod file {
                 true
                 // TODO(fintan): I think this is failing because the FileName isn't actually in the
                 // commit history, so rebuilding the files will fail
+                // TODO(fintan): Actually this is failing because we're creating arbitrary
+                // filenames and it doesn't make much sense unless the history is in some way
+                // consistent.
                 // properties::prop_file_must_exist_in_history::<File, CommitHistory>(filename, history)
             }
         }
@@ -412,6 +428,13 @@ pub mod file {
         quickcheck! {
             fn prop_files_match_directories(history: CommitHistory) -> bool {
                 properties::prop_files_match_directories::<File>(history)
+            }
+        }
+
+        quickcheck! {
+            fn prop_file_is_its_history(file: File) -> bool {
+                true
+                // properties::prop_file_is_its_history(file)
             }
         }
     }
@@ -507,5 +530,52 @@ mod unit_tests {
 
         let history = CommitHistory { commits: vec![commit, commit1] };
         assert!(properties::prop_files_match_directories::<File>(history))
+    }
+
+    #[test]
+    fn unit_prop_file_must_exist_in_history() {
+        let default_filename = FileName {
+            directory: Directory { path: vec![String::from("def")] },
+            name: String::from("def_name"),
+        };
+        let directory = Directory { path: vec![String::from("foo"), String::from("bar")] };
+        let filename = FileName { directory, name: String::from("test_filename") };
+        let delete = Change::Delete(filename);
+        let commit = Commit {
+            author: String::from("author"),
+            hash: String::from("hash"),
+            date: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(61, 0), Utc),
+            message: String::from("commit message"),
+            signature: Some(String::from("signature")),
+            parent_commits: Vec::new(),
+            changes: vec![delete],
+        };
+
+        let history = CommitHistory { commits: vec![commit] };
+        assert!(properties::prop_file_must_exist_in_history::<File, CommitHistory>(default_filename, history))
+    }
+
+    #[test]
+    fn unit_create_then_delete() {
+        let default_filename = FileName {
+            directory: Directory { path: vec![String::from("def")] },
+            name: String::from("def_name"),
+        };
+        let directory = Directory { path: vec![String::from("foo"), String::from("bar")] };
+        let filename = FileName { directory, name: String::from("test_filename") };
+        let create = Change::Create(filename.clone());
+        let delete = Change::Delete(filename.clone());
+        let commit = Commit {
+            author: String::from("author"),
+            hash: String::from("hash"),
+            date: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(61, 0), Utc),
+            message: String::from("commit message"),
+            signature: Some(String::from("signature")),
+            parent_commits: Vec::new(),
+            changes: vec![create, delete],
+        };
+
+        let file = File { name: filename, commits: vec![commit], contents: FileContents::empty_file_contents() };
+        assert!(properties::prop_file_is_its_history::<File>(file))
     }
 }
