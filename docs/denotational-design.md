@@ -155,20 +155,26 @@ listDirectory :: Directory -> NonEmpty (Label, SystemType)
       Left dir -> (fst dir, IsDirectory)
       Right file -> (fst file, IsFile)
 
+fileName :: File -> Label
+μ fileName file = fst (μ file)
+
 findFile :: NonEmpty Label -> Directory -> Maybe File
 μ findFile (label :| labels) directory =
   let (label, artefacts) = (μ directory)
   if label == label' then go labels artefacts else Nothing
   where
-    go [] _ = Nothing
-    go [label] artefacts = Nothing
-      Left dir -> Nothing
-      Right file -> let f@(label', _) = μ file in if label == label' then Just f else Nothing
+    findFileWithLabel :: Foldable f => Label -> f (Either Directory File) -> Maybe File
+    findFileWithLabel label = find (\artefact -> case artefact of
+      Left _     -> False
+      Right file -> fileLabel == label)
 
-    -- TODO(fintan): Unsure if this is right
-    go (label:labels) artefacts = getSubDirectories artefacts
-      Left label', dir =
-      Right _ -> = Nothing
+    go :: [Label] -> [Either Directory File] -> Just File
+    go [] _ = Nothing
+    go [label] directories = findMaybe (fileWithLabel label) directories
+    go (label:labels) directories = go labels $ find ((label ==) . fst) onlyDirectories directories
+
+onlyDirectories :: Foldable f => f (Either Directory File) -> [Directory]
+onlyDirectories = filter isLeft . toList
 
 getSubDirectories :: Directory -> [Directory]
 μ getSubDirectories directory = foldMap f $ snd (μ directory)
