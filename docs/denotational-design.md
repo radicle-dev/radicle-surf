@@ -208,6 +208,9 @@ pijulMagic :: Patch -> Directory -> Directory
 getHistory :: Browser a (History a)
 μ getHistory = get
 
+setHistory :: History a -> Browser a ()
+μ setHistory = put
+
 -- Get the current Directory in the Browser
 getDirectory :: Browser a Directory
 μ getDirectory = do
