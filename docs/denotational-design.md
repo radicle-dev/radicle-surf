@@ -58,6 +58,27 @@ type Label
 type Directory
 μ Directory = (Label, NonEmpty (Either Directory File))
 
+-- DirectoryContents can either be the special IsRepo object,
+-- a Directory, or a File.
+type DirectoryContents
+μ DirectoryContents = IsRepo | Directory | File
+
+-- Opaque representation of repository state directories (e.g. `.git`, `.pijul`)
+-- Those are not browseable, but have to be present at the repo root 'Directory'.
+type IsRepo
+
+-- A Directory captures its own Label followed by 1 or more DirectoryContents
+--
+-- An example of "foo/bar.hs" structure:
+--  foo
+--  |-- bar.hs
+--
+-- Would look like:
+-- @("~", IsRepo :| [Directory ("foo", File ("bar.hs", "module Banana ..") :| [])]
+-- where IsRepo is the implicit root of the repository.
+type Directory
+μ Directory = (Label, NonEmpty DirectoryContents)
+
 -- A File is its Label and its contents
 type File
 μ File = (Label, ByteString)
@@ -142,50 +163,56 @@ findInHistory :: Eq a => a -> History a -> Maybe a
 μ findInHistory a history = find (== a) (μ history)
 
 -- A special Label that guarantees a starting point, i.e. ~
-root :: Label
-μ root = "~"
+rootLabel :: Label
+μ rootLabel = "~"
 
--- A special form of directory that gives us a starting directory
--- with a placeholder file. This ensures we have a NonEmpty to work
--- off of.
-rootDir :: Directory
-μ rootDir = (root, Right (".root", mempty) :| [])
+emptyRepoRoot :: Directory
+μ emptyRepoRoot = (rootLabel, IsRepo :| [])
 
 -- Get the difference between two directory views.
 diff :: Directory -> Directory -> Diff
 
 -- List the current file or directories in a given Directory view.
-listDirectory :: Directory -> NonEmpty (Label, SystemType)
-μ listDirectory directory = map toLabel $ snd (μ directory)
+listDirectory :: Directory -> [Label, SystemType]
+μ listDirectory directory = foldMap toLabel $ snd (μ directory)
   where
-    toLabel = either (\dir -> (fst dir, IsDirectory)) (\file -> (fst file, IsFile))
+    toLabel content = case content of
+      File      (label, _) -> [(label, IsFile)]
+      Directory (label, _) -> [(label, IsDirectory)]
+      IsRepo               -> []
 
 fileName :: File -> Label
 μ fileName file = fst (μ file)
 
 findFile :: NonEmpty Label -> Directory -> Maybe File
-μ findFile (label :| labels) directory =
-  let (label, artefacts) = (μ directory)
-  if label == label' then go labels artefacts else Nothing
+μ findFile (label :| labels) (Directory (label', contents)) =
+  if label == label' then go labels contents else Nothing
   where
-    findFileWithLabel :: Foldable f => Label -> f (Either Directory File) -> Maybe File
-    findFileWithLabel label = find (\artefact -> case artefact of
-      Left _     -> False
-      Right file -> fileLabel == label)
+    findFileWithLabel :: Foldable f => Label -> f DirectoryContents -> Maybe File
+    findFileWithLabel label = find (\artefact -> case content of
+      File (fileLabel, _) -> fileLabel == label
+      Directory _         -> False
+      IsRepo              -> False)
 
-    go :: [Label] -> [Either Directory File] -> Just File
-    go [] _ = Nothing
-    go [label] directories = findMaybe (fileWithLabel label) directories
-    go (label:labels) directories = go labels $ find ((label ==) . fst) onlyDirectories directories
+    go :: [Label] -> NonEmpty DirectoryContents -> Just File
+    go []             _        = Nothing
+    go [label]        contents = findMaybe (fileWithLabel label) contents
+    go (label:labels) contents = (go labels . snd) <$> find ((label ==) . fst) onlyDirectories contents
 
-onlyDirectories :: Foldable f => f (Either Directory File) -> [Directory]
-μ onlyDirectories = filter isLeft . toList
+onlyDirectories :: Foldable f => f DirectoryContents -> [Directory]
+μ onlyDirectories = fmapMaybe (\content -> case content of
+  d@(Directory _) -> Just d
+  File _          -> Nothing
+  IsRepo          -> Nothing) . toList
 
 getSubDirectories :: Directory -> [Directory]
 μ getSubDirectories directory = foldMap f $ snd (μ directory)
   where
-    f :: Either Directory File -> [Directory]
-    f = either pure []
+    f :: DirectoryContents -> [Directory]
+    f = \case
+      d@(Directory _) -> [d]
+      File _          -> []
+      IsRepo          -> []
 
 -- Definition elided
 findDirectory :: NonEmpty Label -> Directory -> Maybe Directory
@@ -196,7 +223,7 @@ fuzzyFind :: Label -> [Directory]
 -- A Git Snapshot is grabbing the HEAD commit of your History
 -- and turning it into a Directory
 gitSnapshot :: Snapshot Commit
-μ gitSnapshot commits = second (\root -> root <> getDirectoryPtr $ Nel.head commits) rootDir
+μ gitSnapshot commits = second (\root -> root <> getDirectoryPtr $ Nel.head commits) emptyRepoRoot
 
 -- Opaque and defined by the backend
 getDirectoryPtr :: Commit -> Directory
@@ -204,7 +231,7 @@ getDirectoryPtr :: Commit -> Directory
 -- A Pijul history is semantically applying the patches in a
 -- topological order and achieving the Directory view.
 pijulHistory :: Snapshot Patch
-μ pijulHistory = foldl pijulMagic rootDir
+μ pijulHistory = foldl pijulMagic emptyRepoRoot
 
 -- Opaque and defined by the backend
 pijulMagic :: Patch -> Directory -> Directory
