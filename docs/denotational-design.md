@@ -198,7 +198,7 @@ getDirectoryPtr :: Commit -> Directory
 
 -- A Pijul history is semantically applying the patches in a
 -- topological order and achieving the Directory view.
-pijulHistory :: History Patch
+pijulHistory :: Snapshot Patch
 pijulHistory = foldl pijulMagic mempty
 
 -- Opaque and defined by the backend
