@@ -94,7 +94,7 @@ type Diff
 --  * In `git` this would be a `Commit`.
 --  * In `pijul` it would be a `Patch`.
 type History a
-μ History = [a]
+μ History = NonEmpty a
 
 -- A Repo is a collection of multiple histories.
 -- This would essentially boil down to branches and tags.
@@ -143,17 +143,22 @@ findInHistory :: Eq a => a -> History a -> Maybe a
 
 -- A special Label that guarantees a starting point, i.e. ~
 root :: Label
+μ root = "~"
+
+-- A special form of directory that gives us a starting directory
+-- with a placeholder file. This ensures we have a NonEmpty to work
+-- off of.
+rootDir :: Directory
+μ rootDir = (root, Right (".root", mempty) :| [])
 
 -- Get the difference between two directory views.
 diff :: Directory -> Directory -> Diff
 
 -- List the current file or directories in a given Directory view.
 listDirectory :: Directory -> NonEmpty (Label, SystemType)
-μ listDirectory directory = map f $ snd (μ directory)
+μ listDirectory directory = map toLabel $ snd (μ directory)
   where
-    f = \case
-      Left dir -> (fst dir, IsDirectory)
-      Right file -> (fst file, IsFile)
+    toLabel = either (\dir -> (fst dir, IsDirectory)) (\file -> (fst file, IsFile))
 
 fileName :: File -> Label
 μ fileName file = fst (μ file)
@@ -174,7 +179,7 @@ findFile :: NonEmpty Label -> Directory -> Maybe File
     go (label:labels) directories = go labels $ find ((label ==) . fst) onlyDirectories directories
 
 onlyDirectories :: Foldable f => f (Either Directory File) -> [Directory]
-onlyDirectories = filter isLeft . toList
+μ onlyDirectories = filter isLeft . toList
 
 getSubDirectories :: Directory -> [Directory]
 μ getSubDirectories directory = foldMap f $ snd (μ directory)
@@ -190,8 +195,8 @@ fuzzyFind :: Label -> [Directory]
 
 -- A Git Snapshot is grabbing the HEAD commit of your History
 -- and turning it into a Directory
-gitSnapshot :: Snapshot [Commit]
-μ gitSnapshot = getDirectoryPtr . head
+gitSnapshot :: Snapshot Commit
+μ gitSnapshot commits = second (\root -> root <> getDirectoryPtr $ Nel.head commits) rootDir
 
 -- Opaque and defined by the backend
 getDirectoryPtr :: Commit -> Directory
@@ -199,7 +204,7 @@ getDirectoryPtr :: Commit -> Directory
 -- A Pijul history is semantically applying the patches in a
 -- topological order and achieving the Directory view.
 pijulHistory :: Snapshot Patch
-μ pijulHistory = foldl pijulMagic mempty
+μ pijulHistory = foldl pijulMagic rootDir
 
 -- Opaque and defined by the backend
 pijulMagic :: Patch -> Directory -> Directory
