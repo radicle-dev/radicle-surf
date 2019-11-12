@@ -66,7 +66,7 @@ type File
 -- Useful for listing a directory and denoting what the label is
 -- corresponding to.
 type SystemType
-SystemType
+μ SystemType
   = IsFile
   | IsDirectory
 
@@ -191,7 +191,7 @@ fuzzyFind :: Label -> [Directory]
 -- A Git Snapshot is grabbing the HEAD commit of your History
 -- and turning it into a Directory
 gitSnapshot :: Snapshot [Commit]
-gitSnapshot = getDirectoryPtr . head
+μ gitSnapshot = getDirectoryPtr . head
 
 -- Opaque and defined by the backend
 getDirectoryPtr :: Commit -> Directory
@@ -199,27 +199,27 @@ getDirectoryPtr :: Commit -> Directory
 -- A Pijul history is semantically applying the patches in a
 -- topological order and achieving the Directory view.
 pijulHistory :: Snapshot Patch
-pijulHistory = foldl pijulMagic mempty
+μ pijulHistory = foldl pijulMagic mempty
 
 -- Opaque and defined by the backend
 pijulMagic :: Patch -> Directory -> Directory
 
 -- Get the current History we are working with.
 getHistory :: Browser a (History a)
-getHistory = get
+μ getHistory = get
 
 -- Get the current Directory in the Browser
 getDirectory :: Browser a Directory
-getDirectory = do
+μ getDirectory = do
   hist <- get
   fromHistory <- ask
   pure $ fromHistory hist
 
 -- We modify the history by changing the internal history state.
 switchHistory :: ([a] -> [a]) -> Browser a b
-switchHistory f = modify f
+μ switchHistory f = modify f
 
 -- View the history up to a given point
 viewAt :: Eq a => a -> Browser a b
-viewAt a = switchHistory (dropWhile (/= a))
+μ viewAt a = switchHistory (dropWhile (/= a))
 ```
