@@ -215,8 +215,8 @@ setHistory :: History a -> Browser a ()
 getDirectory :: Browser a Directory
 μ getDirectory = do
   hist <- get
-  fromHistory <- ask
-  pure $ fromHistory hist
+  applySnapshot <- ask
+  pure $ applySnapshot hist
 
 -- We modify the history by changing the internal history state.
 switchHistory :: ([a] -> [a]) -> Browser a b
