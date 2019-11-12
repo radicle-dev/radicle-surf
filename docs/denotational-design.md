@@ -251,10 +251,22 @@ getDirectory :: Browser a Directory
   pure $ applySnapshot hist
 
 -- We modify the history by changing the internal history state.
-switchHistory :: ([a] -> [a]) -> Browser a b
+switchHistory :: (History a -> History a) -> Browser a b
 μ switchHistory f = modify f
 
+type ViewResult
+μ ViewResult = Fail | Success
+
 -- View the history up to a given point
-viewAt :: Eq a => a -> Browser a b
-μ viewAt a = switchHistory (dropWhile (/= a))
+-- Returns Success if @a@ existed in the history and we
+-- could successfully set a new history.
+--
+-- Returns Failure if @a@ was not in the history and
+-- we did not modify the history.
+viewAt :: Eq a => a -> Browser a ViewResult
+μ viewAt a = do
+  hist <- get
+  case nonEmpty $ Nel.dropWhile (/= a) hist of
+    Nothing -> pure Failure
+    Just h -> setHistory h *> pure Success
 ```
