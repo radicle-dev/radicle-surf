@@ -1,2 +1,3 @@
-pub mod traits;
-pub mod types;
+pub mod diff;
+pub mod file_system;
+pub mod vcs;
