@@ -1,4 +1,4 @@
-use crate::file_system::Label;
+use crate::file_system::{Directory, Label};
 use nonempty::NonEmpty;
 
 pub struct Location {}
@@ -26,3 +26,11 @@ pub enum Change {
 }
 
 pub struct Diff(pub Vec<Change>);
+
+impl Diff {
+    // TODO(fintan): This is a bit more involved going to elide for now
+    #[allow(dead_code)]
+    fn diff<Repo>(_directory: Directory<Repo>, _directory_: Directory<Repo>) -> Self {
+        panic!("TODO")
+    }
+}
