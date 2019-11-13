@@ -8,6 +8,11 @@ pub struct Repo<A>(pub Vec<History<A>>);
 
 pub trait Snapshot<A> {
     fn apply_snapshot(history: &History<A>) -> Directory;
+
+impl<A> History<A> {
+    pub fn iter<'a>(&'a self) -> impl Iterator<Item = &A> + 'a {
+        self.0.iter()
+    }
 }
 
 pub struct Browser<'a, A, S> {
@@ -67,7 +72,6 @@ impl<'a, A, S> Browser<'a, A, S> {
     {
         let new_history: Option<NonEmpty<A>> = from_vec(
             self.history
-                .0
                 .iter()
                 .cloned()
                 .take_while(|current| *current != artifact)
