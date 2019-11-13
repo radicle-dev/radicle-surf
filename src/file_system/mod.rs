@@ -3,7 +3,7 @@ use nonempty::NonEmpty;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Label(pub String);
 
-pub trait IsRepo
+pub trait RepoBackend
 where
     Self: Sized,
 {
@@ -36,6 +36,13 @@ pub enum SystemType {
 }
 
 impl<Repo> Directory<Repo> {
+    pub fn empty_root() -> Directory<Repo>
+    where
+        Repo: RepoBackend,
+    {
+        Repo::new()
+    }
+
     pub fn root_label() -> Label {
         Label(String::from("~"))
     }
