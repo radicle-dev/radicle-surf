@@ -4,19 +4,16 @@ use nonempty::NonEmpty;
 #[derive(Clone)]
 pub struct History<A>(pub NonEmpty<A>);
 
-pub struct Repo<A>(pub Vec<History<A>>);
-
-pub trait Snapshot<A> {
-    fn apply_snapshot(history: &History<A>) -> Directory;
-
 impl<A> History<A> {
     pub fn iter<'a>(&'a self) -> impl Iterator<Item = &A> + 'a {
         self.0.iter()
     }
 }
 
-pub struct Browser<'a, A, S> {
-    snapshot: &'a S,
+pub struct Repo<A>(pub Vec<History<A>>);
+
+pub struct Browser<'browser, A> {
+    snapshot: Box<dyn Fn(&History<A>) -> Directory + 'browser>,
     history: History<A>,
 }
 
@@ -40,7 +37,7 @@ fn from_vec<T>(vec: Vec<T>) -> Option<NonEmpty<T>> {
     }
 }
 
-impl<'a, A, S> Browser<'a, A, S> {
+impl<'browser, A> Browser<'browser, A> {
     pub fn get_history(&self) -> History<A>
     where
         A: Clone,
@@ -52,11 +49,8 @@ impl<'a, A, S> Browser<'a, A, S> {
         self.history = history;
     }
 
-    pub fn get_directory(&self) -> Directory
-    where
-        S: Snapshot<A>,
-    {
-        S::apply_snapshot(&self.history)
+    pub fn get_directory(&self) -> Directory {
+        (self.snapshot)(&self.history)
     }
 
     pub fn modify_history<F>(&mut self, f: F)
