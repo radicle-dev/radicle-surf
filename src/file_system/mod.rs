@@ -53,31 +53,49 @@ pub fn list_directory(directory: Directory) -> Vec<(Label, SystemType)> {
 }
 
 pub fn find_file(path: NonEmpty<Label>, directory: Directory) -> Option<File> {
-    let file = None;
-    let search_directory = directory;
+    let mut file = None;
+    let mut search_directory = Some(directory);
     for label in path.iter() {
-        // Really all this is doing is making sure that when we get to the last
-        // label we check that the file is in this directory. Its returned on the
-        // outside of the loop.
-        let file = file_in_directory(label, &search_directory);
+        match search_directory {
+            // We could not find a sub-directory so we bail out
+            None => return None,
 
-        // Update the sub-directory to search.
-        let search_directory = get_sub_directory(label, &search_directory);
+            // We have a viable sub-directory that we will search in
+            Some(dir) => {
+                // Really all this is doing is making sure that when we get to the last
+                // label we check that the file is in this directory. Its returned on the
+                // outside of the loop.
+                file = file_in_directory(label, &dir);
+
+                // Update the sub-directory to search.
+                search_directory = get_sub_directory(label, &dir);
+            }
+        }
     }
     file
 }
 
 pub fn find_directory(path: NonEmpty<Label>, directory: Directory) -> Option<Directory> {
-    panic!("TODO")
+    let mut search_directory = Some(directory);
+    let mut result = None;
+    for label in path.iter() {
+        match search_directory {
+            None => return None,
+            Some(dir) => {
+                // Update the sub-directory to search.
+                search_directory = get_sub_directory(label, &dir);
+                result = search_directory.clone();
+            }
+        }
+    }
+    result
 }
 
+/* TODO(fintan): This is going to be a bit trickier so going to leave it out for now
 pub fn fuzzy_find(label: Label) -> Vec<Directory> {
     panic!("TODO")
 }
-
-fn only_directory(entries: NonEmpty<DirectoryContents>) -> Vec<Directory> {
-    panic!("TODO")
-}
+*/
 
 fn get_sub_directories(directory: &Directory) -> Vec<Directory> {
     directory
@@ -85,7 +103,7 @@ fn get_sub_directories(directory: &Directory) -> Vec<Directory> {
         .iter()
         .filter_map(|entry| match entry {
             DirectoryContents::SubDirectory(dir) => {
-                let val: Directory = *dir;
+                let val: Directory = panic!("TODO");
                 Some(val)
             }
             DirectoryContents::File(_) => None,
