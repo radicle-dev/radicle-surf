@@ -102,10 +102,7 @@ fn get_sub_directories(directory: &Directory) -> Vec<Directory> {
         .entries
         .iter()
         .filter_map(|entry| match entry {
-            DirectoryContents::SubDirectory(dir) => {
-                let val: Directory = panic!("TODO");
-                Some(val)
-            }
+            DirectoryContents::SubDirectory(dir) => Some(*dir.clone()),
             DirectoryContents::File(_) => None,
             DirectoryContents::Repo(_) => None,
         })
