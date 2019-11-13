@@ -12,8 +12,8 @@ impl<A> History<A> {
 
 pub struct Repo<A>(pub Vec<History<A>>);
 
-pub struct Browser<'browser, A> {
-    snapshot: Box<dyn Fn(&History<A>) -> Directory + 'browser>,
+pub struct Browser<'browser, Repo, A> {
+    snapshot: Box<dyn Fn(&History<A>) -> Directory<Repo> + 'browser>,
     history: History<A>,
 }
 
@@ -37,7 +37,7 @@ fn from_vec<T>(vec: Vec<T>) -> Option<NonEmpty<T>> {
     }
 }
 
-impl<'browser, A> Browser<'browser, A> {
+impl<'browser, Repo, A> Browser<'browser, Repo, A> {
     pub fn get_history(&self) -> History<A>
     where
         A: Clone,
@@ -49,7 +49,7 @@ impl<'browser, A> Browser<'browser, A> {
         self.history = history;
     }
 
-    pub fn get_directory(&self) -> Directory {
+    pub fn get_directory(&self) -> Directory<Repo> {
         (self.snapshot)(&self.history)
     }
 

@@ -3,24 +3,24 @@ use nonempty::NonEmpty;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Label(pub String);
 
-pub trait IsRepo {
-    fn new() -> Directory;
+pub trait IsRepo
+where
+    Self: Sized,
+{
+    fn new() -> Directory<Self>;
 }
 
 #[derive(Debug, Clone)]
-pub struct Repo {}
-
-#[derive(Debug, Clone)]
-pub enum DirectoryContents {
-    SubDirectory(Box<Directory>),
+pub enum DirectoryContents<Repo> {
+    SubDirectory(Box<Directory<Repo>>),
     File(File),
     Repo(Repo),
 }
 
 #[derive(Debug, Clone)]
-pub struct Directory {
+pub struct Directory<Repo> {
     pub label: Label,
-    pub entries: NonEmpty<DirectoryContents>,
+    pub entries: NonEmpty<DirectoryContents<Repo>>,
 }
 
 #[derive(Debug, Clone)]
@@ -35,12 +35,15 @@ pub enum SystemType {
     IsDirectory,
 }
 
-impl Directory {
+impl<Repo> Directory<Repo> {
     pub fn root_label() -> Label {
         Label(String::from("~"))
     }
 
-    pub fn list_directory(&self) -> Vec<(Label, SystemType)> {
+    pub fn list_directory(&self) -> Vec<(Label, SystemType)>
+    where
+        Repo: Clone,
+    {
         self.entries
             .iter()
             .cloned()
@@ -52,7 +55,10 @@ impl Directory {
             .collect()
     }
 
-    pub fn find_file(&self, path: NonEmpty<Label>) -> Option<File> {
+    pub fn find_file(&self, path: NonEmpty<Label>) -> Option<File>
+    where
+        Repo: Clone,
+    {
         let mut file = None;
         let mut search_directory = Some(self.clone());
         for label in path.iter() {
@@ -75,7 +81,10 @@ impl Directory {
         file
     }
 
-    pub fn find_directory(&self, path: NonEmpty<Label>) -> Option<Directory> {
+    pub fn find_directory(&self, path: NonEmpty<Label>) -> Option<Self>
+    where
+        Repo: Clone,
+    {
         let mut search_directory = Some(self.clone());
         for label in path.iter() {
             match search_directory {
@@ -95,7 +104,10 @@ impl Directory {
     }
     */
 
-    fn get_sub_directories(&self) -> Vec<Directory> {
+    fn get_sub_directories(&self) -> Vec<Self>
+    where
+        Repo: Clone,
+    {
         self.entries
             .iter()
             .filter_map(|entry| match entry {
@@ -106,7 +118,10 @@ impl Directory {
             .collect()
     }
 
-    fn get_sub_directory(&self, label: &Label) -> Option<Directory> {
+    fn get_sub_directory(&self, label: &Label) -> Option<Self>
+    where
+        Repo: Clone,
+    {
         self.get_sub_directories()
             .iter()
             .cloned()
