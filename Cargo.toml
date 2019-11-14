@@ -6,5 +6,8 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[dependencies.nonempty]
+git = "https://github.com/FintanH/nonempty.git"
+rev = "0e2d9d95abaa853a380eaea47041a2a3a7ff95ea"
+
 [dependencies]
-nonempty = "0.1.1"

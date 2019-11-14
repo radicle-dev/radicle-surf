@@ -215,26 +215,6 @@ impl<Repo> Directory<Repo> {
             entries: NonEmpty::new(DirectoryContents::SubDirectory(Box::new(dir))),
         }
     }
-
-    #[cfg(test)]
-    pub(crate) fn add_file(&mut self, path: Path, file: File)
-    where
-        Repo: Clone,
-    {
-        if path.is_root() {
-            self.entries.push(DirectoryContents::File(file))
-        } else {
-            let mut sub_directory = None;
-            for label in path.iter() {
-                sub_directory = self.get_sub_directory(label)
-            }
-
-            match sub_directory {
-                None => (),
-                Some(mut dir) => dir.entries.push(DirectoryContents::File(file)),
-            }
-        }
-    }
 }
 
 #[cfg(test)]
