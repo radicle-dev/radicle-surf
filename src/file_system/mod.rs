@@ -207,4 +207,112 @@ impl<Repo> Directory<Repo> {
         }
         None
     }
+
+    #[allow(dead_code)]
+    pub(crate) fn mkdir(label: Label, dir: Self) -> Self {
+        Directory {
+            label,
+            entries: NonEmpty::new(DirectoryContents::SubDirectory(Box::new(dir))),
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn add_file(&mut self, path: Path, file: File)
+    where
+        Repo: Clone,
+    {
+        if path.is_root() {
+            self.entries.push(DirectoryContents::File(file))
+        } else {
+            let mut sub_directory = None;
+            for label in path.iter() {
+                sub_directory = self.get_sub_directory(label)
+            }
+
+            match sub_directory {
+                None => (),
+                Some(mut dir) => dir.entries.push(DirectoryContents::File(file)),
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use crate::file_system::*;
+
+    #[derive(Debug, Clone)]
+    struct TestRepo {}
+
+    impl RepoBackend for TestRepo {
+        fn new() -> Directory<TestRepo> {
+            Directory {
+                label: Label::root_label(),
+                entries: NonEmpty::new(DirectoryContents::Repo(TestRepo {})),
+            }
+        }
+    }
+
+    #[test]
+    fn find_added_file() {
+        let file_path = Path::from_labels(Label::root_label(), &["foo.hs".into()]);
+
+        let file = File {
+            filename: "foo.hs".into(),
+            contents: String::from("module Banana ..."),
+        };
+
+        let directory: Directory<TestRepo> = Directory {
+            label: Label::root_label(),
+            entries: NonEmpty::new(DirectoryContents::File(file.clone())),
+        };
+
+        // Search for "~/foo.hs"
+        assert_eq!(directory.find_file(file_path), Some(file))
+    }
+
+    #[test]
+    fn find_added_file_long_path() {
+        let file_path = Path::from_labels(
+            Label::root_label(),
+            &["foo".into(), "bar".into(), "baz.hs".into()],
+        );
+
+        let file = File {
+            filename: "baz.hs".into(),
+            contents: String::from("module Banana ..."),
+        };
+
+        let directory: Directory<TestRepo> = Directory::mkdir(
+            Label::root_label(),
+            Directory::mkdir(
+                "foo".into(),
+                Directory {
+                    label: "bar".into(),
+                    entries: NonEmpty::new(DirectoryContents::File(file.clone())),
+                },
+            ),
+        );
+
+        // Search for "~/foo/bar/baz.hs"
+        assert_eq!(directory.find_file(file_path), Some(file))
+    }
+
+    #[test]
+    fn _404_file_not_found() {
+        let file_path = Path::from_labels(Label::root_label(), &["bar.hs".into()]);
+
+        let file = File {
+            filename: "foo.hs".into(),
+            contents: String::from("module Banana ..."),
+        };
+
+        let directory: Directory<TestRepo> = Directory {
+            label: Label::root_label(),
+            entries: NonEmpty::new(DirectoryContents::File(file.clone())),
+        };
+
+        // Search for "~/bar.hs"
+        assert_eq!(directory.find_file(file_path), None)
+    }
 }
