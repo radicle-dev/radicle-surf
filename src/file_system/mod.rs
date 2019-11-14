@@ -3,6 +3,73 @@ use nonempty::NonEmpty;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Label(pub String);
 
+impl Label {
+    pub fn root_label() -> Self {
+        "~".into()
+    }
+}
+
+impl From<&str> for Label {
+    fn from(item: &str) -> Self {
+        Label(item.into())
+    }
+}
+
+impl From<String> for Label {
+    fn from(item: String) -> Self {
+        Label(item)
+    }
+}
+
+pub struct Path(pub NonEmpty<Label>);
+
+impl Path {
+    pub fn root_path() -> Self {
+        Path(NonEmpty::new(Label::root_label()))
+    }
+
+    pub fn is_root(&self) -> bool {
+        *self.0.first() == Label::root_label() && *self.0.last() == Label::root_label()
+    }
+
+    pub fn append(&mut self, path: &mut Self) {
+        path.0.iter().for_each(|l| self.0.push(l.clone()))
+    }
+
+    pub fn push(&mut self, label: Label) {
+        self.0.push(label)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &Label> {
+        self.0.iter()
+    }
+
+    pub fn split_first(&self) -> (&Label, &[Label]) {
+        self.0.split_first()
+    }
+
+    pub fn split_last(&self) -> (Vec<Label>, Label) {
+        let (first, middle, last) = self.0.split();
+
+        // first == last, so drop first
+        if middle.is_empty() {
+            (vec![], last.clone())
+        } else {
+            // Create the prefix vector
+            let mut vec = middle.to_vec();
+            vec.insert(0, first.clone());
+
+            (vec, last.clone())
+        }
+    }
+
+    pub fn from_labels(root: Label, labels: &[Label]) -> Path {
+        let mut path = NonEmpty::new(root);
+        labels.iter().cloned().for_each(|l| path.push(l));
+        Path(path)
+    }
+}
+
 pub trait RepoBackend
 where
     Self: Sized,
@@ -36,15 +103,11 @@ pub enum SystemType {
 }
 
 impl<Repo> Directory<Repo> {
-    pub fn empty_root() -> Directory<Repo>
+    pub fn empty_root() -> Self
     where
         Repo: RepoBackend,
     {
         Repo::new()
-    }
-
-    pub fn root_label() -> Label {
-        Label(String::from("~"))
     }
 
     pub fn list_directory(&self) -> Vec<(Label, SystemType)>
