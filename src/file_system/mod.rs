@@ -102,6 +102,16 @@ pub enum SystemType {
     IsDirectory,
 }
 
+impl SystemType {
+    pub fn is_file(label: Label) -> (Label, Self) {
+        (label, SystemType::IsFile)
+    }
+
+    pub fn is_directory(label: Label) -> (Label, Self) {
+        (label, SystemType::IsDirectory)
+    }
+}
+
 impl<Repo> Directory<Repo> {
     pub fn empty_root() -> Self
     where
@@ -118,8 +128,8 @@ impl<Repo> Directory<Repo> {
             .iter()
             .cloned()
             .filter_map(|entry| match entry {
-                DirectoryContents::SubDirectory(dir) => Some((dir.label, SystemType::IsDirectory)),
-                DirectoryContents::File(file) => Some((file.filename, SystemType::IsFile)),
+                DirectoryContents::SubDirectory(dir) => Some(SystemType::is_directory(dir.label)),
+                DirectoryContents::File(file) => Some(SystemType::is_file(file.filename)),
                 DirectoryContents::Repo(_) => None,
             })
             .collect()
@@ -294,5 +304,41 @@ pub mod tests {
 
         // Search for "~/bar.hs"
         assert_eq!(directory.find_file(file_path), None)
+    }
+
+    #[test]
+    fn list_directory() {
+        let foo = File {
+            filename: "foo.hs".into(),
+            contents: String::from("module Banana ..."),
+        };
+
+        let bar = File {
+            filename: "bar.hs".into(),
+            contents: String::from("module Banana ..."),
+        };
+
+        let baz = File {
+            filename: "baz.hs".into(),
+            contents: String::from("module Banana ..."),
+        };
+
+        let mut files = NonEmpty::new(foo);
+        files.push(bar);
+        files.push(baz);
+
+        let directory: Directory<TestRepo> = Directory {
+            label: Label::root_label(),
+            entries: files,
+        };
+
+        assert_eq!(
+            directory.list_directory(),
+            vec![
+                SystemType::is_file("foo.hs".into()),
+                SystemType::is_file("bar.hs".into()),
+                SystemType::is_file("baz".into()),
+            ]
+        );
     }
 }
