@@ -90,7 +90,7 @@ pub struct Directory<Repo> {
     pub entries: NonEmpty<DirectoryContents<Repo>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct File {
     pub filename: Label,
     pub contents: String,
@@ -125,47 +125,40 @@ impl<Repo> Directory<Repo> {
             .collect()
     }
 
-    pub fn find_file(&self, path: NonEmpty<Label>) -> Option<File>
+    pub fn find_file(&self, path: Path) -> Option<File>
     where
-        Repo: Clone,
+        Repo: Clone + std::fmt::Debug,
     {
-        let mut file = None;
-        let mut search_directory = Some(self.clone());
-        for label in path.iter() {
-            match search_directory {
-                // We could not find a sub-directory so we bail out
-                None => return None,
+        let (path, filename) = path.split_last();
+        let path = NonEmpty::from_slice(&path);
 
-                // We have a viable sub-directory that we will search in
-                Some(dir) => {
-                    // Really all this is doing is making sure that when we get to the last
-                    // label we check that the file is in this directory. Its returned on the
-                    // outside of the loop.
-                    file = dir.file_in_directory(label);
+        let search_directory = match path {
+            None => Some(self.clone()),
+            Some(p) => self.find_directory(Path(p)),
+        };
 
-                    // Update the sub-directory to search.
-                    search_directory = dir.get_sub_directory(label);
-                }
-            }
-        }
-        file
+        search_directory.and_then(|dir| dir.file_in_directory(&filename))
     }
 
-    pub fn find_directory(&self, path: NonEmpty<Label>) -> Option<Self>
+    pub fn find_directory(&self, path: Path) -> Option<Self>
     where
         Repo: Clone,
     {
         let mut search_directory = Some(self.clone());
-        for label in path.iter() {
-            match search_directory {
-                None => return None,
-                Some(dir) => {
-                    // Update the sub-directory to search.
-                    search_directory = dir.get_sub_directory(label);
+        let (label, labels) = path.split_first();
+        if *label == self.label {
+            for label in labels {
+                match search_directory {
+                    None => return None,
+                    Some(dir) => {
+                        search_directory = dir.get_sub_directory(&label);
+                    }
                 }
             }
+            search_directory
+        } else {
+            None
         }
-        search_directory
     }
 
     // TODO(fintan): This is going to be a bit trickier so going to leave it out for now
