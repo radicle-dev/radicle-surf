@@ -168,18 +168,12 @@ impl<Repo> Directory<Repo> {
     where
         Repo: Clone,
     {
-        let mut search_directory = Some(self.clone());
         let (label, labels) = path.split_first();
         if *label == self.label {
-            for label in labels {
-                match search_directory {
-                    None => return None,
-                    Some(dir) => {
-                        search_directory = dir.get_sub_directory(&label);
-                    }
-                }
-            }
-            search_directory
+            // recursively dig down into sub-directories
+            labels
+                .iter()
+                .try_fold(self.clone(), |dir, label| dir.get_sub_directory(&label))
         } else {
             None
         }
