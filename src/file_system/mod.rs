@@ -110,7 +110,7 @@ pub struct File {
     pub contents: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum SystemType {
     IsFile,
     IsDirectory,
@@ -236,7 +236,7 @@ impl<Repo> Directory<Repo> {
     pub(crate) fn mkdir(label: Label, dir: Self) -> Self {
         Directory {
             label,
-            entries: NonEmpty::new(DirectoryContents::SubDirectory(Box::new(dir))),
+            entries: NonEmpty::new(DirectoryContents::sub_directory(dir)),
         }
     }
 }
@@ -263,7 +263,7 @@ pub mod tests {
 
         let file = File {
             filename: "foo.hs".into(),
-            contents: String::from("module Banana ..."),
+            contents: "module Banana ...".into(),
         };
 
         let directory: Directory<TestRepo> = Directory {
@@ -284,7 +284,7 @@ pub mod tests {
 
         let file = File {
             filename: "baz.hs".into(),
-            contents: String::from("module Banana ..."),
+            contents: "module Banana ...".into(),
         };
 
         let directory: Directory<TestRepo> = Directory::mkdir(
@@ -306,14 +306,12 @@ pub mod tests {
     fn _404_file_not_found() {
         let file_path = Path::from_labels(Label::root_label(), &["bar.hs".into()]);
 
-        let file = File {
-            filename: "foo.hs".into(),
-            contents: String::from("module Banana ..."),
-        };
-
         let directory: Directory<TestRepo> = Directory {
             label: Label::root_label(),
-            entries: NonEmpty::new(DirectoryContents::File(file.clone())),
+            entries: NonEmpty::new(DirectoryContents::file(
+                "foo.hs".into(),
+                "module Banana ...".into(),
+            )),
         };
 
         // Search for "~/bar.hs"
@@ -322,20 +320,9 @@ pub mod tests {
 
     #[test]
     fn list_directory() {
-        let foo = File {
-            filename: "foo.hs".into(),
-            contents: String::from("module Banana ..."),
-        };
-
-        let bar = File {
-            filename: "bar.hs".into(),
-            contents: String::from("module Banana ..."),
-        };
-
-        let baz = File {
-            filename: "baz.hs".into(),
-            contents: String::from("module Banana ..."),
-        };
+        let foo = DirectoryContents::file("foo.hs".into(), "module Banana ...".into());
+        let bar = DirectoryContents::file("bar.hs".into(), "module Banana ...".into());
+        let baz = DirectoryContents::file("baz.hs".into(), "module Banana ...".into());
 
         let mut files = NonEmpty::new(foo);
         files.push(bar);
@@ -351,7 +338,7 @@ pub mod tests {
             vec![
                 SystemType::is_file("foo.hs".into()),
                 SystemType::is_file("bar.hs".into()),
-                SystemType::is_file("baz".into()),
+                SystemType::is_file("baz.hs".into()),
             ]
         );
     }
