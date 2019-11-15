@@ -218,15 +218,12 @@ impl<Repo> Directory<Repo> {
     fn file_in_directory(&self, label: &Label) -> Option<File> {
         for entry in self.entries.iter() {
             match entry {
-                DirectoryContents::File(file) => {
-                    if file.filename == *label {
-                        return Some(file.clone());
-                    } else {
-                        continue;
-                    }
+                DirectoryContents::File(file) if file.filename == *label => {
+                    return Some(file.clone());
                 }
-                DirectoryContents::SubDirectory(_) => continue,
-                DirectoryContents::Repo(_) => continue,
+                DirectoryContents::File(..) => {}
+                DirectoryContents::SubDirectory(_) => {}
+                DirectoryContents::Repo(_) => {}
             }
         }
         None
