@@ -1,6 +1,8 @@
 use crate::file_system::Directory;
 use nonempty::NonEmpty;
 
+pub mod git;
+
 #[derive(Clone)]
 pub struct History<A>(pub NonEmpty<A>);
 

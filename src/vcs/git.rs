@@ -1,12 +1,11 @@
-
-use git2::Repository;
-
-#[(cfg(test)]
+#[cfg(test)]
 mod tests {
+    use git2::Repository;
+
     #[test]
     fn test_print() {
-        let repo = match Repository::open("/path/to/a/repo") {
-            Ok(repo) => println!(repo),
+        let repo = match Repository::open("/home/haptop/Developer/radicle-surf") {
+            Ok(repo) => println!("{:#?}", repo),
             Err(e) => panic!("failed to open: {}", e),
         };
     }
