@@ -85,7 +85,6 @@ pub trait GetHistory<A> {
         A: Clone,
         Self::ArtefactId: PartialEq,
     {
-        let history: Vec<A> = history.0.into();
         history
             .iter()
             .find(|artifact| {
