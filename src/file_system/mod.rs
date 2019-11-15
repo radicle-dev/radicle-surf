@@ -84,6 +84,20 @@ pub enum DirectoryContents<Repo> {
     Repo(Repo),
 }
 
+impl<Repo> DirectoryContents<Repo> {
+    pub fn sub_directory(directory: Directory<Repo>) -> Self {
+        DirectoryContents::SubDirectory(Box::new(directory))
+    }
+
+    pub fn file(filename: Label, contents: String) -> Self {
+        DirectoryContents::File(File { filename, contents })
+    }
+
+    pub fn repo(repo: Repo) -> Self {
+        DirectoryContents::Repo(repo)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Directory<Repo> {
     pub label: Label,
