@@ -22,21 +22,6 @@ pub enum ViewResult {
     Failure,
 }
 
-fn from_vec<T>(vec: Vec<T>) -> Option<NonEmpty<T>> {
-    let mut vec = vec;
-    let head = vec.pop();
-    match head {
-        Some(t) => {
-            let mut result = NonEmpty::new(t);
-            for u in vec {
-                result.push(u)
-            }
-            Some(result)
-        }
-        None => None,
-    }
-}
-
 impl<'browser, Repo, A> Browser<'browser, Repo, A> {
     pub fn get_history(&self) -> History<A>
     where
@@ -64,12 +49,13 @@ impl<'browser, Repo, A> Browser<'browser, Repo, A> {
     where
         A: PartialEq + Clone,
     {
-        let new_history: Option<NonEmpty<A>> = from_vec(
-            self.history
+        let new_history: Option<NonEmpty<A>> = NonEmpty::from_slice(
+            &self
+                .history
                 .iter()
                 .cloned()
                 .take_while(|current| *current != artifact)
-                .collect(),
+                .collect::<Vec<_>>(),
         );
         match new_history {
             Some(h) => {
