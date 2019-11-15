@@ -188,7 +188,7 @@ impl<Repo> Directory<Repo> {
     // TODO(fintan): This is going to be a bit trickier so going to leave it out for now
     #[allow(dead_code)]
     pub fn fuzzy_find(_label: Label) -> Vec<Self> {
-        panic!("TODO")
+        unimplemented!()
     }
 
     fn get_sub_directories(&self) -> Vec<Self>
