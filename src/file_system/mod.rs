@@ -112,17 +112,17 @@ pub struct File {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SystemType {
-    IsFile,
-    IsDirectory,
+    File,
+    Directory,
 }
 
 impl SystemType {
-    pub fn is_file(label: Label) -> (Label, Self) {
-        (label, SystemType::IsFile)
+    pub fn file(label: Label) -> (Label, Self) {
+        (label, SystemType::File)
     }
 
-    pub fn is_directory(label: Label) -> (Label, Self) {
-        (label, SystemType::IsDirectory)
+    pub fn directory(label: Label) -> (Label, Self) {
+        (label, SystemType::Directory)
     }
 }
 
@@ -142,8 +142,8 @@ impl<Repo> Directory<Repo> {
             .iter()
             .cloned()
             .filter_map(|entry| match entry {
-                DirectoryContents::SubDirectory(dir) => Some(SystemType::is_directory(dir.label)),
-                DirectoryContents::File(file) => Some(SystemType::is_file(file.filename)),
+                DirectoryContents::SubDirectory(dir) => Some(SystemType::directory(dir.label)),
+                DirectoryContents::File(file) => Some(SystemType::file(file.filename)),
                 DirectoryContents::Repo(_) => None,
             })
             .collect()
@@ -336,9 +336,9 @@ pub mod tests {
         assert_eq!(
             directory.list_directory(),
             vec![
-                SystemType::is_file("foo.hs".into()),
-                SystemType::is_file("bar.hs".into()),
-                SystemType::is_file("baz.hs".into()),
+                SystemType::file("foo.hs".into()),
+                SystemType::file("bar.hs".into()),
+                SystemType::file("baz.hs".into()),
             ]
         );
     }
