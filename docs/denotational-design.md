@@ -1,214 +1,265 @@
-This an attempt to use Denotational Design to define the Code Exploration component of the Code
-Collaboration library.
+# Design Documentation
 
-Anything that is a `type` is an object that we refer to in our system. Initially they are
-opaque and we do not give them meanings right away. Sometimes they are trivial so elide their
-meanings.
+In this document we will describe the design of `radicle-surf`. The design of the system will rely
+heavily on [denotational design](todo) and use Haskell syntax (because types are easy to reason about, I'm sorry).
 
-When we use `type instance` we are giving an object the simplest meaning we can give it. This
-is a process so if the meaning can be simpler we can refine that and iterate on the design.
+`radicle-surf` is a system to describe a file-system in a VCS world. We have the concept of files and directories,
+but these objects can change over time while people iterate on them. Thus, it is a file-system within history and
+we, the user, are viewing the file-system at a particular snapshot. Alongside this, we will wish to take two snapshots
+and view their differences.
 
-We then list the functionality of our API by laying out the functions that will work with these
-objects in our system. The meanings of these functions are denoted using the symbol `μ`. For
-example, below we have the object `Repo` and when we say `μ repo` we are saying that we are
-accessing the meaning of `Repo`, which in this case is `([Branch], [Tag])`. Thus, the meaning
-of the function `getBranches` is taking the `fst` element from the meaning of `Repo`, i.e.
-`fst (μ repo)`.
+The stream of consciousness that gave birth to this document started with thinking how the user would interact with
+the system, identifying the key components. This is captured in [User Flow](#user-flow). From there we found nouns that
+represent objects in our system and verbs that represent functions over those objects. This iteratively informed us as
+to what other actions we would need to supply. We would occassionally look at [GitHub](todo) and [Pijul Nest](todo) for
+inspiration, since we would like to imitate the features that they supply, and we ultimately want use one or both of
+these for our backends.
+
+## User Flow
+
+For the user flow we imagined what it would be like if the user was using a [REPL](todo) to interact with `radicle-surf`.
+The general concept was that the user would enter the repository, build a view of the directory structure, and then
+interact with the directories and files from there (called `browse`).
+```haskell
+repl :: IO ()
+repl = do
+  repo <- getRepo
+  history <- getHistory label repo -- head is SHA1, tail is rest
+  directory <- buildDirectory history
+
+  forever browse directory
+```
+
+But then we thought about what happens when we are in `browse` but we would like to change the history and see that
+file or directory at a different snapshot. This was captured in the pseudo-code below:
+```haskell
+  src_foo_bar <- find...
+  history' <- historyOf src_foo_bar
+```
+
+This information was enough for us to begin the [denotational design](#denotational-design) below.
+
+## Denotational Design
 
 ```haskell
--- A Repo is a series of CommitHistory's where the
--- most recent is the head of the list.
-type Repo
-type instance Repo = [CommitHistory]
+-- A Label is a name for a directory or a file
+type Label
+μ Label = Text
 
--- A series of commits that is named. This encapsulates
--- both a Branch and a Tag
--- This is assuming that the @head [Commit] == latestCommit@
-type CommitHistory = (Name, [Commit])
-
--- A directory is a named path, in this case calling each
--- part of that path a Component.
--- i.e. /home/foo/bar/ ~ [home, foo, bar]
+-- A Directory captures its own Label followed by 1 or more
+-- artefacts which can either be sub-directories or files.
+--
+-- An example of "foo/bar.hs" structure:
+--  foo
+--  |-- bar.hs
+--
+-- Would look like:
+-- @("foo", Right ("bar.hs", "module Banana ...") :| [])@
 type Directory
-type instance Directory = [Component]
+μ Directory = (Label, NonEmpty (Either Directory File))
 
--- A File is its location, 'FileName', and commits
+-- DirectoryContents can either be the special IsRepo object,
+-- a Directory, or a File.
+type DirectoryContents
+μ DirectoryContents = IsRepo | Directory | File
+
+-- Opaque representation of repository state directories (e.g. `.git`, `.pijul`)
+-- Those are not browseable, but have to be present at the repo root 'Directory'.
+type IsRepo
+
+-- A Directory captures its own Label followed by 1 or more DirectoryContents
+--
+-- An example of "foo/bar.hs" structure:
+--  foo
+--  |-- bar.hs
+--
+-- Would look like:
+-- @("~", IsRepo :| [Directory ("foo", File ("bar.hs", "module Banana ..") :| [])]
+-- where IsRepo is the implicit root of the repository.
+type Directory
+μ Directory = (Label, NonEmpty DirectoryContents)
+
+-- A File is its Label and its contents
 type File
-type instance File = (FileName, [Commit])
+μ File = (Label, ByteString)
 
--- A FileName is a full directory path and the name of
--- the file itself
-type FileName
-type instance FileName = (Directory, Name)
+-- An enumeration of what file-system artefact we're looking at.
+-- Useful for listing a directory and denoting what the label is
+-- corresponding to.
+type SystemType
+μ SystemType
+  = IsFile
+  | IsDirectory
 
-type FileContents
-type instance FileContents = Text
-
-type Commit
-type instance Commit = (CommitMeta, [Commit], [Change])
-
-type Author
-
--- Something like a GPG signature
-type Signature
-
-type Hash
-type instance Hash = Text
-
-type Date
-type instance Date = UTCTime
-
-type Message
-type instance Message = Text
-
+-- A Chnage is an enumeration of how a file has changed.
+-- This is simply used for getting the difference between two
+-- directories.
 type Change
+
 -- Constructors of Change - think GADT
-AddLineToFile :: FileName -> Location -> FileContents -> Change
-RemoveLineFromFile :: FileName -> Location -> Change
-MoveFile :: FileName -> FileName -> Change
-CreateFile :: FileName -> Change
-DeleteFile :: FileName -> Change
+AddLineToFile :: NonEmpty Label -> Location -> ByteString -> Change
+RemoveLineFromFile :: NonEmpty Label -> Location -> Change
+MoveFile :: NonEmpty Label -> NonEmpty Label -> Change
+CreateFile :: NonEmpty Label -> Change
+DeleteFile :: NonEmpty Label -> Change
 
--- Prepend a 'CommitHistory' to a 'Repo'
-addCommitHistory :: CommitHistory -> Repo -> Repo
-μ addCommitHistory history = history : μ repo
+-- A Diff is a set of Changes that were made
+type Diff
+μ Diff = [Change]
 
--- Retrieve a list of the 'CommitHistory's
-getCommitHistories :: Repo -> [CommitHistory]
-μ getCommitHistories repo = μ repo
+-- History is an ordered set of @a@s. The reason for it being
+-- polymorphic is that it allows us to choose what set artefact we
+-- want to carry around.
+--
+-- For example:
+--  * In `git` this would be a `Commit`.
+--  * In `pijul` it would be a `Patch`.
+type History a
+μ History = NonEmpty a
 
--- Get a list of the commits in the given history
-getCommits :: CommitHistory -> [Commit]
-μ getCommits history = snd (μ history)
+-- A Repo is a collection of multiple histories.
+-- This would essentially boil down to branches and tags.
+type Repo
+μ Repo a = [History a]
 
-getHistoryTo :: Commit -> CommitHistory -> [Commit]
-μ getHistoryTo commit history =
-  dropUpTo (/= commit) (getCommits history)
+-- A Snapshot is a way of converting a History into a Directory.
+-- In other words it gives us a snapshot of the history in the form of a directory.
+type Snapshot a
+μ Snapshot a = History a -> Directory
 
--- dropWhile including breaking element
-dropUpTo :: (a -> Bool) -> [a] -> [a]
+-- For example, we have a `git` snapshot or a `pjul` snapshot.
+type Commit
+type GitSnapshot   = Snapshot Commit
 
--- Get a list of the directories in a given history
-getHistoryDirectories :: CommitHistory -> [Directory]
-μ getHistoryDirectories =
-  nub . map fileDirectory . getFiles . getCommits
+type Patch
+type PijulSnapshot = Snapshot Patch
 
--- Helper to get a File's Directory
-fileDirectory :: File -> Directory
-μ fileDirectory file = fst $ fst (μ file)
+-- This is piece de resistance of the design! It turns out,
+-- everything is just a Monad after all.
+--
+-- Our code Browser is a stateful computation of what History
+-- we are currently working with and how to get a Snapshot of it.
+type Browser a b
+μ type Browser a b = ReaderT (Snapshot a) (State (History a) b)
 
-fileHistory :: File -> [Commit]
-μ fileHistory file = snd (μ file)
+-- A function that will retrieve a repository given an
+-- identifier. In our case the identifier is opaque to the system.
+getRepo :: Repo -> Repo
 
--- Gets the all files under a Directory.
--- My thinking is that we could cut off the result of this
--- to have a view of the files and the next directories.
-getDirectoryView :: Directory -> [File] -> [File]
-μ getDirectoryView directory files =
-  filter (\file -> directory `isPrefixOf` fileDirectory file) [] files
+-- Find a particular History in the Repo. Again, how these things
+-- are equated and found is opaque, but we can think of them as
+-- branch or tag labels.
+getHistory :: Eq a => History a -> Repo a -> Maybe (History a)
+μ getHistory history repo =
+  find history (μ repo)
 
--- Check that the path of the first directory is a prefix to the
--- path of the second directory
--- i.e. /home/foo `isPrefixOf` /home/foo/bar == True
---      forall d. d `isPrefixOf` d == True
-isPrefixOf :: Directory -> Directory -> Bool
-μ isPrefixOf prefix directory = μ prefix `List.isPrefixOf` μ directory
+-- Find if a particular artefact occurs in 0 or more histories.
+findInHistories :: a -> [History a] -> [History a]
+μ findInHistories a histories =
+  filterMaybe (findInHistory a) histories
 
--- Get the Files for this set of commits
-getFiles :: [Commit] -> [File]
-μ getFiles commits =
-  concatMap assocs $
-    foldr (\commit -> foldr (\change -> union (buildChangeMap commit change)) mapEmpty (getCommitChanges commit))
-          []
-          commits
+-- Find a particular artefact is in a history.
+findInHistory :: Eq a => a -> History a -> Maybe a
+μ findInHistory a history = find (== a) (μ history)
 
--- Keep track of how a file changes within a commit
-buildChangeMap :: Commit -> Change -> Map FileName [Commit] -> Map FileName [Commit]
-μ buildChangeMap commit change changeMap = case change of
-  CreateFile filename             -> insertWith filename (commit:) changeMap
-  DeleteFile filename             -> delete filename changeMap
-  MoveFile (filename, filename')  -> insertWith filename' (commit:)
-                                   . changeKey filename filename'
-                                   $ changeMap
-  AddLineToFile filname _ _       -> insertWith filename (commit:) changeMap
-  RemoveLineFromFile filename _ _ -> insertWith filename (commit:) changeMap
+-- A special Label that guarantees a starting point, i.e. ~
+rootLabel :: Label
+μ rootLabel = "~"
 
-directoryHistory :: CommitHistory -> Directory -> [Commit]
-μ directoryHistory history directory =
-  foldMap fileHistory (getDirectoryView directory (getFiles history))
+emptyRepoRoot :: Directory
+μ emptyRepoRoot = (rootLabel, IsRepo :| [])
 
--- To get FileContents for a certain commit we can do:
--- @fileContentsUpTo file (getHistoryTo commit)@
-fileContentsUpTo :: File -> [Commit] -> FileContents
-μ fileContentsUpTo file commits =
-  foldr applyChange emptyFileContents
-  . filter (\change -> changeFile change == fst (μ file))
-  $ commits
+-- Get the difference between two directory views.
+diff :: Directory -> Directory -> Diff
 
--- See the up-to-date view of a File
-currentFileContents :: File -> FileContents
-μ currentFileContents file =
-  fileContentsUpTo file . foldMap getCommitChanges $ snd (μ file)
+-- List the current file or directories in a given Directory view.
+listDirectory :: Directory -> [Label, SystemType]
+μ listDirectory directory = foldMap toLabel $ snd (μ directory)
+  where
+    toLabel content = case content of
+      File      (label, _) -> [(label, IsFile)]
+      Directory (label, _) -> [(label, IsDirectory)]
+      IsRepo               -> []
 
-applyChange :: Change -> FileContents -> FileContents
-μ applyChange change fileContents = case change of
-  AddLineToFile _ location fileContents' -> addLine location fileContents' fileContents
-  RemoveLineFromFile _ location          -> removeLine location fileContents
-  -- These operations don't modify contents per se but rather just modify the file
-  MoveFile _ _                           -> fileContents
-  CreateFile _                           -> fileContents
-  -- Deleting will set FileContents to nothing
-  DeleteFile _                           -> emptyFileContents
-
-fileName :: File -> FileName
+fileName :: File -> Label
 μ fileName file = fst (μ file)
 
--- Eliding details because they should be trivial getters on Commit metadata
-commitAuthor :: Commit -> Author
-commitHash :: Commit -> Hash
-commitDate :: Commit -> Date
-commitMessage :: Commit -> Message
-commitSignature :: Commit -> Maybe Signature
+findFile :: NonEmpty Label -> Directory -> Maybe File
+μ findFile (label :| labels) (Directory (label', contents)) =
+  if label == label' then go labels contents else Nothing
+  where
+    findFileWithLabel :: Foldable f => Label -> f DirectoryContents -> Maybe File
+    findFileWithLabel label = find (\artefact -> case content of
+      File (fileLabel, _) -> fileLabel == label
+      Directory _         -> False
+      IsRepo              -> False)
 
-signCommit :: Key -> Commit -> Commit
-μ signCommit key commit = μ commit { signature = sign key }
+    go :: [Label] -> NonEmpty DirectoryContents -> Just File
+    go []             _        = Nothing
+    go [label]        contents = findMaybe (fileWithLabel label) contents
+    go (label:labels) contents = (go labels . snd) <$> find ((label ==) . fst) onlyDirectories contents
 
-commitParents :: Commit -> [Commit]
-μ commitParents commit = snd (μ commit)
+onlyDirectories :: Foldable f => f DirectoryContents -> [Directory]
+μ onlyDirectories = fmapMaybe (\content -> case content of
+  d@(Directory _) -> Just d
+  File _          -> Nothing
+  IsRepo          -> Nothing) . toList
 
-commitChildren :: Repo -> Commit -> [Commit]
-μ commitChildren repo commit =
-  foldMap (dropWhile (/= commit) . getCommits) (μ repo)
+getSubDirectories :: Directory -> [Directory]
+μ getSubDirectories directory = foldMap f $ snd (μ directory)
+  where
+    f :: DirectoryContents -> [Directory]
+    f = \case
+      d@(Directory _) -> [d]
+      File _          -> []
+      IsRepo          -> []
 
-findAuthorCommits :: Author -> [Commit] -> [Commit]
-μ findAuthorCommits author commits = filter ((== author) . commitAuthor) commits
+-- Definition elided
+findDirectory :: NonEmpty Label -> Directory -> Maybe Directory
 
-getCommitByHash :: Hash -> CommitHistory -> Maybe Commit
-μ getCommitByHash hash history = find ((== hash) . commitHash) (snd $ μ history)
+-- Definition elided
+fuzzyFind :: Label -> [Directory]
 
-getRepoCommit :: Hash -> Repo -> Maybe Commit
-μ getRepoCommit hash repo = findMaybe (getCommitByHash hash) (getCommitHistories repo)
+-- A Git Snapshot is grabbing the HEAD commit of your History
+-- and turning it into a Directory
+gitSnapshot :: Snapshot Commit
+μ gitSnapshot commits = second (\root -> root <> getDirectoryPtr $ Nel.head commits) emptyRepoRoot
 
-findMaybe :: (a -> Maybe b) -> [a] -> Maybe b
+-- Opaque and defined by the backend
+getDirectoryPtr :: Commit -> Directory
 
-getCommitChanges :: Commit -> [Change]
-μ getCommitChanges commit = third id (μ commit)
+-- A Pijul history is semantically applying the patches in a
+-- topological order and achieving the Directory view.
+pijulHistory :: Snapshot Patch
+μ pijulHistory = foldl pijulMagic emptyRepoRoot
 
--- Properties
+-- Opaque and defined by the backend
+pijulMagic :: Patch -> Directory -> Directory
 
--- If the File's commits are equivalent to the commits in the CommitHistory
--- this implies that the File should be an element of the File's we can build
--- from the CommitHistory.
-file_must_exist_in_history :: Property
-file_must_exist_in_history = ∀ file history. fileHistory file ≡ getCommits history ⇒ file ∈ getFiles (getCommits history)
+-- Get the current History we are working with.
+getHistory :: Browser a (History a)
+μ getHistory = get
 
--- Building a File from from its own Commits should result back in the file
--- itself.
-file_is_its_history :: Property
-file_is_its_history = ∀ file. getFiles (fileHistory file) ≡ [file]
+setHistory :: History a -> Browser a ()
+μ setHistory = put
 
--- Getting the [Directory] from CommitHistory should be equivalent to building
--- the [File] and getting their Directory
-files_and_directories :: Property
-files_and_directories = ∀ history. getHistoryDirectories history ≡ map fileDirectory (getFiles (getCommits history))
+-- Get the current Directory in the Browser
+getDirectory :: Browser a Directory
+μ getDirectory = do
+  hist <- get
+  applySnapshot <- ask
+  pure $ applySnapshot hist
+
+-- We modify the history by changing the internal history state.
+switchHistory :: (History a -> History a) -> Browser a b
+μ switchHistory f = modify f
+
+-- | Find the suffix of a History.
+findSuffix :: Eq a => a -> History a -> Maybe (History a)
+μ findSuffix a = nonEmpty . Nel.dropWhile (/= a)
+
+-- View the history up to a given point by supplying a function to modify
+-- the state. If this operation fails, then the default value is used.
+viewAt :: (History a -> Maybe (History a)) -> History a -> Browser a b
+μ viewAt f def = switchHistory (fromMaybe def . f)
 ```
