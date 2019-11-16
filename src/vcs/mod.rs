@@ -8,6 +8,21 @@ impl<A> History<A> {
     pub fn iter<'a>(&'a self) -> impl Iterator<Item = &A> + 'a {
         self.0.iter()
     }
+
+    pub fn find_suffix(&self, artifact: &A) -> Option<Self>
+    where
+        A: Clone + PartialEq,
+    {
+        let new_history: Option<NonEmpty<A>> = NonEmpty::from_slice(
+            &self
+                .iter()
+                .cloned()
+                .take_while(|current| *current != *artifact)
+                .collect::<Vec<_>>(),
+        );
+
+        new_history.map(History)
+    }
 }
 
 pub struct Repo<A>(pub Vec<History<A>>);
@@ -15,11 +30,6 @@ pub struct Repo<A>(pub Vec<History<A>>);
 pub struct Browser<'browser, Repo, A> {
     snapshot: Box<dyn Fn(&History<A>) -> Directory<Repo> + 'browser>,
     history: History<A>,
-}
-
-pub enum ViewResult {
-    Success,
-    Failure,
 }
 
 impl<'browser, Repo, A> Browser<'browser, Repo, A> {
@@ -45,25 +55,12 @@ impl<'browser, Repo, A> Browser<'browser, Repo, A> {
         self.history = f(&self.history)
     }
 
-    pub fn view_at(&mut self, artifact: A) -> ViewResult
+    pub fn view_at<F>(&mut self, default_history: History<A>, f: F)
     where
         A: PartialEq + Clone,
+        F: Fn(&History<A>) -> Option<History<A>>,
     {
-        let new_history: Option<NonEmpty<A>> = NonEmpty::from_slice(
-            &self
-                .history
-                .iter()
-                .cloned()
-                .take_while(|current| *current != artifact)
-                .collect::<Vec<_>>(),
-        );
-        match new_history {
-            Some(h) => {
-                self.set_history(History(h));
-                ViewResult::Success
-            }
-            None => ViewResult::Failure,
-        }
+        self.modify_history(|history| f(history).unwrap_or(default_history.clone()))
     }
 }
 
