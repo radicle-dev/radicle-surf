@@ -1,4 +1,4 @@
-FROM rust:1.37.0-slim-buster
+FROM rust:1.39.0-slim-buster
 
 # Install additional packages
 RUN apt-get update \
