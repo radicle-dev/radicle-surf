@@ -254,19 +254,12 @@ getDirectory :: Browser a Directory
 switchHistory :: (History a -> History a) -> Browser a b
 μ switchHistory f = modify f
 
-type ViewResult
-μ ViewResult = Fail | Success
+-- | Find the suffix of a History.
+findSuffix :: Eq a => a -> History a -> Maybe (History a)
+μ findSuffix a = nonEmpty . Nel.dropWhile (/= a)
 
--- View the history up to a given point
--- Returns Success if @a@ existed in the history and we
--- could successfully set a new history.
---
--- Returns Failure if @a@ was not in the history and
--- we did not modify the history.
-viewAt :: Eq a => a -> Browser a ViewResult
-μ viewAt a = do
-  hist <- get
-  case nonEmpty $ Nel.dropWhile (/= a) hist of
-    Nothing -> pure Failure
-    Just h -> setHistory h *> pure Success
+-- View the history up to a given point by supplying a function to modify
+-- the state. If this operation fails, then the default value is used.
+viewAt :: (History a -> Maybe (History a)) -> History a -> Browser a b
+μ viewAt f def = switchHistory (fromMaybe def . f)
 ```
