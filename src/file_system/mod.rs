@@ -410,7 +410,7 @@ pub mod tests {
             label: Label::root_label(),
             entries: NonEmpty::new(DirectoryContents::file(
                 "foo.hs".into(),
-                "module Banana ...".into(),
+                "module Banana ...".as_bytes(),
             )),
         };
 
@@ -420,9 +420,9 @@ pub mod tests {
 
     #[test]
     fn list_directory() {
-        let foo = DirectoryContents::file("foo.hs".into(), "module Banana ...".into());
-        let bar = DirectoryContents::file("bar.hs".into(), "module Banana ...".into());
-        let baz = DirectoryContents::file("baz.hs".into(), "module Banana ...".into());
+        let foo = DirectoryContents::file("foo.hs".into(), "module Banana ...".as_bytes());
+        let bar = DirectoryContents::file("bar.hs".into(), "module Banana ...".as_bytes());
+        let baz = DirectoryContents::file("baz.hs".into(), "module Banana ...".as_bytes());
 
         let mut files = NonEmpty::new(foo);
         files.push(bar);
