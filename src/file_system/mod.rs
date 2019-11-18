@@ -87,14 +87,55 @@ impl Path {
     ///
     /// ```
     /// use radicle_surf::file_system::{Path, Label};
+    /// use nonempty::NonEmpty;
     ///
     /// let path = Path::from_labels(Label::root_label(), &["foo".into(), "bar".into(), "baz.rs".into()]);
-    /// println!("{:#?}", path);
+    ///
+    /// let mut expected = Path::root_path();
+    /// expected.push("foo".into());
+    /// expected.push("bar".into());
+    /// expected.push("baz.rs".into());
+    ///
+    /// assert_eq!(path, expected);
     /// ```
     pub fn from_labels(root: Label, labels: &[Label]) -> Path {
         let mut path = Path(NonEmpty::new(root));
         labels.iter().cloned().for_each(|l| path.push(l));
         path
+    }
+
+    /// Convert a raw string literal to a `Path`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use radicle_surf::file_system::{Path};
+    ///
+    /// let path = Path::from_string("foo/bar/baz.rs");
+    ///
+    /// let expected = Path::from_labels("foo".into(), &["bar".into(), "baz.rs".into()]);
+    ///
+    /// assert_eq!(path, expected);
+    /// ```
+    ///
+    /// ```
+    /// use radicle_surf::file_system::{Path};
+    ///
+    /// let path = Path::from_string("foo/bar/baz/");
+    ///
+    /// let expected = Path::from_labels("foo".into(), &["bar".into(), "baz".into()]);
+    ///
+    /// assert_eq!(path, expected);
+    /// ```
+    pub fn from_string(path: &str) -> Self {
+        NonEmpty::from_slice(
+            &path
+                .trim_matches('/')
+                .split('/')
+                .map(|l| l.into())
+                .collect::<Vec<_>>(),
+        )
+        .map_or(Path::root_path(), Path)
     }
 }
 
