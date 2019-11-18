@@ -30,7 +30,7 @@ pub struct Diff(pub Vec<Change>);
 impl Diff {
     // TODO(fintan): This is a bit more involved going to elide for now
     #[allow(dead_code)]
-    fn diff<Repo>(_directory: Directory<Repo>, _directory_: Directory<Repo>) -> Self {
+    fn diff<Repo>(_directory: Directory, _directory_: Directory) -> Self {
         unimplemented!()
     }
 }

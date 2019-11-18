@@ -147,7 +147,7 @@ pub trait RepoBackend
 where
     Self: Sized,
 {
-    fn new() -> Directory<Self>;
+    fn new() -> Directory;
 }
 
 /// A `DirectoryContents` is made up of either:
@@ -157,15 +157,15 @@ where
 ///   special Repository directory, but is opaque
 ///   to the user.
 #[derive(Debug, Clone)]
-pub enum DirectoryContents<Repo> {
-    SubDirectory(Box<Directory<Repo>>),
+pub enum DirectoryContents {
+    SubDirectory(Box<Directory>),
     File(File),
-    Repo(Repo),
+    Repo,
 }
 
-impl<Repo> DirectoryContents<Repo> {
+impl DirectoryContents {
     /// Helper constructor for a `SubDirectory`.
-    pub fn sub_directory(directory: Directory<Repo>) -> Self {
+    pub fn sub_directory(directory: Directory) -> Self {
         DirectoryContents::SubDirectory(Box::new(directory))
     }
 
@@ -175,8 +175,8 @@ impl<Repo> DirectoryContents<Repo> {
     }
 
     /// Helper constructor for a `Repo`.
-    pub fn repo(repo: Repo) -> Self {
-        DirectoryContents::Repo(repo)
+    pub fn repo() -> Self {
+        DirectoryContents::Repo
     }
 }
 
@@ -185,9 +185,9 @@ impl<Repo> DirectoryContents<Repo> {
 /// should be at least on entry. This is because empty
 /// directories doe not exist in VCSes.
 #[derive(Debug, Clone)]
-pub struct Directory<Repo> {
+pub struct Directory {
     pub label: Label,
-    pub entries: NonEmpty<DirectoryContents<Repo>>,
+    pub entries: NonEmpty<DirectoryContents>,
 }
 
 /// A `File` consists of its file name (a `Label`) and
@@ -221,10 +221,10 @@ impl SystemType {
     }
 }
 
-impl<Repo> Directory<Repo> {
+impl Directory {
     /// An empty root `Directory`, just containing
     /// the special repository directory.
-    pub fn empty_root() -> Self
+    pub fn empty_root<Repo>() -> Self
     where
         Repo: RepoBackend,
     {
@@ -232,17 +232,14 @@ impl<Repo> Directory<Repo> {
     }
 
     /// List the current `Directory`'s files and sub-directories.
-    pub fn list_directory(&self) -> Vec<(Label, SystemType)>
-    where
-        Repo: Clone,
-    {
+    pub fn list_directory(&self) -> Vec<(Label, SystemType)> {
         self.entries
             .iter()
             .cloned()
             .filter_map(|entry| match entry {
                 DirectoryContents::SubDirectory(dir) => Some(SystemType::directory(dir.label)),
                 DirectoryContents::File(file) => Some(SystemType::file(file.filename)),
-                DirectoryContents::Repo(_) => None,
+                DirectoryContents::Repo => None,
             })
             .collect()
     }
@@ -252,10 +249,7 @@ impl<Repo> Directory<Repo> {
     ///
     /// This operation fails if the path does not lead to
     /// the `File`.
-    pub fn find_file(&self, path: Path) -> Option<File>
-    where
-        Repo: Clone + std::fmt::Debug,
-    {
+    pub fn find_file(&self, path: Path) -> Option<File> {
         let (path, filename) = path.split_last();
         let path = NonEmpty::from_slice(&path);
 
@@ -270,10 +264,7 @@ impl<Repo> Directory<Repo> {
     ///
     /// This operation fails if the path does not lead to
     /// the `Directory`.
-    pub fn find_directory(&self, path: Path) -> Option<Self>
-    where
-        Repo: Clone,
-    {
+    pub fn find_directory(&self, path: Path) -> Option<Self> {
         let (label, labels) = path.split_first();
         if *label == self.label {
             // recursively dig down into sub-directories
@@ -292,16 +283,13 @@ impl<Repo> Directory<Repo> {
     }
 
     /// Get the sub directories of a `Directory`.
-    fn get_sub_directories(&self) -> Vec<Self>
-    where
-        Repo: Clone,
-    {
+    fn get_sub_directories(&self) -> Vec<Self> {
         self.entries
             .iter()
             .filter_map(|entry| match entry {
                 DirectoryContents::SubDirectory(dir) => Some(*dir.clone()),
                 DirectoryContents::File(_) => None,
-                DirectoryContents::Repo(_) => None,
+                DirectoryContents::Repo => None,
             })
             .collect()
     }
@@ -309,10 +297,7 @@ impl<Repo> Directory<Repo> {
     /// Get the a sub directory of a `Directory` given its name.
     ///
     /// This operation fails if the directory does not exist.
-    fn get_sub_directory(&self, label: &Label) -> Option<Self>
-    where
-        Repo: Clone,
-    {
+    fn get_sub_directory(&self, label: &Label) -> Option<Self> {
         self.get_sub_directories()
             .iter()
             .cloned()
@@ -331,7 +316,7 @@ impl<Repo> Directory<Repo> {
                 }
                 DirectoryContents::File(..) => {}
                 DirectoryContents::SubDirectory(_) => {}
-                DirectoryContents::Repo(_) => {}
+                DirectoryContents::Repo => {}
             }
         }
         None
@@ -355,10 +340,10 @@ pub mod tests {
     struct TestRepo {}
 
     impl RepoBackend for TestRepo {
-        fn new() -> Directory<TestRepo> {
+        fn new() -> Directory {
             Directory {
                 label: Label::root_label(),
-                entries: NonEmpty::new(DirectoryContents::Repo(TestRepo {})),
+                entries: NonEmpty::new(DirectoryContents::Repo),
             }
         }
     }
@@ -372,7 +357,7 @@ pub mod tests {
             contents: "module Banana ...".into(),
         };
 
-        let directory: Directory<TestRepo> = Directory {
+        let directory: Directory = Directory {
             label: Label::root_label(),
             entries: NonEmpty::new(DirectoryContents::File(file.clone())),
         };
@@ -393,7 +378,7 @@ pub mod tests {
             contents: "module Banana ...".into(),
         };
 
-        let directory: Directory<TestRepo> = Directory::mkdir(
+        let directory: Directory = Directory::mkdir(
             Label::root_label(),
             Directory::mkdir(
                 "foo".into(),
@@ -412,7 +397,7 @@ pub mod tests {
     fn _404_file_not_found() {
         let file_path = Path::from_labels(Label::root_label(), &["bar.hs".into()]);
 
-        let directory: Directory<TestRepo> = Directory {
+        let directory: Directory = Directory {
             label: Label::root_label(),
             entries: NonEmpty::new(DirectoryContents::file(
                 "foo.hs".into(),
@@ -434,7 +419,7 @@ pub mod tests {
         files.push(bar);
         files.push(baz);
 
-        let directory: Directory<TestRepo> = Directory {
+        let directory: Directory = Directory {
             label: Label::root_label(),
             entries: files,
         };
