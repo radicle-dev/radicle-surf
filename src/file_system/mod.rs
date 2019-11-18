@@ -1,8 +1,9 @@
 use nonempty::NonEmpty;
+use std::collections::HashMap;
 
 /// A label for `Directory` and `File` to
 /// allow for search.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Label(pub String);
 
 impl Label {
@@ -26,7 +27,7 @@ impl From<String> for Label {
 
 /// A non-empty set of labels to define a path
 /// in a directory search.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Path(pub NonEmpty<Label>);
 
 impl Path {
@@ -253,6 +254,10 @@ impl Directory {
             .collect()
     }
 
+    pub fn add_contents(&mut self, entries: NonEmpty<DirectoryContents>) {
+        self.entries.append(&mut entries.into())
+    }
+
     /// Find a `File` in the directory given the `Path` to
     /// the `File`.
     ///
@@ -332,12 +337,42 @@ impl Directory {
     }
 
     /// Helper function for creating a `Directory` with a given sub-directory.
-    #[allow(dead_code)]
     pub(crate) fn mkdir(label: Label, dir: Self) -> Self {
         Directory {
             label,
             entries: NonEmpty::new(DirectoryContents::sub_directory(dir)),
         }
+    }
+
+    pub fn from<Repo>(paths: HashMap<Path, NonEmpty<File>>) -> Self
+    where
+        Repo: RepoBackend,
+    {
+        let mut root = Directory::empty_root::<Repo>();
+        for (dir, files) in paths {
+            let file_entries: NonEmpty<DirectoryContents> =
+                files.map(|f| DirectoryContents::File(f.clone()));
+
+            // Root level files can get added directly
+            if dir.is_root() {
+                root.add_contents(file_entries)
+            } else {
+                // If our file location is ~/foo/bar/baz.hs we
+                // first create bar containing baz.hs then recursively
+                // build up from there.
+                let (prefix, current) = dir.split_last();
+                let mut directory = Directory {
+                    label: current,
+                    entries: file_entries,
+                };
+                for label in prefix {
+                    directory = Directory::mkdir(label, directory);
+                }
+                root.entries
+                    .push(DirectoryContents::SubDirectory(Box::new(directory)))
+            }
+        }
+        root
     }
 }
 
