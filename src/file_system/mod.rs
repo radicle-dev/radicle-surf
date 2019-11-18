@@ -170,8 +170,11 @@ impl DirectoryContents {
     }
 
     /// Helper constructor for a `File`.
-    pub fn file(filename: Label, contents: String) -> Self {
-        DirectoryContents::File(File { filename, contents })
+    pub fn file(filename: Label, contents: &[u8]) -> Self {
+        DirectoryContents::File(File {
+            filename,
+            contents: contents.to_owned(),
+        })
     }
 
     /// Helper constructor for a `Repo`.
@@ -192,10 +195,16 @@ pub struct Directory {
 
 /// A `File` consists of its file name (a `Label`) and
 /// its file contents.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct File {
     pub filename: Label,
-    pub contents: String,
+    pub contents: Vec<u8>,
+}
+
+impl std::fmt::Debug for File {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "File {{ filename: {:#?} }}", self.filename)
+    }
 }
 
 /// `SystemType` is an enumeration over what can be
