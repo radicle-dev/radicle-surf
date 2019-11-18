@@ -8,4 +8,4 @@ edition = "2018"
 
 [dependencies]
 git2 = "0.10.1"
-nonempty = "0.1.2"
+nonempty = "0.1.4"
