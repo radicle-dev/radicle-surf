@@ -138,27 +138,26 @@ where
     type ArtefactId;
 
     /// Find a Repository
-    fn get_repo(identifier: &Self::RepoId) -> Self::Repository;
+    fn get_repo(identifier: &Self::RepoId) -> Option<Self>;
 
     /// Find a History in a Repo given a way to identify it
-    fn get_history(repo: Self::Repository, identifier: &Self::HistoryId) -> Self::History;
+    fn get_history(&'repo self, identifier: &Self::HistoryId) -> Option<Self::History>;
 
     /// Find all histories in a Repo
-    fn get_histories(repo: Self::Repository) -> Vec<Self::History>;
+    fn get_histories(&'repo self) -> Vec<Self::History>;
 
     /// Identify artifacts of a Repository
-    fn get_identifier(artifact: &A) -> &Self::ArtefactId;
+    fn get_identifier(artifact: &'repo A) -> Self::ArtefactId;
 
     /// Turn a Repository History into a radicle-surf History
-    fn to_history(history: &Self::History) -> History<A>;
+    fn to_history(&'repo self, history: Self::History) -> Option<History<A>>;
 
     /// Turn a Repository into a radicle-surf Repository
-    fn to_repo(repo: Self::Repository) -> Repo<A> {
-        Repo(
-            Self::get_histories(repo)
-                .iter()
-                .map(|history| Self::to_history(history))
-                .collect(),
-        )
+    fn to_repo(&'repo self) -> Repo<A> {
+        let histories = self
+            .get_histories()
+            .into_iter()
+            .filter_map(|h| self.to_history(h));
+        Repo(histories.collect())
     }
 }
