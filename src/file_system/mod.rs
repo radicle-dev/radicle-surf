@@ -242,7 +242,7 @@ impl Directory {
     where
         Repo: RepoBackend,
     {
-        Repo::new()
+        Directory::mkdir(Label::root_label(), Repo::new())
     }
 
     /// List the current `Directory`'s files and sub-directories.
