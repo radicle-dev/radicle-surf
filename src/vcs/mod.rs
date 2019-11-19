@@ -78,12 +78,13 @@ pub struct Repo<A>(pub Vec<History<A>>);
 /// A `Browser` is a way of rendering a `History` into a
 /// `Directory` snapshot, and the current `History` it is
 /// viewing.
-pub struct Browser<'browser, A> {
-    snapshot: Box<dyn Fn(&History<A>) -> Directory + 'browser>,
+pub struct Browser<'browser, Repo, A> {
+    snapshot: Box<dyn Fn(&Repo, &History<A>) -> Directory + 'browser>,
     history: History<A>,
+    repository: &'browser Repo,
 }
 
-impl<'browser, A> Browser<'browser, A> {
+impl<'browser, Repo, A> Browser<'browser, Repo, A> {
     /// Get the current `History` the `Browser` is viewing.
     pub fn get_history(&self) -> History<A>
     where
@@ -99,7 +100,7 @@ impl<'browser, A> Browser<'browser, A> {
 
     /// Render the `Directory` for this `Browser`.
     pub fn get_directory(&self) -> Directory {
-        (self.snapshot)(&self.history)
+        (self.snapshot)(&self.repository, &self.history)
     }
 
     /// Modify the `History` in this `Browser`.
