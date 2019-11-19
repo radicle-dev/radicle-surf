@@ -118,7 +118,7 @@ impl<'browser, Repo, A> Browser<'browser, Repo, A> {
         A: PartialEq + Clone,
         F: Fn(&History<A>) -> Option<History<A>>,
     {
-        self.modify_history(|history| f(history).unwrap_or(default_history.clone()))
+        self.modify_history(|history| f(history).unwrap_or_else(|| default_history.clone()))
     }
 }
 
