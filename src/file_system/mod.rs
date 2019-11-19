@@ -129,14 +129,18 @@ impl Path {
     /// assert_eq!(path, expected);
     /// ```
     pub fn from_string(path: &str) -> Self {
-        NonEmpty::from_slice(
-            &path
-                .trim_matches('/')
-                .split('/')
-                .map(|l| l.into())
-                .collect::<Vec<_>>(),
-        )
-        .map_or(Path::root_path(), Path)
+        if path.is_empty() {
+            Path::root_path()
+        } else {
+            NonEmpty::from_slice(
+                &path
+                    .trim_matches('/')
+                    .split('/')
+                    .map(|l| l.into())
+                    .collect::<Vec<_>>(),
+            )
+            .map_or(Path::root_path(), Path)
+        }
     }
 }
 
