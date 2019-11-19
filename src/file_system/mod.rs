@@ -152,7 +152,7 @@ pub trait RepoBackend
 where
     Self: Sized,
 {
-    fn new() -> Directory;
+    fn repo_directory() -> Directory;
 }
 
 /// A `DirectoryContents` is made up of either:
@@ -242,7 +242,7 @@ impl Directory {
     where
         Repo: RepoBackend,
     {
-        Directory::mkdir(Label::root(), Repo::new())
+        Directory::mkdir(Label::root(), Repo::repo_directory())
     }
 
     /// List the current `Directory`'s files and sub-directories.
@@ -388,7 +388,7 @@ pub mod tests {
     struct TestRepo {}
 
     impl RepoBackend for TestRepo {
-        fn new() -> Directory {
+        fn repo_directory() -> Directory {
             Directory {
                 label: ".test".into(),
                 entries: NonEmpty::new(DirectoryContents::Repo),
