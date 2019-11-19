@@ -3,12 +3,12 @@ use std::collections::HashMap;
 
 /// A label for `Directory` and `File` to
 /// allow for search.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Label(pub String);
 
 impl Label {
     /// The root label for the root directory, i.e. `"~"`.
-    pub fn root_label() -> Self {
+    pub fn root() -> Self {
         "~".into()
     }
 }
@@ -32,14 +32,14 @@ pub struct Path(pub NonEmpty<Label>);
 
 impl Path {
     /// The root path is the singleton containing the
-    /// root label (see: `root_label`).
-    pub fn root_path() -> Self {
-        Path(NonEmpty::new(Label::root_label()))
+    /// root label (see: `Label::root`).
+    pub fn root() -> Self {
+        Path(NonEmpty::new(Label::root()))
     }
 
     /// Check that this is the root path.
     pub fn is_root(&self) -> bool {
-        *self == Self::root_path()
+        *self == Self::root()
     }
 
     /// Append two `Path`s together.
@@ -90,9 +90,9 @@ impl Path {
     /// use radicle_surf::file_system::{Path, Label};
     /// use nonempty::NonEmpty;
     ///
-    /// let path = Path::from_labels(Label::root_label(), &["foo".into(), "bar".into(), "baz.rs".into()]);
+    /// let path = Path::from_labels(Label::root(), &["foo".into(), "bar".into(), "baz.rs".into()]);
     ///
-    /// let mut expected = Path::root_path();
+    /// let mut expected = Path::root();
     /// expected.push("foo".into());
     /// expected.push("bar".into());
     /// expected.push("baz.rs".into());
@@ -130,7 +130,7 @@ impl Path {
     /// ```
     pub fn from_string(path: &str) -> Self {
         if path.is_empty() {
-            Path::root_path()
+            Path::root()
         } else {
             NonEmpty::from_slice(
                 &path
@@ -139,7 +139,7 @@ impl Path {
                     .map(|l| l.into())
                     .collect::<Vec<_>>(),
             )
-            .map_or(Path::root_path(), Path)
+            .map_or(Path::root(), Path)
         }
     }
 }
@@ -217,7 +217,7 @@ impl std::fmt::Debug for File {
 /// the caller a `Label` and its type.
 ///
 /// See `SystemType::file` and `SystemType::directory`.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SystemType {
     File,
     Directory,
@@ -242,7 +242,7 @@ impl Directory {
     where
         Repo: RepoBackend,
     {
-        Directory::mkdir(Label::root_label(), Repo::new())
+        Directory::mkdir(Label::root(), Repo::new())
     }
 
     /// List the current `Directory`'s files and sub-directories.
@@ -390,15 +390,15 @@ pub mod tests {
     impl RepoBackend for TestRepo {
         fn new() -> Directory {
             Directory {
-                label: Label::root_label(),
+                label: ".test".into(),
                 entries: NonEmpty::new(DirectoryContents::Repo),
             }
         }
     }
 
     #[test]
-    fn find_added_file() {
-        let file_path = Path::from_labels(Label::root_label(), &["foo.hs".into()]);
+    fn test_find_added_file() {
+        let file_path = Path::from_labels(Label::root(), &["foo.hs".into()]);
 
         let file = File {
             filename: "foo.hs".into(),
@@ -406,7 +406,7 @@ pub mod tests {
         };
 
         let directory: Directory = Directory {
-            label: Label::root_label(),
+            label: Label::root(),
             entries: NonEmpty::new(DirectoryContents::File(file.clone())),
         };
 
@@ -415,9 +415,9 @@ pub mod tests {
     }
 
     #[test]
-    fn find_added_file_long_path() {
+    fn test_find_added_file_long_path() {
         let file_path = Path::from_labels(
-            Label::root_label(),
+            Label::root(),
             &["foo".into(), "bar".into(), "baz.hs".into()],
         );
 
@@ -427,7 +427,7 @@ pub mod tests {
         };
 
         let directory: Directory = Directory::mkdir(
-            Label::root_label(),
+            Label::root(),
             Directory::mkdir(
                 "foo".into(),
                 Directory {
@@ -442,11 +442,11 @@ pub mod tests {
     }
 
     #[test]
-    fn _404_file_not_found() {
-        let file_path = Path::from_labels(Label::root_label(), &["bar.hs".into()]);
+    fn test_404_file_not_found() {
+        let file_path = Path::from_labels(Label::root(), &["bar.hs".into()]);
 
         let directory: Directory = Directory {
-            label: Label::root_label(),
+            label: Label::root(),
             entries: NonEmpty::new(DirectoryContents::file(
                 "foo.hs".into(),
                 "module Banana ...".as_bytes(),
@@ -458,7 +458,7 @@ pub mod tests {
     }
 
     #[test]
-    fn list_directory() {
+    fn test_list_directory() {
         let foo = DirectoryContents::file("foo.hs".into(), "module Banana ...".as_bytes());
         let bar = DirectoryContents::file("bar.hs".into(), "module Banana ...".as_bytes());
         let baz = DirectoryContents::file("baz.hs".into(), "module Banana ...".as_bytes());
@@ -468,7 +468,7 @@ pub mod tests {
         files.push(baz);
 
         let directory: Directory = Directory {
-            label: Label::root_label(),
+            label: Label::root(),
             entries: files,
         };
 
@@ -478,6 +478,61 @@ pub mod tests {
                 SystemType::file("foo.hs".into()),
                 SystemType::file("bar.hs".into()),
                 SystemType::file("baz.hs".into()),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_create_and_list() {
+        let mut directory_map = HashMap::new();
+
+        // Root files set up
+        let mut root_files = NonEmpty::new(File {
+            filename: "foo.rs".into(),
+            contents: "use crate::bar".as_bytes().to_vec(),
+        });
+        root_files.push(File {
+            filename: "bar.rs".into(),
+            contents: "fn hello_world()".as_bytes().to_vec(),
+        });
+        directory_map.insert(Path::root(), root_files);
+
+        // Haskell files set up
+        let mut haskell_files = NonEmpty::new(File {
+            filename: "foo.hs".into(),
+            contents: "module Foo where".as_bytes().to_vec(),
+        });
+        haskell_files.push(File {
+            filename: "bar.hs".into(),
+            contents: "module Bar where".as_bytes().to_vec(),
+        });
+        directory_map.insert(Path(NonEmpty::new("haskell".into())), haskell_files);
+
+        let directory = Directory::from::<TestRepo>(directory_map);
+        let mut directory_contents = directory.list_directory();
+        directory_contents.sort();
+
+        assert_eq!(
+            directory_contents,
+            vec![
+                SystemType::directory(".test".into()),
+                SystemType::file("bar.rs".into()),
+                SystemType::file("foo.rs".into()),
+                SystemType::directory("haskell".into()),
+            ]
+        );
+
+        let sub_directory = directory
+            .find_directory(Path::from_labels("~".into(), &["haskell".into()]))
+            .unwrap();
+        let mut sub_directory_contents = sub_directory.list_directory();
+        sub_directory_contents.sort();
+
+        assert_eq!(
+            sub_directory_contents,
+            vec![
+                SystemType::file("bar.hs".into()),
+                SystemType::file("foo.hs".into()),
             ]
         );
     }
