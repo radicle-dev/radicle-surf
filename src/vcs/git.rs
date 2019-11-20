@@ -83,6 +83,19 @@ impl<'repo> GitBrowser<'repo> {
         })
     }
 
+    pub fn list_branches(&self) -> Result<Vec<String>, Error> {
+        let mut names = Vec::new();
+        let branches = self.repository.0.branches(None)?;
+        for branch_result in branches {
+            let (branch, _) = branch_result?;
+            let name = branch.name()?;
+            if let Some(n) = name {
+                names.push(n);
+            }
+        }
+        Ok(names)
+    }
+
     fn get_tree(
         repo: &Repository,
         commit: &Commit,
