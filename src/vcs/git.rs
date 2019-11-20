@@ -16,7 +16,6 @@ pub type GitBrowser<'repo> = vcs::Browser<'repo, GitRepository, Commit<'repo>, E
 
 impl<'repo> vcs::VCS<'repo, Commit<'repo>, Error> for GitRepository {
     type RepoId = &'repo str;
-    type History = Reference<'repo>;
     type HistoryId = &'repo str;
     type ArtefactId = Oid;
 
@@ -24,16 +23,19 @@ impl<'repo> vcs::VCS<'repo, Commit<'repo>, Error> for GitRepository {
         Repository::open(repo_id).map(GitRepository)
     }
 
-    fn get_history(&'repo self, history_id: Self::HistoryId) -> Result<Self::History, Error> {
-        self.0.resolve_reference_from_short_name(&history_id)
+    fn get_history(&'repo self, history_id: Self::HistoryId) -> Result<GitHistory, Error> {
+        self.0
+            .resolve_reference_from_short_name(&history_id)
+            .and_then(|reference| self.to_history(reference))
     }
 
-    fn get_histories(&'repo self) -> Result<Vec<Self::History>, Error> {
+    fn get_histories(&'repo self) -> Result<Vec<GitHistory>, Error> {
         self.0.references().and_then(|mut references| {
             references.try_fold(vec![], |mut acc, reference| {
-                reference.map(|r| {
-                    acc.push(r);
-                    acc
+                reference.and_then(|r| {
+                    let history = self.to_history(r)?;
+                    acc.push(history);
+                    Ok(acc)
                 })
             })
         })
@@ -42,8 +44,15 @@ impl<'repo> vcs::VCS<'repo, Commit<'repo>, Error> for GitRepository {
     fn get_identifier(artifact: &'repo Commit) -> Self::ArtefactId {
         artifact.id()
     }
+}
 
-    fn to_history(&'repo self, history: Self::History) -> Result<GitHistory, Error> {
+impl<'repo> GitRepository {
+    pub fn head(&'repo self) -> Result<GitHistory, Error> {
+        let head = self.0.head()?;
+        self.to_history(head)
+    }
+
+    pub(crate) fn to_history(&'repo self, history: Reference<'repo>) -> Result<GitHistory, Error> {
         let head = history.peel_to_commit()?;
         let mut commits = NonEmpty::new(head.clone());
         let mut revwalk = self.0.revwalk()?;
@@ -60,18 +69,9 @@ impl<'repo> vcs::VCS<'repo, Commit<'repo>, Error> for GitRepository {
     }
 }
 
-impl<'repo> GitRepository {
-    pub fn head(
-        &'repo self,
-    ) -> Result<<GitRepository as vcs::VCS<'repo, Commit<'repo>, Error>>::History, Error> {
-        self.0.head()
-    }
-}
-
 impl<'repo> GitBrowser<'repo> {
     pub fn new(repository: &'repo GitRepository) -> Result<Self, Error> {
-        let head = repository.head()?;
-        let history = repository.to_history(head)?;
+        let history = repository.head()?;
         let snapshot = Box::new(|repository: &GitRepository, history: &GitHistory| {
             let tree = Self::get_tree(&repository.0, history.0.first())?;
             Ok(file_system::Directory::from::<GitRepository>(tree))
@@ -84,17 +84,13 @@ impl<'repo> GitBrowser<'repo> {
     }
 
     pub fn head(&mut self) -> Result<(), Error> {
-        let head = self.repository.head()?;
-        let history = self.repository.to_history(head)?;
+        let history = self.repository.head()?;
         self.set_history(history);
         Ok(())
     }
 
     pub fn branch(&mut self, branch_name: &'repo str) -> Result<(), Error> {
-        let branch = self
-            .repository
-            .get_history(branch_name)
-            .and_then(|h| self.repository.to_history(h))?;
+        let branch = self.repository.get_history(branch_name)?;
         self.set_history(branch);
         Ok(())
     }

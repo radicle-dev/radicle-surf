@@ -134,9 +134,6 @@ where
     /// The way to identify a Repository.
     type RepoId;
 
-    /// The History type to work with, e.g. Branch, Tag in git.
-    type History;
-
     /// The way to identify a History.
     type HistoryId;
 
@@ -147,28 +144,16 @@ where
     fn get_repo(identifier: Self::RepoId) -> Result<Self, Error>;
 
     /// Find a History in a Repo given a way to identify it
-    fn get_history(&'repo self, identifier: Self::HistoryId) -> Result<Self::History, Error>;
+    fn get_history(&'repo self, identifier: Self::HistoryId) -> Result<History<A>, Error>;
 
     /// Find all histories in a Repo
-    fn get_histories(&'repo self) -> Result<Vec<Self::History>, Error>;
+    fn get_histories(&'repo self) -> Result<Vec<History<A>>, Error>;
 
     /// Identify artifacts of a Repository
     fn get_identifier(artifact: &'repo A) -> Self::ArtefactId;
 
-    /// Turn a Repository History into a radicle-surf History
-    fn to_history(&'repo self, history: Self::History) -> Result<History<A>, Error>;
-
     /// Turn a Repository into a radicle-surf Repository
     fn to_repo(&'repo self) -> Result<Repo<A>, Error> {
-        let histories = self
-            .get_histories()?
-            .into_iter()
-            .try_fold(vec![], |mut acc, history| {
-                self.to_history(history).and_then(|h| {
-                    acc.push(h);
-                    Ok(acc)
-                })
-            });
-        histories.map(Repo)
+        self.get_histories().map(Repo)
     }
 }
