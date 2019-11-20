@@ -123,21 +123,48 @@ impl<'browser, Repo, A, Error> Browser<'browser, Repo, A, Error> {
     }
 }
 
-pub trait VCS<'repo, A: 'repo, Error>
+impl<'browser, Repo, A, Error> VCS<'browser, A, Error> for Browser<'browser, Repo, A, Error>
 where
-    Self: 'repo + Sized,
+    A: 'browser,
+    Error: 'browser,
+    Repo: VCS<'browser, A, Error>,
+{
+    type HistoryId = Repo::HistoryId;
+    type ArtefactId = Repo::ArtefactId;
+
+    fn get_history(&'browser self, identifier: Self::HistoryId) -> Result<History<A>, Error> {
+        self.repository.get_history(identifier)
+    }
+
+    fn get_histories(&'browser self) -> Result<Vec<History<A>>, Error> {
+        self.repository.get_histories()
+    }
+
+    fn get_identifier(artifact: &'browser A) -> Self::ArtefactId {
+        Repo::get_identifier(artifact)
+    }
+}
+
+pub(crate) trait GetVCS<'repo, Error>
+where
+    Self: Sized,
 {
     /// The way to identify a Repository.
     type RepoId;
 
+    /// Find a Repository
+    fn get_repo(identifier: Self::RepoId) -> Result<Self, Error>;
+}
+
+pub trait VCS<'repo, A: 'repo, Error>
+where
+    Self: 'repo + Sized,
+{
     /// The way to identify a History.
     type HistoryId;
 
     /// The way to identify an artifact.
     type ArtefactId;
-
-    /// Find a Repository
-    fn get_repo(identifier: Self::RepoId) -> Result<Self, Error>;
 
     /// Find a History in a Repo given a way to identify it
     fn get_history(&'repo self, identifier: Self::HistoryId) -> Result<History<A>, Error>;
