@@ -84,16 +84,18 @@ impl<'repo> GitBrowser<'repo> {
     }
 
     pub fn list_branches(&self) -> Result<Vec<String>, Error> {
-        let mut names = Vec::new();
-        let branches = self.repository.0.branches(None)?;
-        for branch_result in branches {
-            let (branch, _) = branch_result?;
-            let name = branch.name()?;
-            if let Some(n) = name {
-                names.push(n.to_string());
-            }
-        }
-        Ok(names)
+        self.repository.0.branches(None).and_then(|mut branches| {
+            branches.try_fold(vec![], |mut acc, branch| {
+                let (branch, _) = branch?;
+                let branch_name = branch.name()?;
+                if let Some(name) = branch_name {
+                    acc.push(name.to_string());
+                    Ok(acc)
+                } else {
+                    Err(Error::from_str("Failed to decode branch name"))
+                }
+            })
+        })
     }
 
     fn get_tree(
