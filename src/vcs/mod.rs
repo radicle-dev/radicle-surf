@@ -75,16 +75,21 @@ impl<A> History<A> {
 /// then the `Repo` is in its initial state.
 pub struct Repo<A>(pub Vec<History<A>>);
 
+/// A Snapshot is a function that renders a `Directory` given
+/// the `Repo` object and a `History` of artifacts.
+type Snapshot<'browser, A, Repo, Error> =
+    Box<dyn Fn(&Repo, &History<A>) -> Result<Directory, Error> + 'browser>;
+
 /// A `Browser` is a way of rendering a `History` into a
 /// `Directory` snapshot, and the current `History` it is
 /// viewing.
-pub struct Browser<'browser, Repo, A> {
-    snapshot: Box<dyn Fn(&Repo, &History<A>) -> Directory + 'browser>,
+pub struct Browser<'browser, Repo, A, Error> {
+    snapshot: Snapshot<'browser, A, Repo, Error>,
     history: History<A>,
     repository: &'browser Repo,
 }
 
-impl<'browser, Repo, A> Browser<'browser, Repo, A> {
+impl<'browser, Repo, A, Error> Browser<'browser, Repo, A, Error> {
     /// Get the current `History` the `Browser` is viewing.
     pub fn get_history(&self) -> History<A>
     where
@@ -99,7 +104,7 @@ impl<'browser, Repo, A> Browser<'browser, Repo, A> {
     }
 
     /// Render the `Directory` for this `Browser`.
-    pub fn get_directory(&self) -> Directory {
+    pub fn get_directory(&self) -> Result<Directory, Error> {
         (self.snapshot)(&self.repository, &self.history)
     }
 
