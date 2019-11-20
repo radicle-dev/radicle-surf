@@ -1,7 +1,7 @@
 use crate::file_system;
 use crate::vcs;
 use crate::vcs::VCS;
-use git2::{Branch, BranchType, Commit, Error, Oid, Repository, TreeWalkMode, TreeWalkResult};
+use git2::{Commit, Error, Oid, Reference, Repository, TreeWalkMode, TreeWalkResult};
 use nonempty::NonEmpty;
 use std::collections::HashMap;
 
@@ -16,8 +16,8 @@ pub type GitBrowser<'repo> = vcs::Browser<'repo, GitRepository, Commit<'repo>>;
 
 impl<'repo> vcs::VCS<'repo, Commit<'repo>> for GitRepository {
     type RepoId = String;
-    type History = Branch<'repo>;
-    type HistoryId = (String, BranchType);
+    type History = Reference<'repo>;
+    type HistoryId = String;
     type ArtefactId = Oid;
 
     fn get_repo(repo_id: &Self::RepoId) -> Option<Self> {
@@ -25,18 +25,15 @@ impl<'repo> vcs::VCS<'repo, Commit<'repo>> for GitRepository {
     }
 
     fn get_history(&'repo self, history_id: &Self::HistoryId) -> Option<Self::History> {
-        self.0.find_branch(&history_id.0, history_id.1).ok()
+        self.0.resolve_reference_from_short_name(&history_id).ok()
     }
 
     fn get_histories(&'repo self) -> Vec<Self::History> {
         let mut histories = Vec::new();
-        let _: Result<(), Error> = self.0.branches(None).map(|branches| {
-            branches
-                .filter_map(|branch| branch.ok())
-                .for_each(|(branch, _)| {
-                    println!("Grabbing branch: {:#?}", branch.name());
-                    histories.push(branch)
-                });
+        let _: Result<(), Error> = self.0.references().map(|references| {
+            references
+                .filter_map(|reference| reference.ok())
+                .for_each(|reference| histories.push(reference));
         });
         histories
     }
@@ -46,7 +43,7 @@ impl<'repo> vcs::VCS<'repo, Commit<'repo>> for GitRepository {
     }
 
     fn to_history(&'repo self, history: Self::History) -> Option<GitHistory> {
-        let head = history.get().peel_to_commit().ok()?;
+        let head = history.peel_to_commit().ok()?;
         let mut commits = NonEmpty::new(head.clone());
         let mut revwalk = self.0.revwalk().ok()?;
 
@@ -62,19 +59,23 @@ impl<'repo> vcs::VCS<'repo, Commit<'repo>> for GitRepository {
     }
 }
 
+impl<'repo> GitRepository {
+    pub fn head(&'repo self) -> Option<<GitRepository as vcs::VCS<'repo, Commit<'repo>>>::History> {
+        self.0.head().ok()
+    }
+}
+
 impl<'repo> GitBrowser<'repo> {
     pub fn new(repository: &'repo GitRepository) -> Self {
-        let master = repository
-            .get_history(&("master".to_string(), BranchType::Local))
-            .expect("Could not fetch 'master' branch");
-        let master = repository.to_history(master).unwrap();
+        let head = repository.head().expect("Could not fetch 'master' branch");
+        let head = repository.to_history(head).unwrap();
         vcs::Browser {
             snapshot: Box::new(|repository, history| {
                 file_system::Directory::from::<GitRepository>(
                     Self::get_tree(&repository.0, history.0.first()).unwrap(),
                 )
             }),
-            history: master,
+            history: head,
             repository: &repository,
         }
     }
@@ -151,7 +152,6 @@ mod tests {
     use rm_rf;
     use std::panic;
 
-    #[cfg(test)]
     fn setup_golden_dir() {
         let repo =
             Repository::init("./data/git-test").expect("Failed to initialise './data/git-test'");
@@ -179,13 +179,11 @@ mod tests {
         .expect("Could not make first commit on './data/git-test'");
     }
 
-    #[cfg(test)]
     fn teardown_golden_dir() {
         rm_rf::ensure_removed("./data/git-test/.git")
             .expect("Failed to remove '.git' directory in './data/git-test'")
     }
 
-    #[cfg(test)]
     fn run_git_test<T>(test: T) -> ()
     where
         T: FnOnce() -> () + panic::UnwindSafe,
@@ -204,7 +202,6 @@ mod tests {
         run_git_test(test_dir)
     }
 
-    #[cfg(test)]
     fn test_dir() {
         let repo: GitRepository = vcs::VCS::get_repo(&String::from("./data/git-test"))
             .expect("Could not retrieve ./data/git-test as git repository");
