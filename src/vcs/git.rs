@@ -98,6 +98,14 @@ impl<'repo> GitBrowser<'repo> {
         })
     }
 
+    pub fn list_tags(&self) -> Result<Vec<String>, Error> {
+        let tags = self.repository.0.tag_names(None)?;
+        Ok(tags
+            .into_iter()
+            .filter_map(|tag| tag.map(String::from))
+            .collect())
+    }
+
     fn get_tree(
         repo: &Repository,
         commit: &Commit,
