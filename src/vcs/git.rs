@@ -83,6 +83,22 @@ impl<'repo> GitBrowser<'repo> {
         })
     }
 
+    pub fn head(&mut self) -> Result<(), Error> {
+        let head = self.repository.head()?;
+        let history = self.repository.to_history(head)?;
+        self.set_history(history);
+        Ok(())
+    }
+
+    pub fn branch(&mut self, branch_name: &'repo str) -> Result<(), Error> {
+        let branch = self
+            .repository
+            .get_history(branch_name)
+            .and_then(|h| self.repository.to_history(h))?;
+        self.set_history(branch);
+        Ok(())
+    }
+
     pub fn list_branches(&self) -> Result<Vec<String>, Error> {
         self.repository.0.branches(None).and_then(|mut branches| {
             branches.try_fold(vec![], |mut acc, branch| {
