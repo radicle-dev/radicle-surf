@@ -46,6 +46,10 @@ impl<'repo> vcs::VCS<'repo, Commit<'repo>, Error> for GitRepository {
 }
 
 impl<'repo> GitRepository {
+    pub fn new(repo_uri: &str) -> Result<Self, Error> {
+        Repository::init(repo_uri).map(GitRepository)
+    }
+
     pub fn head(&'repo self) -> Result<GitHistory, Error> {
         let head = self.0.head()?;
         self.to_history(head)
@@ -223,7 +227,7 @@ mod tests {
     }
 
     fn test_dir() {
-        let repo: GitRepository = vcs::VCS::get_repo("./data/git-test")
+        let repo = GitRepository::new("./data/git-test")
             .expect("Could not retrieve ./data/git-test as git repository");
         let browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
         let directory = browser.get_directory().expect("Could not render Directory");
