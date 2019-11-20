@@ -172,25 +172,6 @@ impl std::fmt::Debug for GitRepository {
     }
 }
 
-/*
-pub fn list_branches(repo: Repository) -> Result<Vec<String>, Error> {
-    let mut names = Vec::new();
-    let branches: Branches = repo.branches(None)?;
-    for branch_result in branches {
-        let (branch, branch_type) = branch_result?;
-        let name = branch.name()?;
-        if let Some(n) = name {
-            let result = match branch_type {
-                BranchType::Local => format!("local: {}", n),
-                BranchType::Remote => format!("remote: {}", n),
-            };
-            names.push(result);
-        }
-    }
-    Ok(names)
-}
-*/
-
 #[cfg(test)]
 mod tests {
     use crate::file_system::*;
