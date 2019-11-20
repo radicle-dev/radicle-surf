@@ -90,7 +90,7 @@ impl<'repo> GitBrowser<'repo> {
             let (branch, _) = branch_result?;
             let name = branch.name()?;
             if let Some(n) = name {
-                names.push(n);
+                names.push(n.to_string());
             }
         }
         Ok(names)
