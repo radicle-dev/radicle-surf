@@ -147,8 +147,7 @@ pub fn list_branches(repo: Repository) -> Result<Vec<String>, Error> {
 mod tests {
     use crate::file_system::*;
     use crate::vcs::git::*;
-    use git2::IndexAddOption;
-    use git2::IntoCString;
+    use git2::{IndexAddOption, IntoCString, Signature};
     use rm_rf;
     use std::panic;
 
@@ -163,7 +162,8 @@ mod tests {
             .add_all("*".into_c_string(), IndexAddOption::DEFAULT, None)
             .expect("add all files failed");
         let tree_id = index.write_tree().expect("Failed to write Tree object");
-        let signature = repo.signature().expect("Failed to initialise signature");
+        let signature = Signature::now("monadic.xyz", "test@monadic.xyz")
+            .expect("Failed to initialise signature");
         let tree = repo
             .find_tree(tree_id)
             .expect("Failed to initialise Tree object");
