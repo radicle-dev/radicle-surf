@@ -134,7 +134,7 @@ impl<'repo> GitBrowser<'repo> {
             entry
                 .to_object(repo)
                 .map(|object| {
-                    let result = object.as_blob().and_then(|blob| {
+                    object.as_blob().and_then(|blob| {
                         entry.name().and_then(|filename| {
                             let file = file_system::File {
                                 filename: filename.into(),
@@ -146,10 +146,7 @@ impl<'repo> GitBrowser<'repo> {
                             Some(TreeWalkResult::Ok)
                         })
                     });
-                    match result {
-                        Some(walk_result) => walk_result,
-                        None => TreeWalkResult::Skip,
-                    }
+                    TreeWalkResult::Ok
                 })
                 .unwrap_or(TreeWalkResult::Skip)
         })?;
