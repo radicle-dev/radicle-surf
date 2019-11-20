@@ -12,7 +12,7 @@ pub struct GitRepository(pub(crate) Repository);
 
 pub type GitRepo<'repo> = vcs::Repo<Commit<'repo>>;
 pub type GitHistory<'repo> = vcs::History<Commit<'repo>>;
-pub type GitBrowser<'repo> = vcs::Browser<'repo, GitRepository, Commit<'repo>>;
+pub type GitBrowser<'repo> = vcs::Browser<'repo, GitRepository, Commit<'repo>, Error>;
 
 impl<'repo> vcs::VCS<'repo, Commit<'repo>, Error> for GitRepository {
     type RepoId = String;
@@ -63,24 +63,24 @@ impl<'repo> vcs::VCS<'repo, Commit<'repo>, Error> for GitRepository {
 impl<'repo> GitRepository {
     pub fn head(
         &'repo self,
-    ) -> Option<<GitRepository as vcs::VCS<'repo, Commit<'repo>, Error>>::History> {
-        self.0.head().ok()
+    ) -> Result<<GitRepository as vcs::VCS<'repo, Commit<'repo>, Error>>::History, Error> {
+        self.0.head()
     }
 }
 
 impl<'repo> GitBrowser<'repo> {
-    pub fn new(repository: &'repo GitRepository) -> Self {
-        let head = repository.head().expect("Could not fetch 'master' branch");
-        let head = repository.to_history(head).unwrap();
-        vcs::Browser {
-            snapshot: Box::new(|repository, history| {
-                file_system::Directory::from::<GitRepository>(
-                    Self::get_tree(&repository.0, history.0.first()).unwrap(),
-                )
-            }),
-            history: head,
+    pub fn new(repository: &'repo GitRepository) -> Result<Self, Error> {
+        let head = repository.head()?;
+        let history = repository.to_history(head)?;
+        let snapshot = Box::new(|repository: &GitRepository, history: &GitHistory| {
+            let tree = Self::get_tree(&repository.0, history.0.first())?;
+            Ok(file_system::Directory::from::<GitRepository>(tree))
+        });
+        Ok(vcs::Browser {
+            snapshot,
+            history,
             repository: &repository,
-        }
+        })
     }
 
     fn get_tree(
@@ -208,8 +208,8 @@ mod tests {
     fn test_dir() {
         let repo: GitRepository = vcs::VCS::get_repo(&String::from("./data/git-test"))
             .expect("Could not retrieve ./data/git-test as git repository");
-        let browser = GitBrowser::new(&repo);
-        let directory = browser.get_directory();
+        let browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
+        let directory = browser.get_directory().expect("Could not render Directory");
         let mut directory_contents = directory.list_directory();
         directory_contents.sort();
 
