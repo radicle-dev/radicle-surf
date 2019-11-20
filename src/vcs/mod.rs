@@ -122,7 +122,7 @@ impl<'browser, Repo, A> Browser<'browser, Repo, A> {
     }
 }
 
-pub trait VCS<'repo, A: 'repo>
+pub trait VCS<'repo, A: 'repo, Error>
 where
     Self: 'repo + Sized,
 {
@@ -139,26 +139,31 @@ where
     type ArtefactId;
 
     /// Find a Repository
-    fn get_repo(identifier: &Self::RepoId) -> Option<Self>;
+    fn get_repo(identifier: &Self::RepoId) -> Result<Self, Error>;
 
     /// Find a History in a Repo given a way to identify it
-    fn get_history(&'repo self, identifier: &Self::HistoryId) -> Option<Self::History>;
+    fn get_history(&'repo self, identifier: &Self::HistoryId) -> Result<Self::History, Error>;
 
     /// Find all histories in a Repo
-    fn get_histories(&'repo self) -> Vec<Self::History>;
+    fn get_histories(&'repo self) -> Result<Vec<Self::History>, Error>;
 
     /// Identify artifacts of a Repository
     fn get_identifier(artifact: &'repo A) -> Self::ArtefactId;
 
     /// Turn a Repository History into a radicle-surf History
-    fn to_history(&'repo self, history: Self::History) -> Option<History<A>>;
+    fn to_history(&'repo self, history: Self::History) -> Result<History<A>, Error>;
 
     /// Turn a Repository into a radicle-surf Repository
-    fn to_repo(&'repo self) -> Repo<A> {
+    fn to_repo(&'repo self) -> Result<Repo<A>, Error> {
         let histories = self
-            .get_histories()
+            .get_histories()?
             .into_iter()
-            .filter_map(|h| self.to_history(h));
-        Repo(histories.collect())
+            .try_fold(vec![], |mut acc, history| {
+                self.to_history(history).and_then(|h| {
+                    acc.push(h);
+                    Ok(acc)
+                })
+            });
+        histories.map(Repo)
     }
 }
