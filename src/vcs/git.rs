@@ -239,16 +239,8 @@ mod tests {
 
         // Root files set up, note that we're ignoring
         // file contents
-        let mut root_files = NonEmpty::new(File {
+        let root_files = NonEmpty::new(File {
             filename: "Cargo.toml".into(),
-            contents: "".as_bytes().to_vec(),
-        });
-        root_files.push(File {
-            filename: "Cargo.lock".into(),
-            contents: "".as_bytes().to_vec(),
-        });
-        root_files.push(File {
-            filename: ".gitignore".into(),
             contents: "".as_bytes().to_vec(),
         });
         directory_map.insert(Path::root(), root_files);
