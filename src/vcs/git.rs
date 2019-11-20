@@ -127,26 +127,31 @@ impl<'repo> GitBrowser<'repo> {
         commit: &Commit,
     ) -> Result<HashMap<file_system::Path, NonEmpty<file_system::File>>, Error> {
         let mut dir: HashMap<file_system::Path, NonEmpty<file_system::File>> = HashMap::new();
-        let tree = commit.as_object().peel_to_tree().unwrap();
+        let tree = commit.as_object().peel_to_tree()?;
         tree.walk(TreeWalkMode::PreOrder, |s, entry| {
             let path = file_system::Path::from_string(s);
 
-            match entry.to_object(repo) {
-                Ok(object) => {
-                    if let Some(blob) = object.as_blob() {
-                        let filename = entry.name().map(|name| name.into()).unwrap();
-                        let file = file_system::File {
-                            filename,
-                            contents: blob.content().to_owned(),
-                        };
-                        dir.entry(path)
-                            .and_modify(|entries| entries.push(file.clone()))
-                            .or_insert_with(|| NonEmpty::new(file));
-                    };
-                    TreeWalkResult::Ok
-                }
-                Err(_) => TreeWalkResult::Skip,
-            }
+            entry
+                .to_object(repo)
+                .map(|object| {
+                    let result = object.as_blob().and_then(|blob| {
+                        entry.name().and_then(|filename| {
+                            let file = file_system::File {
+                                filename: filename.into(),
+                                contents: blob.content().to_owned(),
+                            };
+                            dir.entry(path)
+                                .and_modify(|entries| entries.push(file.clone()))
+                                .or_insert_with(|| NonEmpty::new(file));
+                            Some(TreeWalkResult::Ok)
+                        })
+                    });
+                    match result {
+                        Some(walk_result) => walk_result,
+                        None => TreeWalkResult::Skip,
+                    }
+                })
+                .unwrap_or(TreeWalkResult::Skip)
         })?;
         Ok(dir)
     }
