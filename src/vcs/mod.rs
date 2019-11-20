@@ -71,10 +71,6 @@ impl<A> History<A> {
     }
 }
 
-/// A `Repo` is a bag of `History`s. If the bag is empty
-/// then the `Repo` is in its initial state.
-pub struct Repo<A>(pub Vec<History<A>>);
-
 /// A Snapshot is a function that renders a `Directory` given
 /// the `Repo` object and a `History` of artifacts.
 type Snapshot<'browser, A, Repo, Error> =
@@ -151,9 +147,4 @@ where
 
     /// Identify artifacts of a Repository
     fn get_identifier(artifact: &'repo A) -> Self::ArtefactId;
-
-    /// Turn a Repository into a radicle-surf Repository
-    fn to_repo(&'repo self) -> Result<Repo<A>, Error> {
-        self.get_histories().map(Repo)
-    }
 }

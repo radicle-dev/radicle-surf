@@ -10,7 +10,6 @@ use std::collections::HashMap;
 /// on the underlying object.
 pub struct GitRepository(pub(crate) Repository);
 
-pub type GitRepo<'repo> = vcs::Repo<Commit<'repo>>;
 pub type GitHistory<'repo> = vcs::History<Commit<'repo>>;
 pub type GitBrowser<'repo> = vcs::Browser<'repo, GitRepository, Commit<'repo>, Error>;
 
