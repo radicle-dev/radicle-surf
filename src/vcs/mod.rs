@@ -144,10 +144,10 @@ where
     type ArtefactId;
 
     /// Find a Repository
-    fn get_repo(identifier: &Self::RepoId) -> Result<Self, Error>;
+    fn get_repo(identifier: Self::RepoId) -> Result<Self, Error>;
 
     /// Find a History in a Repo given a way to identify it
-    fn get_history(&'repo self, identifier: &Self::HistoryId) -> Result<Self::History, Error>;
+    fn get_history(&'repo self, identifier: Self::HistoryId) -> Result<Self::History, Error>;
 
     /// Find all histories in a Repo
     fn get_histories(&'repo self) -> Result<Vec<Self::History>, Error>;
