@@ -14,53 +14,56 @@ pub type GitRepo<'repo> = vcs::Repo<Commit<'repo>>;
 pub type GitHistory<'repo> = vcs::History<Commit<'repo>>;
 pub type GitBrowser<'repo> = vcs::Browser<'repo, GitRepository, Commit<'repo>>;
 
-impl<'repo> vcs::VCS<'repo, Commit<'repo>> for GitRepository {
+impl<'repo> vcs::VCS<'repo, Commit<'repo>, Error> for GitRepository {
     type RepoId = String;
     type History = Reference<'repo>;
     type HistoryId = String;
     type ArtefactId = Oid;
 
-    fn get_repo(repo_id: &Self::RepoId) -> Option<Self> {
-        Repository::open(repo_id).map(GitRepository).ok()
+    fn get_repo(repo_id: &Self::RepoId) -> Result<Self, Error> {
+        Repository::open(repo_id).map(GitRepository)
     }
 
-    fn get_history(&'repo self, history_id: &Self::HistoryId) -> Option<Self::History> {
-        self.0.resolve_reference_from_short_name(&history_id).ok()
+    fn get_history(&'repo self, history_id: &Self::HistoryId) -> Result<Self::History, Error> {
+        self.0.resolve_reference_from_short_name(&history_id)
     }
 
-    fn get_histories(&'repo self) -> Vec<Self::History> {
-        let mut histories = Vec::new();
-        let _: Result<(), Error> = self.0.references().map(|references| {
-            references
-                .filter_map(|reference| reference.ok())
-                .for_each(|reference| histories.push(reference));
-        });
-        histories
+    fn get_histories(&'repo self) -> Result<Vec<Self::History>, Error> {
+        self.0.references().and_then(|mut references| {
+            references.try_fold(vec![], |mut acc, reference| {
+                reference.map(|r| {
+                    acc.push(r);
+                    acc
+                })
+            })
+        })
     }
 
     fn get_identifier(artifact: &'repo Commit) -> Self::ArtefactId {
         artifact.id()
     }
 
-    fn to_history(&'repo self, history: Self::History) -> Option<GitHistory> {
-        let head = history.peel_to_commit().ok()?;
+    fn to_history(&'repo self, history: Self::History) -> Result<GitHistory, Error> {
+        let head = history.peel_to_commit()?;
         let mut commits = NonEmpty::new(head.clone());
-        let mut revwalk = self.0.revwalk().ok()?;
+        let mut revwalk = self.0.revwalk()?;
 
-        revwalk.push(head.id()).ok()?;
+        revwalk.push(head.id())?;
 
         for commit_result_id in revwalk {
-            let commit_id = commit_result_id.ok()?;
-            let commit = self.0.find_commit(commit_id).ok()?;
+            let commit_id = commit_result_id?;
+            let commit = self.0.find_commit(commit_id)?;
             commits.push(commit.clone());
         }
 
-        Some(vcs::History(commits))
+        Ok(vcs::History(commits))
     }
 }
 
 impl<'repo> GitRepository {
-    pub fn head(&'repo self) -> Option<<GitRepository as vcs::VCS<'repo, Commit<'repo>>>::History> {
+    pub fn head(
+        &'repo self,
+    ) -> Option<<GitRepository as vcs::VCS<'repo, Commit<'repo>, Error>>::History> {
         self.0.head().ok()
     }
 }
