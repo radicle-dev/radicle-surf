@@ -15,16 +15,16 @@ pub type GitHistory<'repo> = vcs::History<Commit<'repo>>;
 pub type GitBrowser<'repo> = vcs::Browser<'repo, GitRepository, Commit<'repo>, Error>;
 
 impl<'repo> vcs::VCS<'repo, Commit<'repo>, Error> for GitRepository {
-    type RepoId = String;
+    type RepoId = &'repo str;
     type History = Reference<'repo>;
-    type HistoryId = String;
+    type HistoryId = &'repo str;
     type ArtefactId = Oid;
 
-    fn get_repo(repo_id: &Self::RepoId) -> Result<Self, Error> {
+    fn get_repo(repo_id: Self::RepoId) -> Result<Self, Error> {
         Repository::open(repo_id).map(GitRepository)
     }
 
-    fn get_history(&'repo self, history_id: &Self::HistoryId) -> Result<Self::History, Error> {
+    fn get_history(&'repo self, history_id: Self::HistoryId) -> Result<Self::History, Error> {
         self.0.resolve_reference_from_short_name(&history_id)
     }
 
@@ -229,7 +229,7 @@ mod tests {
     }
 
     fn test_dir() {
-        let repo: GitRepository = vcs::VCS::get_repo(&String::from("./data/git-test"))
+        let repo: GitRepository = vcs::VCS::get_repo("./data/git-test")
             .expect("Could not retrieve ./data/git-test as git repository");
         let browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
         let directory = browser.get_directory().expect("Could not render Directory");
