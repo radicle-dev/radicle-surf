@@ -25,7 +25,7 @@
 //! let this_file = Path::from_labels(Label::root(), &["src".into(), "lib.rs".into()]);
 //!
 //! // And assert that we can find it!
-//! assert!(directory.find_file(this_file).is_some());
+//! assert!(directory.find_file(&this_file).is_some());
 //! ```
 pub mod diff;
 pub mod file_system;

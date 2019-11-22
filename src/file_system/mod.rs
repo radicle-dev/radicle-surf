@@ -336,13 +336,13 @@ impl Directory {
     ///
     /// This operation fails if the path does not lead to
     /// the `File`.
-    pub fn find_file(&self, path: Path) -> Option<File> {
+    pub fn find_file(&self, path: &Path) -> Option<File> {
         let (path, filename) = path.split_last();
         let path = NonEmpty::from_slice(&path);
 
         // Find the file in the current directoy if the prefix path is empty.
         // Otherwise find it in the directory found in the given path (if it exists).
-        path.map_or(Some(self.clone()), |p| self.find_directory(Path(p)))
+        path.map_or(Some(self.clone()), |p| self.find_directory(&Path(p)))
             .and_then(|dir| dir.file_in_directory(&filename))
     }
 
@@ -351,13 +351,13 @@ impl Directory {
     ///
     /// This operation fails if the path does not lead to
     /// the `Directory`.
-    pub fn find_directory(&self, path: Path) -> Option<Self> {
+    pub fn find_directory(&self, path: &Path) -> Option<Self> {
         let (label, labels) = path.split_first();
         if *label == self.label {
             // recursively dig down into sub-directories
             labels
                 .iter()
-                .try_fold(self.clone(), |dir, label| dir.get_sub_directory(&label))
+                .try_fold(self.clone(), |dir, label| dir.sub_directory(&label))
         } else {
             None
         }
@@ -480,7 +480,7 @@ pub mod tests {
         };
 
         // Search for "~/foo.hs"
-        assert_eq!(directory.find_file(file_path), Some(file))
+        assert_eq!(directory.find_file(&file_path), Some(file))
     }
 
     #[test]
@@ -507,7 +507,7 @@ pub mod tests {
         );
 
         // Search for "~/foo/bar/baz.hs"
-        assert_eq!(directory.find_file(file_path), Some(file))
+        assert_eq!(directory.find_file(&file_path), Some(file))
     }
 
     #[test]
@@ -523,7 +523,7 @@ pub mod tests {
         };
 
         // Search for "~/bar.hs"
-        assert_eq!(directory.find_file(file_path), None)
+        assert_eq!(directory.find_file(&file_path), None)
     }
 
     #[test]
@@ -592,7 +592,7 @@ pub mod tests {
         );
 
         let sub_directory = directory
-            .find_directory(Path::from_labels("~".into(), &["haskell".into()]))
+            .find_directory(&Path::from_labels("~".into(), &["haskell".into()]))
             .unwrap();
         let mut sub_directory_contents = sub_directory.list_directory();
         sub_directory_contents.sort();

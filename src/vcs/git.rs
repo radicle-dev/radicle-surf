@@ -377,13 +377,13 @@ mod tests {
 
         // find src directory in the Git directory and the in-memory directory
         let src_directory = directory
-            .find_directory(Path::from_labels("~".into(), &["src".into()]))
+            .find_directory(&Path::from_labels("~".into(), &["src".into()]))
             .unwrap();
         let mut src_directory_contents = src_directory.list_directory();
         src_directory_contents.sort();
 
         let expected_src_directory = expected
-            .find_directory(Path::from_labels("~".into(), &["src".into()]))
+            .find_directory(&Path::from_labels("~".into(), &["src".into()]))
             .unwrap();
         let mut expected_src_directory_contents = expected_src_directory.list_directory();
         expected_src_directory_contents.sort();
