@@ -1,6 +1,9 @@
 use nonempty::NonEmpty;
 use std::collections::HashMap;
 
+#[cfg(test)]
+use quickcheck::{Arbitrary, Gen};
+
 /// A label for `Directory` and `File` to
 /// allow for search.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -10,6 +13,13 @@ impl Label {
     /// The root label for the root directory, i.e. `"~"`.
     pub fn root() -> Self {
         "~".into()
+    }
+}
+
+#[cfg(test)]
+impl Arbitrary for Label {
+    fn arbitrary<G: Gen>(g: &mut G) -> Self {
+        Label(Arbitrary::arbitrary(g))
     }
 }
 
@@ -29,6 +39,15 @@ impl From<String> for Label {
 /// in a directory search.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Path(pub NonEmpty<Label>);
+
+#[cfg(test)]
+impl Arbitrary for Path {
+    fn arbitrary<G: Gen>(g: &mut G) -> Self {
+        let head = Arbitrary::arbitrary(g);
+        let tail: Vec<Label> = Arbitrary::arbitrary(g);
+        Path::from_labels(head, &tail)
+    }
+}
 
 impl Path {
     /// The root path is the singleton containing the
@@ -200,10 +219,19 @@ pub struct Directory {
 
 /// A `File` consists of its file name (a `Label`) and
 /// its file contents.
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct File {
     pub filename: Label,
     pub contents: Vec<u8>,
+}
+
+#[cfg(test)]
+impl Arbitrary for File {
+    fn arbitrary<G: Gen>(g: &mut G) -> Self {
+        let filename = Arbitrary::arbitrary(g);
+        let contents = Arbitrary::arbitrary(g);
+        File { filename, contents }
+    }
 }
 
 impl std::fmt::Debug for File {
@@ -536,4 +564,13 @@ pub mod tests {
             ]
         );
     }
+
+    /* TODO(fintan): this quickcheck takes far too long to complete
+    #[quickcheck]
+    fn prop_all_directories_and_files_quickcheck(
+        directory_map: SmallHashMap<Path, (File, Vec<File>)>,
+    ) -> bool {
+        prop_all_directories_and_files(directory_map.get_small_hashmap)
+    }
+    */
 }
