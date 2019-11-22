@@ -333,14 +333,34 @@ impl Path {
     }
 }
 
-/// A trait to say how to intitialise a
-/// Repository `Directory`. For example, Git
-/// would initialise with the `.git` folder and
+/// A trait to say how to intitialise a Repository `Directory`.
+/// For example, Git would initialise with the `.git` folder and
 /// the files contained in it.
 pub trait RepoBackend
 where
     Self: Sized,
 {
+    /// Should result in a root directory
+    /// with a `DirectoryContents::Repo` as
+    /// its entry.
+    ///
+    /// For example:
+    /// ```
+    /// use radicle_surf::file_system::{Label, Path, Directory, DirectoryContents};
+    /// use nonempty::NonEmpty;
+    ///
+    /// let repo = Directory {
+    ///     label: Label::root(),
+    ///     entries: NonEmpty::new(
+    ///         DirectoryContents::SubDirectory(Box::new(
+    ///             Directory {
+    ///                 label: ".git".into(),
+    ///                 entries: NonEmpty::new(DirectoryContents::Repo),
+    ///             }
+    ///         ))
+    ///     )
+    /// };
+    /// ```
     fn repo_directory() -> Directory;
 }
 
@@ -348,8 +368,7 @@ where
 /// * A `SubDirectory`
 /// * A `File`
 /// * A `Repo`, which is expected to be the
-///   special Repository directory, but is opaque
-///   to the user.
+///   special Repository directory, but is opaque.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DirectoryContents {
     SubDirectory(Box<Directory>),
@@ -359,36 +378,66 @@ pub enum DirectoryContents {
 
 impl DirectoryContents {
     /// Helper constructor for a `SubDirectory`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use nonempty::NonEmpty;
+    /// use radicle_surf::file_system::{File, Directory, DirectoryContents};
+    ///
+    /// let lib = Directory {
+    ///     label: "src".into(),
+    ///     entries: NonEmpty::new(DirectoryContents::File(File {
+    ///         filename: "lib.rs".into(),
+    ///         contents: b"pub mod file_system;".to_vec(),
+    ///     }))
+    /// };
+    ///
+    /// let sub_dir = DirectoryContents::sub_directory(lib.clone());
+    ///
+    /// assert_eq!(sub_dir, DirectoryContents::SubDirectory(Box::new(lib)));
+    /// ```
     pub fn sub_directory(directory: Directory) -> Self {
         DirectoryContents::SubDirectory(Box::new(directory))
     }
 
     /// Helper constructor for a `File`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use nonempty::NonEmpty;
+    /// use radicle_surf::file_system::{File, Directory, DirectoryContents};
+    ///
+    /// let lib = Directory {
+    ///     label: "src".into(),
+    ///     entries: NonEmpty::new(DirectoryContents::file("lib.rs".into(), b"pub mod file_system;")),
+    /// };
+    ///
+    /// let sub_dir = DirectoryContents::sub_directory(lib.clone());
+    ///
+    /// assert_eq!(sub_dir, DirectoryContents::SubDirectory(Box::new(lib)));
+    /// ```
     pub fn file(filename: Label, contents: &[u8]) -> Self {
         DirectoryContents::File(File {
             filename,
             contents: contents.to_owned(),
         })
     }
-
-    /// Helper constructor for a `Repo`.
-    pub fn repo() -> Self {
-        DirectoryContents::Repo
-    }
 }
 
-/// A `Directory` consists of its `Label` and its entries.
-/// The entries are a set of `DirectoryContents` and there
-/// should be at least on entry. This is because empty
-/// directories doe not exist in VCSes.
+/// A `Directory` consists of its [`Label`](struct.Label.html) and its entries.
+/// The entries are a set of [`DirectoryContents`](struct.DirectoryContents.html)
+/// and there should be at least one entry.
+/// This is because empty directories do not generally exist in VCSes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Directory {
     pub label: Label,
     pub entries: NonEmpty<DirectoryContents>,
 }
 
-/// A `File` consists of its file name (a `Label`) and
-/// its file contents.
+/// A `File` consists of its file name (a [`Label`](struct.Label.html)
+/// and its file contents (a `Vec` of bytes).
 #[derive(Clone, PartialEq, Eq)]
 pub struct File {
     pub filename: Label,
@@ -411,10 +460,12 @@ impl std::fmt::Debug for File {
 }
 
 /// `SystemType` is an enumeration over what can be
-/// found in a `Directory` so we can report back to
-/// the caller a `Label` and its type.
+/// found in a [`Directory`](struct.Directory.html)
+/// so we can report back to the caller a [`Label`](struct.Label)
+/// and its type.
 ///
-/// See `SystemType::file` and `SystemType::directory`.
+/// See [`SystemType::file`](struct.SystemType.html#method.file) and
+/// [`SystemType::directory`](struct.SystemType.html#method.directory).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SystemType {
     File,
@@ -422,12 +473,12 @@ pub enum SystemType {
 }
 
 impl SystemType {
-    /// A file name and `SystemType::File`.
+    /// A file name and [`SystemType::File`](enum.SystemType.html#variant.File).
     pub fn file(label: Label) -> (Label, Self) {
         (label, SystemType::File)
     }
 
-    /// A directory name and `SystemType::File`.
+    /// A directory name and [`SystemType::Directory`](enum.SystemType.html#variant.Directory).
     pub fn directory(label: Label) -> (Label, Self) {
         (label, SystemType::Directory)
     }
