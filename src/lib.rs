@@ -9,7 +9,7 @@
 //!
 //! ```
 //! use radicle_surf::vcs::git::{GitBrowser, GitRepository};
-//! use radicle_surf::file_system::{Label, Path};
+//! use radicle_surf::file_system::{Label, Path, SystemType};
 //!
 //! // We're going to point to this repo.
 //! let repo = GitRepository::new(".").unwrap();
@@ -26,6 +26,32 @@
 //!
 //! // And assert that we can find it!
 //! assert!(directory.find_file(&this_file).is_some());
+//!
+//! let mut root_contents = directory.list_directory();
+//! root_contents.sort();
+//!
+//! assert_eq!(root_contents, vec![
+//!     SystemType::directory(".buildkite".into()),
+//!     SystemType::directory(".docker".into()),
+//!     SystemType::directory(".git".into()),
+//!     SystemType::file(".gitignore".into()),
+//!     SystemType::file("Cargo.toml".into()),
+//!     SystemType::file("README.md".into()),
+//!     SystemType::directory("data".into()),
+//!     SystemType::directory("docs".into()),
+//!     SystemType::directory("src".into()),
+//! ]);
+//!
+//! let src = directory.find_directory(&Path::from_labels(Label::root(), &["src".into()])).unwrap();
+//! let mut src_contents = src.list_directory();
+//! src_contents.sort();
+//!
+//! assert_eq!(src_contents, vec![
+//!     SystemType::directory("diff".into()),
+//!     SystemType::directory("file_system".into()),
+//!     SystemType::file("lib.rs".into()),
+//!     SystemType::directory("vcs".into()),
+//! ]);
 //! ```
 pub mod diff;
 pub mod file_system;
