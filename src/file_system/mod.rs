@@ -62,9 +62,18 @@ impl Path {
     }
 
     /// Append two `Path`s together.
+    ///
+    /// # Example
+    /// ```
+    /// use radicle_surf::file_system::Path;
+    ///
+    /// let mut path1 = Path::from_labels("foo".into(), &["bar".into()]);
+    /// path1.append(&mut Path::from_labels("baz".into(), &["quux".into()]));
+    /// assert_eq!(path1, Path::from_labels("foo".into(), &["bar".into(), "baz".into(), "quux".into()]));
+    /// ```
     pub fn append(&mut self, path: &mut Self) {
         let mut other = path.0.clone().into();
-        path.0.append(&mut other)
+        self.0.append(&mut other)
     }
 
     /// Push a new `Label` onto the `Path`.
