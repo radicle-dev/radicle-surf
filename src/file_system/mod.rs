@@ -62,26 +62,6 @@ impl From<String> for Label {
 
 /// A non-empty set of [`Label`](struct.Label.html)s to define a path
 /// in a directory or file search.
-///
-/// # Examples
-///
-/// ```
-/// use nonempty::NonEmpty;
-/// use radicle_surf::file_system::{Directory, File, Label, Path};
-/// use radicle_surf::git::GitRepository;
-///
-/// let directory = Directory::from::<GitRepository>(
-///     vec![(Path::from_labels("src".into(), &[]), NonEmpty::new(File {
-///         filename: "lib.rs".into(),
-///         contents: b"pub mod vcs;".to_vec(),
-///     }))].into_iter().collect()
-/// );
-///
-/// let lib = Path::from_labels(Label::root(), &["src".into(), "lib.rs".into()]);
-/// let lib_file = directory.find_file(&lib);
-///
-/// assert!(lib_file.is_some());
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Path(pub NonEmpty<Label>);
 
@@ -336,7 +316,7 @@ impl Path {
 /// A trait to say how to intitialise a Repository `Directory`.
 /// For example, Git would initialise with the `.git` folder and
 /// the files contained in it.
-pub trait RepoBackend
+pub(crate) trait RepoBackend
 where
     Self: Sized,
 {
@@ -486,7 +466,7 @@ impl SystemType {
 
 impl Directory {
     /// An empty root `Directory`, just containing the special repository directory.
-    pub fn empty_root<Repo>() -> Self
+    fn empty_root<Repo>() -> Self
     where
         Repo: RepoBackend,
     {
@@ -506,7 +486,7 @@ impl Directory {
             .collect()
     }
 
-    pub fn add_contents(&mut self, entries: NonEmpty<DirectoryContents>) {
+    fn add_contents(&mut self, entries: NonEmpty<DirectoryContents>) {
         self.entries.append(&mut entries.into())
     }
 
@@ -617,7 +597,7 @@ impl Directory {
         }
     }
 
-    pub fn from<Repo>(paths: HashMap<Path, NonEmpty<File>>) -> Self
+    pub(crate) fn from<Repo>(paths: HashMap<Path, NonEmpty<File>>) -> Self
     where
         Repo: RepoBackend,
     {
