@@ -4,13 +4,38 @@ use std::collections::HashMap;
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 
-/// A label for `Directory` and `File` to
-/// allow for search.
+/// A label for [`Directory`](struct.Directory.html)
+/// and [`File`](struct.File.html) to allow for search.
+///
+/// These are essentially directory and file names.
+///
+/// # Examples
+///
+/// ```
+/// use radicle_surf::file_system::{Label, Path};
+///
+/// let lib_filename = "lib.rs".into();
+/// let src_directory_name = "src".into();
+/// let lib_filepath = Path::from_labels(src_directory_name, &[lib_filename]);
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Label(pub String);
 
 impl Label {
     /// The root label for the root directory, i.e. `"~"`.
+    ///
+    /// Prefer creating a root [`Path`](struct.Path.html),
+    /// by using [`Path::root`](struct.Path.html#method.root).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use nonempty::NonEmpty;
+    /// use radicle_surf::file_system::{Label, Path};
+    ///
+    /// let root = Path::root();
+    /// assert_eq!(*root.split_first().0, Label::root());
+    /// ```
     pub fn root() -> Self {
         "~".into()
     }
@@ -35,8 +60,28 @@ impl From<String> for Label {
     }
 }
 
-/// A non-empty set of labels to define a path
-/// in a directory search.
+/// A non-empty set of [`Label`](struct.Label.html)s to define a path
+/// in a directory or file search.
+///
+/// # Examples
+///
+/// ```
+/// use nonempty::NonEmpty;
+/// use radicle_surf::file_system::{Directory, File, Label, Path};
+/// use radicle_surf::git::GitRepository;
+///
+/// let directory = Directory::from::<GitRepository>(
+///     vec![(Path::from_labels("src".into(), &[]), NonEmpty::new(File {
+///         filename: "lib.rs".into(),
+///         contents: b"pub mod vcs;".to_vec(),
+///     }))].into_iter().collect()
+/// );
+///
+/// let lib = Path::from_labels(Label::root(), &["src".into(), "lib.rs".into()]);
+/// let lib_file = directory.find_file(&lib);
+///
+/// assert!(lib_file.is_some());
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Path(pub NonEmpty<Label>);
 
@@ -50,20 +95,43 @@ impl Arbitrary for Path {
 }
 
 impl Path {
-    /// The root path is the singleton containing the
-    /// root label (see: `Label::root`).
+    /// The root path is a `Path` made up of the single
+    /// root label (see: [`Label::root`](stuct.Label.html#method.root).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use nonempty::NonEmpty;
+    /// use radicle_surf::file_system::{Label, Path};
+    ///
+    /// let root = Path::root();
+    /// assert_eq!(*root.split_first().0, Label::root());
+    /// ```
     pub fn root() -> Self {
         Path(NonEmpty::new(Label::root()))
     }
 
     /// Check that this is the root path.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use radicle_surf::file_system::{Label, Path};
+    ///
+    /// let root = Path::root();
+    /// let not_root = Path::from_labels(Label::root(), &["src".into(), "lib.rs".into()]);
+    ///
+    /// assert!(root.is_root());
+    /// assert!(!not_root.is_root());
+    /// ```
     pub fn is_root(&self) -> bool {
         *self == Self::root()
     }
 
     /// Append two `Path`s together.
     ///
-    /// # Example
+    /// # Examples
+    ///
     /// ```
     /// use radicle_surf::file_system::Path;
     ///
@@ -76,26 +144,64 @@ impl Path {
         self.0.append(&mut other)
     }
 
-    /// Push a new `Label` onto the `Path`.
+    /// Push a new [`Label`](struct.Label.html) onto the `Path`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use radicle_surf::file_system::{Label, Path};
+    ///
+    /// let mut root = Path::root();
+    /// root.push("src".into());
+    /// root.push("lib.rs".into());
+    ///
+    /// assert_eq!(root, Path::from_labels(Label::root(), &["src".into(), "lib.rs".into()]));
+    /// ```
     pub fn push(&mut self, label: Label) {
         self.0.push(label)
     }
 
-    /// Iterator over the `Label`s.
+    /// Iterator over the [`Label`](struct.Label.html)s in the `Path`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use radicle_surf::file_system::{Label, Path};
+    ///
+    /// let path = Path::from_labels(Label::root(), &["src".into(), "lib.rs".into()]);
+    /// let mut path_iter = path.iter();
+    ///
+    /// assert_eq!(path_iter.next(), Some(&Label::root()));
+    /// assert_eq!(path_iter.next(), Some(&"src".into()));
+    /// assert_eq!(path_iter.next(), Some(&"lib.rs".into()));
+    /// ```
     pub fn iter(&self) -> impl Iterator<Item = &Label> {
         self.0.iter()
     }
 
-    /// Get the first `Label` and the rest of the `Label`s.
+    /// Get the first [`Label`](struct.Label.html) in the `Path`
+    /// and the rest of the [`Label`](struct.Label.html)s after it.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use radicle_surf::file_system::{Label, Path};
+    ///
+    /// let path = Path::from_labels(Label::root(), &["src".into(), "lib.rs".into()]);
+    ///
+    /// assert_eq!(path.split_first(), (&Label::root(), &["src".into(), "lib.rs".into()][..]));
+    /// ```
     pub fn split_first(&self) -> (&Label, &[Label]) {
         self.0.split_first()
     }
 
-    /// Get the prefix of the `Label`s and the last `Label`.
-    /// This is useful since the prefix could be a directory path
+    /// Get the prefix of the [`Label`](struct.Label.html)s and
+    /// the last [`Label`](struct.Label.html).
+    ///
+    /// This is useful when the prefix is a directory path
     /// and the last label a file name.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```
     /// use radicle_surf::file_system::Path;
@@ -105,10 +211,10 @@ impl Path {
     /// ```
     ///
     /// ```
-    /// use radicle_surf::file_system::Path;
+    /// use radicle_surf::file_system::{Label, Path};
     ///
-    /// let path = Path::from_labels("foo".into(), &["bar".into()]);
-    /// assert_eq!(path.split_last(), (vec!["foo".into()], "bar".into()));
+    /// let path = Path::from_labels(Label::root(), &["src".into(), "lib.rs".into()]);
+    /// assert_eq!(path.split_last(), (vec![Label::root(), "src".into()], "lib.rs".into()));
     /// ```
     ///
     /// ```
@@ -121,6 +227,7 @@ impl Path {
     /// ```
     /// use radicle_surf::file_system::Path;
     ///
+    /// // An interesting case for when first == last, but doesn't imply a singleton Path.
     /// let path = Path::from_labels("foo".into(), &["bar".into(), "foo".into()]);
     /// assert_eq!(path.split_last(), (vec!["foo".into(), "bar".into()], "foo".into()));
     /// ```
@@ -139,10 +246,10 @@ impl Path {
         }
     }
 
-    /// Constructor given at least one `Label` to work from followed
-    /// by 0 or more `Label`s to add to the `Path`.
+    /// Construct a `Path` given at least one [`Label`](struct.Label)
+    /// followed by 0 or more [`Label`](struct.Label)s.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```
     /// use radicle_surf::file_system::{Path, Label};
@@ -167,10 +274,16 @@ impl Path {
 
     /// Convert a raw string literal to a `Path`.
     ///
-    /// # Example
+    /// This expects a '/' delimited `&str` splitting
+    /// the tokens between into separate labels.
+    ///
+    /// **Note**: it will return [`Path::root`](struct.Path.html#method.root)
+    /// if the provided input is empty.
+    ///
+    /// # Examples
     ///
     /// ```
-    /// use radicle_surf::file_system::{Path};
+    /// use radicle_surf::file_system::Path;
     ///
     /// let path = Path::from_string("foo/bar/baz.rs");
     ///
@@ -180,7 +293,7 @@ impl Path {
     /// ```
     ///
     /// ```
-    /// use radicle_surf::file_system::{Path};
+    /// use radicle_surf::file_system::Path;
     ///
     /// let path = Path::from_string("foo/bar/baz/");
     ///
@@ -188,18 +301,34 @@ impl Path {
     ///
     /// assert_eq!(path, expected);
     /// ```
+    ///
+    /// ```
+    /// use radicle_surf::file_system::Path;
+    ///
+    /// let path = Path::from_string("");
+    ///
+    /// assert_eq!(path, Path::root());
+    /// ```
+    ///
+    /// ```
+    /// use radicle_surf::file_system::Path;
+    ///
+    /// let path = Path::from_string("/");
+    ///
+    /// assert_eq!(path, Path::root());
+    /// ```
     pub fn from_string(path: &str) -> Self {
+        let path: Vec<&str> = path
+            .trim_matches('/')
+            .split('/')
+            .filter(|s| !s.is_empty())
+            .collect();
+
         if path.is_empty() {
             Path::root()
         } else {
-            NonEmpty::from_slice(
-                &path
-                    .trim_matches('/')
-                    .split('/')
-                    .map(|l| l.into())
-                    .collect::<Vec<_>>(),
-            )
-            .map_or(Path::root(), Path)
+            NonEmpty::from_slice(&path.into_iter().map(|l| l.into()).collect::<Vec<_>>())
+                .map_or(Path::root(), Path)
         }
     }
 }
