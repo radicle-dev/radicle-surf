@@ -156,6 +156,8 @@ impl Path {
     /// expected.push("baz.rs".into());
     ///
     /// assert_eq!(path, expected);
+    /// let path_vec: Vec<Label> = path.0.into();
+    /// assert_eq!(path_vec, vec!["~".into(), "foo".into(), "bar".into(), "baz.rs".into()]);
     /// ```
     pub fn from_labels(root: Label, labels: &[Label]) -> Path {
         let mut path = Path(NonEmpty::new(root));
