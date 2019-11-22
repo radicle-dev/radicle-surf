@@ -485,8 +485,7 @@ impl SystemType {
 }
 
 impl Directory {
-    /// An empty root `Directory`, just containing
-    /// the special repository directory.
+    /// An empty root `Directory`, just containing the special repository directory.
     pub fn empty_root<Repo>() -> Self
     where
         Repo: RepoBackend,
