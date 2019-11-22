@@ -221,7 +221,7 @@ where
 /// * A `Repo`, which is expected to be the
 ///   special Repository directory, but is opaque
 ///   to the user.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DirectoryContents {
     SubDirectory(Box<Directory>),
     File(File),
@@ -252,7 +252,7 @@ impl DirectoryContents {
 /// The entries are a set of `DirectoryContents` and there
 /// should be at least on entry. This is because empty
 /// directories doe not exist in VCSes.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Directory {
     pub label: Label,
     pub entries: NonEmpty<DirectoryContents>,
