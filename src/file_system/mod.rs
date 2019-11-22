@@ -403,6 +403,15 @@ impl Directory {
             .find(|directory| directory.label == *label)
     }
 
+    /// Get the a sub directory of a `Directory` given its name.
+    ///
+    /// This operation fails if the directory does not exist.
+    fn sub_directory_mut(&mut self, label: &Label) -> Option<&mut Self> {
+        self.sub_directories_mut()
+            .into_iter()
+            .find(|directory| directory.label == *label)
+    }
+
     /// Get the `File` in the current `Directory` if it exists in
     /// the entries.
     ///
@@ -446,24 +455,48 @@ impl Directory {
                 // first create bar containing baz.hs then recursively
                 // build up from there.
                 let (prefix, current) = dir.split_last();
+
                 let mut directory = Directory {
                     label: current,
                     entries: file_entries,
                 };
-                for label in prefix {
+                for label in prefix.into_iter().rev() {
                     directory = Directory::mkdir(label, directory);
                 }
-                root.entries
-                    .push(DirectoryContents::SubDirectory(Box::new(directory)))
+
+                root.combine(&directory)
             }
         }
         root
+    }
+
+    fn combine(&mut self, other: &Directory) {
+        match self.sub_directory_mut(&other.label) {
+            Some(ref mut subdir) => {
+                for entry in other.entries.iter() {
+                    match entry {
+                        DirectoryContents::File(file) => {
+                            subdir.entries.push(DirectoryContents::File(file.clone()))
+                        }
+                        DirectoryContents::Repo => subdir.entries.push(DirectoryContents::Repo),
+                        DirectoryContents::SubDirectory(ref dir) => {
+                            subdir.combine(dir);
+                        }
+                    }
+                }
+            }
+            None => {
+                self.entries
+                    .push(DirectoryContents::sub_directory(other.clone()));
+            }
+        }
     }
 }
 
 #[cfg(test)]
 pub mod tests {
     use crate::file_system::*;
+    use pretty_assertions::assert_eq;
 
     #[derive(Debug, Clone)]
     struct TestRepo {}
@@ -618,6 +651,31 @@ pub mod tests {
         );
     }
 
+    #[test]
+    fn test_all_directories_and_files() {
+        let mut directory_map = HashMap::new();
+
+        let path1 = Path::from_labels("foo".into(), &["bar".into(), "baz".into()]);
+        let file1 = File {
+            filename: "monadic.rs".into(),
+            contents: "".as_bytes().to_vec(),
+        };
+        let file2 = File {
+            filename: "oscoin.rs".into(),
+            contents: "".as_bytes().to_vec(),
+        };
+        directory_map.insert(path1, (file1, vec![file2]));
+
+        let path2 = Path::from_labels("foo".into(), &["bar".into(), "quux".into()]);
+        let file3 = File {
+            filename: "radicle.rs".into(),
+            contents: "".as_bytes().to_vec(),
+        };
+        directory_map.insert(path2, (file3, vec![]));
+
+        assert!(prop_all_directories_and_files(directory_map))
+    }
+
     /* TODO(fintan): this quickcheck takes far too long to complete
     #[quickcheck]
     fn prop_all_directories_and_files_quickcheck(
@@ -626,4 +684,182 @@ pub mod tests {
         prop_all_directories_and_files(directory_map.get_small_hashmap)
     }
     */
+
+    fn prop_all_directories_and_files(directory_map: HashMap<Path, (File, Vec<File>)>) -> bool {
+        let mut new_directory_map = HashMap::new();
+        for (path, files) in directory_map {
+            let mut files_nonempty = NonEmpty::new(files.0.clone());
+            files_nonempty.append(&mut files.1.clone());
+            new_directory_map.insert(path.clone(), files_nonempty);
+        }
+
+        let directory = Directory::from::<TestRepo>(new_directory_map.clone());
+
+        for (directory_path, files) in new_directory_map {
+            for file in files.iter() {
+                let mut path = Path::root();
+                path.append(&mut directory_path.clone());
+
+                if !directory.find_directory(&path).is_some() {
+                    println!("Directory not found");
+                    println!("Directory: {:#?}", directory);
+                    println!("Path: {:#?}", path);
+                    return false;
+                }
+
+                path.push(file.filename.clone());
+                if !directory.find_file(&path).is_some() {
+                    println!("File not found");
+                    println!("Directory: {:#?}", directory);
+                    println!("Path: {:#?}", path);
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
+    #[test]
+    fn test_file_name_is_same_as_root() {
+        // This test ensures that if the filename is the same the root of the
+        // directory, that search_path.split_last() doesn't toss away the prefix.
+        let path = Path::from_labels(Label("foo".into()), &[Label("bar".into())]);
+        let files = (
+            File {
+                filename: Label("~".into()),
+                contents: Vec::new(),
+            },
+            vec![],
+        );
+        let mut directory_map = HashMap::new();
+        directory_map.insert(path, files);
+
+        assert!(prop_all_directories_and_files(directory_map));
+    }
+
+    #[test]
+    /// Given:
+    /// foo
+    /// `-- bar
+    ///     `-- baz
+    ///         `-- quux.rs
+    ///
+    /// And:
+    /// foo
+    /// `-- bar
+    ///     `-- quux
+    ///         `-- hallo.rs
+    ///
+    /// We expect:
+    /// foo
+    /// `-- bar
+    ///     |-- baz
+    ///     |   `-- quux.rs
+    ///     `-- quux
+    ///         `-- hallo.r
+    fn test_combine_dirs() {
+        let mut root = Directory::empty_root::<TestRepo>();
+        let quux = Directory::mkdir(
+            "foo".into(),
+            Directory::mkdir(
+                "bar".into(),
+                Directory {
+                    label: "baz".into(),
+                    entries: NonEmpty::new(DirectoryContents::file("quux.rs".into(), b"")),
+                },
+            ),
+        );
+        root.entries.push(DirectoryContents::sub_directory(quux));
+
+        let hallo = Directory::mkdir(
+            "foo".into(),
+            Directory::mkdir(
+                "bar".into(),
+                Directory {
+                    label: "quux".into(),
+                    entries: NonEmpty::new(DirectoryContents::file("hallo.rs".into(), b"")),
+                },
+            ),
+        );
+
+        let mut expected_root = Directory::empty_root::<TestRepo>();
+        let expected_quux = DirectoryContents::sub_directory(Directory {
+            label: "baz".into(),
+            entries: NonEmpty::new(DirectoryContents::file("quux.rs".into(), b"")),
+        });
+        let expected_hallo = DirectoryContents::sub_directory(Directory {
+            label: "quux".into(),
+            entries: NonEmpty::new(DirectoryContents::file("hallo.rs".into(), b"")),
+        });
+        let mut subdirs = NonEmpty::new(expected_quux);
+        subdirs.push(expected_hallo);
+
+        let expected = Directory::mkdir(
+            "foo".into(),
+            Directory {
+                label: "bar".into(),
+                entries: subdirs,
+            },
+        );
+        expected_root
+            .entries
+            .push(DirectoryContents::sub_directory(expected));
+
+        root.combine(&hallo);
+
+        assert_eq!(root, expected_root)
+    }
+
+    #[test]
+    /// Given:
+    /// foo
+    /// `-- bar
+    ///     `-- baz.rs
+    /// And:
+    /// foo
+    /// `-- bar
+    ///     `-- quux.rs
+    ///
+    /// We expect:
+    /// foo
+    /// `-- bar
+    ///     |-- baz.rs
+    ///     `-- quux.rs
+    fn test_combine_files() {
+        let mut root = Directory::empty_root::<TestRepo>();
+        let baz = Directory::mkdir(
+            "foo".into(),
+            Directory {
+                label: "bar".into(),
+                entries: NonEmpty::new(DirectoryContents::file("baz.rs".into(), b"")),
+            },
+        );
+        root.entries.push(DirectoryContents::sub_directory(baz));
+
+        let quux = Directory::mkdir(
+            "foo".into(),
+            Directory {
+                label: "bar".into(),
+                entries: NonEmpty::new(DirectoryContents::file("quux.rs".into(), b"")),
+            },
+        );
+
+        let mut expected_root = Directory::empty_root::<TestRepo>();
+        let mut files = NonEmpty::new(DirectoryContents::file("baz.rs".into(), b""));
+        files.push(DirectoryContents::file("quux.rs".into(), b""));
+        let expected = Directory::mkdir(
+            "foo".into(),
+            Directory {
+                label: "bar".into(),
+                entries: files,
+            },
+        );
+        expected_root
+            .entries
+            .push(DirectoryContents::sub_directory(expected));
+
+        root.combine(&quux);
+
+        assert_eq!(root, expected_root)
+    }
 }
