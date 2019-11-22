@@ -94,17 +94,47 @@ impl Path {
     /// Get the prefix of the `Label`s and the last `Label`.
     /// This is useful since the prefix could be a directory path
     /// and the last label a file name.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use radicle_surf::file_system::Path;
+    ///
+    /// let path = Path::from_labels("foo".into(), &[]);
+    /// assert_eq!(path.split_last(), (vec![], "foo".into()));
+    /// ```
+    ///
+    /// ```
+    /// use radicle_surf::file_system::Path;
+    ///
+    /// let path = Path::from_labels("foo".into(), &["bar".into()]);
+    /// assert_eq!(path.split_last(), (vec!["foo".into()], "bar".into()));
+    /// ```
+    ///
+    /// ```
+    /// use radicle_surf::file_system::Path;
+    ///
+    /// let path = Path::from_labels("foo".into(), &["bar".into(), "baz".into()]);
+    /// assert_eq!(path.split_last(), (vec!["foo".into(), "bar".into()], "baz".into()));
+    /// ```
+    ///
+    /// ```
+    /// use radicle_surf::file_system::Path;
+    ///
+    /// let path = Path::from_labels("foo".into(), &["bar".into(), "foo".into()]);
+    /// assert_eq!(path.split_last(), (vec!["foo".into(), "bar".into()], "foo".into()));
+    /// ```
     pub fn split_last(&self) -> (Vec<Label>, Label) {
         let (first, middle, last) = self.0.split();
 
         // first == last, so drop first
-        if middle.is_empty() {
+        if first == last && middle.is_empty() {
             (vec![], last.clone())
         } else {
             // Create the prefix vector
-            let mut vec = middle.to_vec();
-            vec.insert(0, first.clone());
-
+            let mut vec = vec![first.clone()];
+            let mut middle = middle.to_vec();
+            vec.append(&mut middle);
             (vec, last.clone())
         }
     }
