@@ -370,7 +370,7 @@ impl Directory {
     }
 
     /// Get the sub directories of a `Directory`.
-    fn get_sub_directories(&self) -> Vec<Self> {
+    fn sub_directories(&self) -> Vec<Self> {
         self.entries
             .iter()
             .filter_map(|entry| match entry {
@@ -381,11 +381,23 @@ impl Directory {
             .collect()
     }
 
+    /// Get the sub directories of a `Directory`.
+    fn sub_directories_mut(&mut self) -> Vec<&mut Self> {
+        self.entries
+            .iter_mut()
+            .filter_map(|entry| match entry {
+                DirectoryContents::SubDirectory(dir) => Some(dir.as_mut()),
+                DirectoryContents::File(_) => None,
+                DirectoryContents::Repo => None,
+            })
+            .collect()
+    }
+
     /// Get the a sub directory of a `Directory` given its name.
     ///
     /// This operation fails if the directory does not exist.
-    fn get_sub_directory(&self, label: &Label) -> Option<Self> {
-        self.get_sub_directories()
+    fn sub_directory(&self, label: &Label) -> Option<Self> {
+        self.sub_directories()
             .iter()
             .cloned()
             .find(|directory| directory.label == *label)
