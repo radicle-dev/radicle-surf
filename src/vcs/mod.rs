@@ -1,6 +1,8 @@
 use crate::file_system::Directory;
 use nonempty::NonEmpty;
 
+pub mod git;
+
 /// A non-empty bag of artifacts which are used to
 /// derive a `Directory` view. Examples of artifacts
 /// would be commits in Git or patches in Pijul.
@@ -69,19 +71,21 @@ impl<A> History<A> {
     }
 }
 
-/// A `Repo` is a bag of `History`s. If the bag is empty
-/// then the `Repo` is in its initial state.
-pub struct Repo<A>(pub Vec<History<A>>);
+/// A Snapshot is a function that renders a `Directory` given
+/// the `Repo` object and a `History` of artifacts.
+type Snapshot<'browser, A, Repo, Error> =
+    Box<dyn Fn(&Repo, &History<A>) -> Result<Directory, Error> + 'browser>;
 
 /// A `Browser` is a way of rendering a `History` into a
 /// `Directory` snapshot, and the current `History` it is
 /// viewing.
-pub struct Browser<'browser, Repo, A> {
-    snapshot: Box<dyn Fn(&History<A>) -> Directory<Repo> + 'browser>,
+pub struct Browser<'browser, Repo, A, Error> {
+    snapshot: Snapshot<'browser, A, Repo, Error>,
     history: History<A>,
+    repository: &'browser Repo,
 }
 
-impl<'browser, Repo, A> Browser<'browser, Repo, A> {
+impl<'browser, Repo, A, Error> Browser<'browser, Repo, A, Error> {
     /// Get the current `History` the `Browser` is viewing.
     pub fn get_history(&self) -> History<A>
     where
@@ -96,8 +100,8 @@ impl<'browser, Repo, A> Browser<'browser, Repo, A> {
     }
 
     /// Render the `Directory` for this `Browser`.
-    pub fn get_directory(&self) -> Directory<Repo> {
-        (self.snapshot)(&self.history)
+    pub fn get_directory(&self) -> Result<Directory, Error> {
+        (self.snapshot)(&self.repository, &self.history)
     }
 
     /// Modify the `History` in this `Browser`.
@@ -115,48 +119,59 @@ impl<'browser, Repo, A> Browser<'browser, Repo, A> {
         A: PartialEq + Clone,
         F: Fn(&History<A>) -> Option<History<A>>,
     {
-        self.modify_history(|history| f(history).unwrap_or(default_history.clone()))
+        self.modify_history(|history| f(history).unwrap_or_else(|| default_history.clone()))
     }
 }
 
-pub trait VCS<A> {
-    /// The Repository type to work with.
-    type Repository;
+impl<'browser, Repo, A, Error> VCS<'browser, A, Error> for Browser<'browser, Repo, A, Error>
+where
+    A: 'browser,
+    Error: 'browser,
+    Repo: VCS<'browser, A, Error>,
+{
+    type HistoryId = Repo::HistoryId;
+    type ArtefactId = Repo::ArtefactId;
 
+    fn get_history(&'browser self, identifier: Self::HistoryId) -> Result<History<A>, Error> {
+        self.repository.get_history(identifier)
+    }
+
+    fn get_histories(&'browser self) -> Result<Vec<History<A>>, Error> {
+        self.repository.get_histories()
+    }
+
+    fn get_identifier(artifact: &'browser A) -> Self::ArtefactId {
+        Repo::get_identifier(artifact)
+    }
+}
+
+pub(crate) trait GetVCS<'repo, Error>
+where
+    Self: Sized,
+{
     /// The way to identify a Repository.
     type RepoId;
 
-    /// The History type to work with, e.g. Branch, Tag in git.
-    type History;
+    /// Find a Repository
+    fn get_repo(identifier: Self::RepoId) -> Result<Self, Error>;
+}
 
+pub trait VCS<'repo, A: 'repo, Error>
+where
+    Self: 'repo + Sized,
+{
     /// The way to identify a History.
     type HistoryId;
 
     /// The way to identify an artifact.
     type ArtefactId;
 
-    /// Find a Repository
-    fn get_repo(identifier: &Self::RepoId) -> Self::Repository;
-
     /// Find a History in a Repo given a way to identify it
-    fn get_history(repo: Self::Repository, identifier: &Self::HistoryId) -> Self::History;
+    fn get_history(&'repo self, identifier: Self::HistoryId) -> Result<History<A>, Error>;
 
     /// Find all histories in a Repo
-    fn get_histories(repo: Self::Repository) -> Vec<Self::History>;
+    fn get_histories(&'repo self) -> Result<Vec<History<A>>, Error>;
 
     /// Identify artifacts of a Repository
-    fn get_identifier(artifact: &A) -> &Self::ArtefactId;
-
-    /// Turn a Repository History into a radicle-surf History
-    fn to_history(history: &Self::History) -> History<A>;
-
-    /// Turn a Repository into a radicle-surf Repository
-    fn to_repo(repo: Self::Repository) -> Repo<A> {
-        Repo(
-            Self::get_histories(repo)
-                .iter()
-                .map(|history| Self::to_history(history))
-                .collect(),
-        )
-    }
+    fn get_identifier(artifact: &'repo A) -> Self::ArtefactId;
 }
