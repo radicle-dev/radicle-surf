@@ -258,6 +258,7 @@ impl<'repo> GitBrowser<'repo> {
                             let file = file_system::File {
                                 filename: filename.into(),
                                 contents: blob.content().to_owned(),
+                                size: blob.size(),
                             };
                             dir.entry(path)
                                 .and_modify(|entries| entries.push(file.clone()))
@@ -356,17 +357,11 @@ mod tests {
 
         // Root files set up, note that we're ignoring
         // file contents
-        let root_files = NonEmpty::new(File {
-            filename: "Cargo.toml".into(),
-            contents: "".as_bytes().to_vec(),
-        });
+        let root_files = NonEmpty::new(File::new("Cargo.toml".into(), &[]));
         directory_map.insert(Path::root(), root_files);
 
         // src files set up
-        let src_files = NonEmpty::new(File {
-            filename: "main.rs".into(),
-            contents: "".as_bytes().to_vec(),
-        });
+        let src_files = NonEmpty::new(File::new("main.rs".into(), &[]));
         directory_map.insert(Path(NonEmpty::new("src".into())), src_files);
 
         let expected = file_system::Directory::from::<GitRepository>(directory_map);

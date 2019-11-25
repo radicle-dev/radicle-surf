@@ -367,10 +367,10 @@ impl DirectoryContents {
     ///
     /// let lib = Directory {
     ///     label: "src".into(),
-    ///     entries: NonEmpty::new(DirectoryContents::File(File {
-    ///         filename: "lib.rs".into(),
-    ///         contents: b"pub mod file_system;".to_vec(),
-    ///     }))
+    ///     entries: NonEmpty::new(DirectoryContents::File(File::new(
+    ///         "lib.rs".into(),
+    ///         b"pub mod file_system;",
+    ///     )))
     /// };
     ///
     /// let sub_dir = DirectoryContents::sub_directory(lib.clone());
@@ -399,10 +399,7 @@ impl DirectoryContents {
     /// assert_eq!(sub_dir, DirectoryContents::SubDirectory(Box::new(lib)));
     /// ```
     pub fn file(filename: Label, contents: &[u8]) -> Self {
-        DirectoryContents::File(File {
-            filename,
-            contents: contents.to_owned(),
-        })
+        DirectoryContents::File(File::new(filename, contents))
     }
 }
 
@@ -422,9 +419,19 @@ pub struct Directory {
 pub struct File {
     pub filename: Label,
     pub contents: Vec<u8>,
+    pub(crate) size: usize,
 }
 
 impl File {
+    pub fn new(filename: Label, contents: &[u8]) -> Self {
+        let size = contents.len();
+        File {
+            filename,
+            contents: contents.to_vec(),
+            size,
+        }
+    }
+
     /// Get the size of the `File` corresponding to
     /// the number of bytes in the file contents.
     ///
@@ -433,15 +440,15 @@ impl File {
     /// ```
     /// use radicle_surf::file_system::File;
     ///
-    /// let file = File {
-    ///     filename: "lib.rs".into(),
-    ///     contents: b"pub mod diff;\npub mod file_system;\npub mod vcs;\npub use crate::vcs::git;\n".to_vec(),
-    /// };
+    /// let file = File::new(
+    ///     "lib.rs".into(),
+    ///     b"pub mod diff;\npub mod file_system;\npub mod vcs;\npub use crate::vcs::git;\n",
+    /// );
     ///
     /// assert_eq!(file.size(), 73);
     /// ```
     pub fn size(&self) -> usize {
-        self.contents.len()
+        self.size
     }
 }
 
@@ -450,7 +457,7 @@ impl Arbitrary for File {
     fn arbitrary<G: Gen>(g: &mut G) -> Self {
         let filename = Arbitrary::arbitrary(g);
         let contents = Arbitrary::arbitrary(g);
-        File { filename, contents }
+        File::new(filename, contents)
     }
 }
 
@@ -752,10 +759,7 @@ pub mod tests {
     fn test_find_added_file() {
         let file_path = Path::from_labels(Label::root(), &["foo.hs".into()]);
 
-        let file = File {
-            filename: "foo.hs".into(),
-            contents: "module Banana ...".into(),
-        };
+        let file = File::new("foo.hs".into(), b"module Banana ...");
 
         let directory: Directory = Directory {
             label: Label::root(),
@@ -773,10 +777,7 @@ pub mod tests {
             &["foo".into(), "bar".into(), "baz.hs".into()],
         );
 
-        let file = File {
-            filename: "baz.hs".into(),
-            contents: "module Banana ...".into(),
-        };
+        let file = File::new("baz.hs".into(), b"module Banana ...");
 
         let directory: Directory = Directory::mkdir(
             Label::root(),
@@ -839,25 +840,16 @@ pub mod tests {
         let mut directory_map = HashMap::new();
 
         // Root files set up
-        let mut root_files = NonEmpty::new(File {
-            filename: "foo.rs".into(),
-            contents: "use crate::bar".as_bytes().to_vec(),
-        });
-        root_files.push(File {
-            filename: "bar.rs".into(),
-            contents: "fn hello_world()".as_bytes().to_vec(),
-        });
+        let mut root_files = NonEmpty::new(File::new("foo.rs".into(), b"use crate::bar"));
+
+        root_files.push(File::new("bar.rs".into(), b"fn hello_world()"));
         directory_map.insert(Path::root(), root_files);
 
         // Haskell files set up
-        let mut haskell_files = NonEmpty::new(File {
-            filename: "foo.hs".into(),
-            contents: "module Foo where".as_bytes().to_vec(),
-        });
-        haskell_files.push(File {
-            filename: "bar.hs".into(),
-            contents: "module Bar where".as_bytes().to_vec(),
-        });
+        let mut haskell_files = NonEmpty::new(File::new("foo.hs".into(), b"module Foo where"));
+
+        haskell_files.push(File::new("bar.hs".into(), b"module Bar where"));
+
         directory_map.insert(Path(NonEmpty::new("haskell".into())), haskell_files);
 
         let directory = Directory::from::<TestRepo>(directory_map);
@@ -894,21 +886,12 @@ pub mod tests {
         let mut directory_map = HashMap::new();
 
         let path1 = Path::from_labels("foo".into(), &["bar".into(), "baz".into()]);
-        let file1 = File {
-            filename: "monadic.rs".into(),
-            contents: "".as_bytes().to_vec(),
-        };
-        let file2 = File {
-            filename: "oscoin.rs".into(),
-            contents: "".as_bytes().to_vec(),
-        };
+        let file1 = File::new("monadic.rs".into(), &[]);
+        let file2 = File::new("oscoin.rs".into(), &[]);
         directory_map.insert(path1, (file1, vec![file2]));
 
         let path2 = Path::from_labels("foo".into(), &["bar".into(), "quux".into()]);
-        let file3 = File {
-            filename: "radicle.rs".into(),
-            contents: "".as_bytes().to_vec(),
-        };
+        let file3 = File::new("radicle.rs".into(), &[]);
         directory_map.insert(path2, (file3, vec![]));
 
         assert!(prop_all_directories_and_files(directory_map))
@@ -962,13 +945,7 @@ pub mod tests {
         // This test ensures that if the filename is the same the root of the
         // directory, that search_path.split_last() doesn't toss away the prefix.
         let path = Path::from_labels(Label("foo".into()), &[Label("bar".into())]);
-        let files = (
-            File {
-                filename: Label("~".into()),
-                contents: Vec::new(),
-            },
-            vec![],
-        );
+        let files = (File::new(Label::root(), &[]), vec![]);
         let mut directory_map = HashMap::new();
         directory_map.insert(path, files);
 
