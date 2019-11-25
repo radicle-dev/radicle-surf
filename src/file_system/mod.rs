@@ -832,7 +832,7 @@ pub mod tests {
         let mut directory_map = HashMap::new();
 
         // Root files set up
-        let mut root_files = (
+        let root_files = (
             File::new("foo.rs".into(), b"use crate::bar"),
             vec![File::new("bar.rs".into(), b"fn hello_world()")],
         )
@@ -840,7 +840,7 @@ pub mod tests {
         directory_map.insert(Path::root(), root_files);
 
         // Haskell files set up
-        let mut haskell_files = (
+        let haskell_files = (
             File::new("foo.hs".into(), b"module Foo where"),
             vec![File::new("bar.hs".into(), b"module Bar where")],
         )
