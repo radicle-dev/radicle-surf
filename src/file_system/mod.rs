@@ -30,7 +30,6 @@ impl Label {
     /// # Examples
     ///
     /// ```
-    /// use nonempty::NonEmpty;
     /// use radicle_surf::file_system::{Label, Path};
     ///
     /// let root = Path::root();
@@ -81,7 +80,6 @@ impl Path {
     /// # Examples
     ///
     /// ```
-    /// use nonempty::NonEmpty;
     /// use radicle_surf::file_system::{Label, Path};
     ///
     /// let root = Path::root();
@@ -247,9 +245,7 @@ impl Path {
     /// assert_eq!(path_vec, vec!["~".into(), "foo".into(), "bar".into(), "baz.rs".into()]);
     /// ```
     pub fn from_labels(root: Label, labels: &[Label]) -> Path {
-        let mut path = Path(NonEmpty::new(root));
-        labels.iter().cloned().for_each(|l| path.push(l));
-        path
+        Path((root, labels.to_vec()).into())
     }
 
     /// Convert a raw string literal to a `Path`.
@@ -736,13 +732,9 @@ pub mod tests {
         let bar = DirectoryContents::file("bar.hs".into(), "module Banana ...".as_bytes());
         let baz = DirectoryContents::file("baz.hs".into(), "module Banana ...".as_bytes());
 
-        let mut files = NonEmpty::new(foo);
-        files.push(bar);
-        files.push(baz);
-
         let directory: Directory = Directory {
             label: Label::root(),
-            entries: files,
+            entries: (foo, vec![bar, baz]).into(),
         };
 
         assert_eq!(
@@ -760,25 +752,33 @@ pub mod tests {
         let mut directory_map = HashMap::new();
 
         // Root files set up
-        let mut root_files = NonEmpty::new(File {
-            filename: "foo.rs".into(),
-            contents: "use crate::bar".as_bytes().to_vec(),
-        });
-        root_files.push(File {
-            filename: "bar.rs".into(),
-            contents: "fn hello_world()".as_bytes().to_vec(),
-        });
+        let root_files = (
+            File {
+                filename: "foo.rs".into(),
+                contents: b"use crate::bar".to_vec(),
+            },
+            vec![File {
+                filename: "bar.rs".into(),
+                contents: b"fn hello_world()".to_vec(),
+            }],
+        )
+            .into();
+
         directory_map.insert(Path::root(), root_files);
 
         // Haskell files set up
-        let mut haskell_files = NonEmpty::new(File {
-            filename: "foo.hs".into(),
-            contents: "module Foo where".as_bytes().to_vec(),
-        });
-        haskell_files.push(File {
-            filename: "bar.hs".into(),
-            contents: "module Bar where".as_bytes().to_vec(),
-        });
+        let haskell_files = (
+            File {
+                filename: "foo.hs".into(),
+                contents: "module Foo where".as_bytes().to_vec(),
+            },
+            vec![File {
+                filename: "bar.hs".into(),
+                contents: "module Bar where".as_bytes().to_vec(),
+            }],
+        )
+            .into();
+
         directory_map.insert(Path(NonEmpty::new("haskell".into())), haskell_files);
 
         let directory = Directory::from::<TestRepo>(directory_map);
@@ -817,18 +817,18 @@ pub mod tests {
         let path1 = Path::from_labels("foo".into(), &["bar".into(), "baz".into()]);
         let file1 = File {
             filename: "monadic.rs".into(),
-            contents: "".as_bytes().to_vec(),
+            contents: vec![],
         };
         let file2 = File {
             filename: "oscoin.rs".into(),
-            contents: "".as_bytes().to_vec(),
+            contents: vec![],
         };
         directory_map.insert(path1, (file1, vec![file2]));
 
         let path2 = Path::from_labels("foo".into(), &["bar".into(), "quux".into()]);
         let file3 = File {
             filename: "radicle.rs".into(),
-            contents: "".as_bytes().to_vec(),
+            contents: vec![],
         };
         directory_map.insert(path2, (file3, vec![]));
 
@@ -847,9 +847,7 @@ pub mod tests {
     fn prop_all_directories_and_files(directory_map: HashMap<Path, (File, Vec<File>)>) -> bool {
         let mut new_directory_map = HashMap::new();
         for (path, files) in directory_map {
-            let mut files_nonempty = NonEmpty::new(files.0.clone());
-            files_nonempty.append(&mut files.1.clone());
-            new_directory_map.insert(path.clone(), files_nonempty);
+            new_directory_map.insert(path.clone(), files.into());
         }
 
         let directory = Directory::from::<TestRepo>(new_directory_map.clone());
@@ -860,17 +858,11 @@ pub mod tests {
                 path.append(&mut directory_path.clone());
 
                 if !directory.find_directory(&path).is_some() {
-                    println!("Directory not found");
-                    println!("Directory: {:#?}", directory);
-                    println!("Path: {:#?}", path);
                     return false;
                 }
 
                 path.push(file.filename.clone());
                 if !directory.find_file(&path).is_some() {
-                    println!("File not found");
-                    println!("Directory: {:#?}", directory);
-                    println!("Path: {:#?}", path);
                     return false;
                 }
             }
@@ -950,8 +942,8 @@ pub mod tests {
             label: "quux".into(),
             entries: NonEmpty::new(DirectoryContents::file("hallo.rs".into(), b"")),
         });
-        let mut subdirs = NonEmpty::new(expected_quux);
-        subdirs.push(expected_hallo);
+
+        let subdirs = (expected_quux, vec![expected_hallo]).into();
 
         let expected = Directory::mkdir(
             "foo".into(),
@@ -1004,8 +996,11 @@ pub mod tests {
         );
 
         let mut expected_root = Directory::empty_root::<TestRepo>();
-        let mut files = NonEmpty::new(DirectoryContents::file("baz.rs".into(), b""));
-        files.push(DirectoryContents::file("quux.rs".into(), b""));
+        let files = (
+            DirectoryContents::file("baz.rs".into(), b""),
+            vec![DirectoryContents::file("quux.rs".into(), b"")],
+        )
+            .into();
         let expected = Directory::mkdir(
             "foo".into(),
             Directory {
