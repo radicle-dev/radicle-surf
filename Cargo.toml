@@ -8,8 +8,7 @@ edition = "2018"
 
 [dependencies]
 git2 = "0.10.1"
-nonempty = { git = "https://github.com/FintanH/nonempty", branch = "fintan/iter-mut" }
-# nonempty = "0.1.4"
+nonempty = "0.1.5"
 rm_rf = "0.5.0"
 
 [dev-dependencies]
