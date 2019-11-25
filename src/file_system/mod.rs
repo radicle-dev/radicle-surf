@@ -424,6 +424,27 @@ pub struct File {
     pub contents: Vec<u8>,
 }
 
+impl File {
+    /// Get the size of the `File` corresponding to
+    /// the number of bytes in the file contents.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use radicle_surf::file_system::File;
+    ///
+    /// let file = File {
+    ///     filename: "lib.rs".into(),
+    ///     contents: b"pub mod diff;\npub mod file_system;\npub mod vcs;\npub use crate::vcs::git;\n".to_vec(),
+    /// };
+    ///
+    /// assert_eq!(file.size(), 73);
+    /// ```
+    pub fn size(&self) -> usize {
+        self.contents.len()
+    }
+}
+
 #[cfg(test)]
 impl Arbitrary for File {
     fn arbitrary<G: Gen>(g: &mut G) -> Self {
@@ -471,6 +492,64 @@ impl Directory {
         Repo: RepoBackend,
     {
         Directory::mkdir(Label::root(), Repo::repo_directory())
+    }
+
+    /// Get the total size, in bytes, of a `Directory`. The size is
+    /// the sum of all files that can be reached from this `Directory`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use radicle_surf::file_system::{Directory, DirectoryContents, File, Label};
+    ///
+    /// let files = (
+    ///     DirectoryContents::file("main.rs".into(), b"println!(\"Hello, world!\")"),
+    ///     vec![DirectoryContents::file("lib.rs".into(), b"struct Hello(String)")],
+    /// ).into();
+    ///
+    /// let directory = Directory {
+    ///     label: Label::root(),
+    ///     entries: files,
+    /// };
+    ///
+    /// assert_eq!(directory.size(), 45);
+    /// ```
+    ///
+    /// ```
+    /// use nonempty::NonEmpty;
+    /// use radicle_surf::file_system::{Directory, DirectoryContents, File, Label};
+    ///
+    /// let mut entries: NonEmpty<DirectoryContents> = (
+    ///     DirectoryContents::file("main.rs".into(), b"println!(\"Hello, world!\")"),
+    ///     vec![DirectoryContents::file("lib.rs".into(), b"struct Hello(String)")],
+    /// ).into();
+    ///
+    /// let subdir = DirectoryContents::sub_directory(Directory {
+    ///     label: "test".into(),
+    ///     entries: NonEmpty::new(DirectoryContents::file(
+    ///         "mod.rs".into(),
+    ///         b"assert_eq!(1 + 1, 2);",
+    ///     )),
+    /// });
+    ///
+    /// entries.push(subdir);
+    ///
+    /// let directory = Directory {
+    ///     label: Label::root(),
+    ///     entries: entries,
+    /// };
+    ///
+    /// assert_eq!(directory.size(), 66);
+    /// ```
+    pub fn size(&self) -> usize {
+        self.entries
+            .iter()
+            .map(|entry| match entry {
+                DirectoryContents::Repo => 0,
+                DirectoryContents::File(file) => file.size(),
+                DirectoryContents::SubDirectory(directory) => directory.size(),
+            })
+            .sum()
     }
 
     /// List the current `Directory`'s files and sub-directories.
