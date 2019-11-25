@@ -452,8 +452,8 @@ impl File {
 impl Arbitrary for File {
     fn arbitrary<G: Gen>(g: &mut G) -> Self {
         let filename = Arbitrary::arbitrary(g);
-        let contents = Arbitrary::arbitrary(g);
-        File::new(filename, contents)
+        let contents: Vec<u8> = Arbitrary::arbitrary(g);
+        File::new(filename, &contents)
     }
 }
 
