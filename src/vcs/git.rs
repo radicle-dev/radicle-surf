@@ -278,8 +278,6 @@ impl<'repo> GitBrowser<'repo> {
 mod tests {
     use crate::file_system::*;
     use crate::vcs::git::*;
-    use git2::{IndexAddOption, IntoCString, Signature};
-    use rm_rf;
     use std::panic;
 
     #[test]
