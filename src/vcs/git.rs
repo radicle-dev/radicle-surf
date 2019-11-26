@@ -40,16 +40,21 @@ impl<'repo> GitRepository {
     ///     println!("Branch: {}", branch);
     /// }
     /// ```
-    pub fn new(repo_uri: &str) -> Result<Self, Error> {
-        Repository::init(repo_uri).map(GitRepository)
+    pub fn new(repo_uri: &str) -> Result<Self, GitError> {
+        Repository::init(repo_uri)
+            .map(GitRepository)
+            .map_err(GitError::from)
     }
 
-    pub(crate) fn head(&'repo self) -> Result<GitHistory, Error> {
+    pub(crate) fn head(&'repo self) -> Result<GitHistory, GitError> {
         let head = self.0.head()?;
         self.to_history(head)
     }
 
-    pub(crate) fn to_history(&'repo self, history: Reference<'repo>) -> Result<GitHistory, Error> {
+    pub(crate) fn to_history(
+        &'repo self,
+        history: Reference<'repo>,
+    ) -> Result<GitHistory, GitError> {
         let head = history.peel_to_commit()?;
         let mut commits = NonEmpty::new(head.clone());
         let mut revwalk = self.0.revwalk()?;
@@ -69,34 +74,40 @@ impl<'repo> GitRepository {
     }
 }
 
-impl<'repo> vcs::GetVCS<'repo, Error> for GitRepository {
+impl<'repo> vcs::GetVCS<'repo, GitError> for GitRepository {
     type RepoId = &'repo str;
 
-    fn get_repo(repo_id: Self::RepoId) -> Result<Self, Error> {
-        Repository::open(repo_id).map(GitRepository)
+    fn get_repo(repo_id: Self::RepoId) -> Result<Self, GitError> {
+        Repository::open(repo_id)
+            .map(GitRepository)
+            .map_err(GitError::from)
     }
 }
 
-impl<'repo> vcs::VCS<'repo, Commit<'repo>, Error> for GitRepository {
+impl<'repo> vcs::VCS<'repo, Commit<'repo>, GitError> for GitRepository {
     type HistoryId = &'repo str;
     type ArtefactId = Oid;
 
-    fn get_history(&'repo self, history_id: Self::HistoryId) -> Result<GitHistory, Error> {
+    fn get_history(&'repo self, history_id: Self::HistoryId) -> Result<GitHistory, GitError> {
         self.0
             .resolve_reference_from_short_name(&history_id)
+            .map_err(GitError::from)
             .and_then(|reference| self.to_history(reference))
     }
 
-    fn get_histories(&'repo self) -> Result<Vec<GitHistory>, Error> {
-        self.0.references().and_then(|mut references| {
-            references.try_fold(vec![], |mut acc, reference| {
-                reference.and_then(|r| {
-                    let history = self.to_history(r)?;
-                    acc.push(history);
-                    Ok(acc)
+    fn get_histories(&'repo self) -> Result<Vec<GitHistory>, GitError> {
+        self.0
+            .references()
+            .map_err(GitError::from)
+            .and_then(|mut references| {
+                references.try_fold(vec![], |mut acc, reference| {
+                    reference.map_err(GitError::from).and_then(|r| {
+                        let history = self.to_history(r)?;
+                        acc.push(history);
+                        Ok(acc)
+                    })
                 })
             })
-        })
     }
 
     fn get_identifier(artifact: &'repo Commit) -> Self::ArtefactId {
@@ -121,7 +132,7 @@ impl std::fmt::Debug for GitRepository {
 
 /// A `Browser` that uses `GitRepository` as the underlying repository backend,
 /// `git2::Commit` as the artifact, and `git2::Error` for error reporting.
-pub type GitBrowser<'repo> = vcs::Browser<'repo, GitRepository, Commit<'repo>, Error>;
+pub type GitBrowser<'repo> = vcs::Browser<'repo, GitRepository, Commit<'repo>, GitError>;
 
 impl<'repo> GitBrowser<'repo> {
     /// Create a new browser to interact with.
@@ -137,7 +148,7 @@ impl<'repo> GitBrowser<'repo> {
     ///     println!("Branch: {}", branch);
     /// }
     /// ```
-    pub fn new(repository: &'repo GitRepository) -> Result<Self, Error> {
+    pub fn new(repository: &'repo GitRepository) -> Result<Self, GitError> {
         let history = repository.head()?;
         let snapshot = Box::new(|repository: &GitRepository, history: &GitHistory| {
             let tree = Self::get_tree(&repository.0, history.0.first())?;
@@ -168,7 +179,7 @@ impl<'repo> GitBrowser<'repo> {
     /// // We are able to render the directory
     /// assert!(directory.is_ok());
     /// ```
-    pub fn head(&mut self) -> Result<(), Error> {
+    pub fn head(&mut self) -> Result<(), GitError> {
         let history = self.repository.head()?;
         self.set_history(history);
         Ok(())
@@ -192,7 +203,7 @@ impl<'repo> GitBrowser<'repo> {
     /// // We are able to render the directory
     /// assert!(directory.is_ok());
     /// ```
-    pub fn branch(&mut self, branch_name: &'repo str) -> Result<(), Error> {
+    pub fn branch(&mut self, branch_name: &'repo str) -> Result<(), GitError> {
         let branch = self.repository.get_history(branch_name)?;
         self.set_history(branch);
         Ok(())
@@ -213,19 +224,23 @@ impl<'repo> GitBrowser<'repo> {
     /// // 'master' exists in the list of branches
     /// assert!(branches.contains(&"master".to_string()));
     /// ```
-    pub fn list_branches(&self) -> Result<Vec<String>, Error> {
-        self.repository.0.branches(None).and_then(|mut branches| {
-            branches.try_fold(vec![], |mut acc, branch| {
-                let (branch, _) = branch?;
-                let branch_name = branch.name()?;
-                if let Some(name) = branch_name {
-                    acc.push(name.to_string());
-                    Ok(acc)
-                } else {
-                    Err(Error::from_str("Failed to decode branch name"))
-                }
+    pub fn list_branches(&self) -> Result<Vec<String>, GitError> {
+        self.repository
+            .0
+            .branches(None)
+            .map_err(GitError::from)
+            .and_then(|mut branches| {
+                branches.try_fold(vec![], |mut acc, branch| {
+                    let (branch, _) = branch?;
+                    let branch_name = branch.name()?;
+                    if let Some(name) = branch_name {
+                        acc.push(name.to_string());
+                        Ok(acc)
+                    } else {
+                        Err(GitError::BranchDecode)
+                    }
+                })
             })
-        })
     }
 
     /// List the names of the tags that are contained in the
@@ -243,7 +258,7 @@ impl<'repo> GitBrowser<'repo> {
     /// // We currently have no tags :(
     /// assert!(tags.is_empty());
     /// ```
-    pub fn list_tags(&self) -> Result<Vec<String>, Error> {
+    pub fn list_tags(&self) -> Result<Vec<String>, GitError> {
         let tags = self.repository.0.tag_names(None)?;
         Ok(tags
             .into_iter()
@@ -257,7 +272,7 @@ impl<'repo> GitBrowser<'repo> {
     fn get_tree(
         repo: &Repository,
         commit: &Commit,
-    ) -> Result<HashMap<file_system::Path, NonEmpty<file_system::File>>, Error> {
+    ) -> Result<HashMap<file_system::Path, NonEmpty<file_system::File>>, GitError> {
         let mut dir: HashMap<file_system::Path, NonEmpty<file_system::File>> = HashMap::new();
         let tree = commit.as_object().peel_to_tree()?;
         tree.walk(TreeWalkMode::PreOrder, |s, entry| {
