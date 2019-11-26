@@ -116,7 +116,7 @@ impl<'browser, Repo, A, Error> Browser<'browser, Repo, A, Error> {
     /// using the default `History` provided if the operation fails.
     pub fn view_at<F>(&mut self, default_history: History<A>, f: F)
     where
-        A: PartialEq + Clone,
+        A: Clone,
         F: Fn(&History<A>) -> Option<History<A>>,
     {
         self.modify_history(|history| f(history).unwrap_or_else(|| default_history.clone()))
