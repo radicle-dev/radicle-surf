@@ -36,6 +36,13 @@ impl<A> History<A> {
         new_history.map(History)
     }
 
+    pub fn find<F, B>(&self, f: F) -> Option<B>
+    where
+        F: Fn(&A) -> Option<B>,
+    {
+        self.iter().find_map(f)
+    }
+
     /// Find an atrifact in the given `History` using the artifacts ID.
     ///
     /// This operation may fail if the artifact does not exist in the history.
