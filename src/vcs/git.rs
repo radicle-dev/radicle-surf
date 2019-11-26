@@ -5,6 +5,19 @@ use git2::{Commit, Error, Oid, Reference, Repository, TreeWalkMode, TreeWalkResu
 use nonempty::NonEmpty;
 use std::collections::HashMap;
 
+#[derive(Debug)]
+pub enum GitError {
+    EmptyCommitHistory,
+    BranchDecode,
+    Internal(Error),
+}
+
+impl From<Error> for GitError {
+    fn from(err: Error) -> Self {
+        GitError::Internal(err)
+    }
+}
+
 /// A `History` that uses `git2::Commit` as the underlying artifact.
 pub type GitHistory<'repo> = vcs::History<Commit<'repo>>;
 
