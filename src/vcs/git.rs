@@ -324,7 +324,7 @@ impl<'repo> GitBrowser<'repo> {
 
             let tree_entry = commit_tree.get_path(directory_path.as_path()).ok()?;
             let object = tree_entry.to_object(&self.repository.0).ok()?;
-            let tree = object.as_tree().map(|t| t.get_name("main.rs"));
+            let tree = object.as_tree().map(|t| t.get_name(&filename.0));
             tree.map(|_| commit)
         }
     }
