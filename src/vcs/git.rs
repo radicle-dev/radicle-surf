@@ -331,8 +331,7 @@ impl<'repo> GitBrowser<'repo> {
 
     pub fn last_commit(&self, path: &file_system::Path) -> Option<Commit> {
         self.get_history()
-            .iter()
-            .find_map(|commit| self.commit_contains_path(commit.clone(), path))
+            .find(|commit| self.commit_contains_path(commit.clone(), path))
     }
 }
 
