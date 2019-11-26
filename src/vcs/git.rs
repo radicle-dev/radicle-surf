@@ -301,31 +301,58 @@ impl<'repo> GitBrowser<'repo> {
         })?;
         Ok(dir)
     }
+
+    fn commit_contains_path(
+        &self,
+        commit: Commit<'repo>,
+        path: &file_system::Path,
+    ) -> Option<Commit<'repo>> {
+        let (directory, filename) = path.split_last();
+        let commit_tree = commit.tree().ok()?;
+
+        if directory == vec![file_system::Label::root()] {
+            commit_tree.get_name(&filename.0).map(|_| commit)
+        } else {
+            let mut directory_path = std::path::PathBuf::new();
+            for dir in directory {
+                if dir == file_system::Label::root() {
+                    continue;
+                }
+
+                directory_path.push(dir.0);
+            }
+
+            let tree_entry = commit_tree.get_path(directory_path.as_path()).ok()?;
+            let object = tree_entry.to_object(&self.repository.0).ok()?;
+            let tree = object.as_tree().map(|t| t.get_name("main.rs"));
+            tree.map(|_| commit)
+        }
+    }
+
+    pub fn last_commit(&self, path: &file_system::Path) -> Option<Commit> {
+        self.get_history()
+            .iter()
+            .find_map(|commit| self.commit_contains_path(commit.clone(), path))
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::file_system::*;
     use crate::vcs::git::*;
-    use git2::{IndexAddOption, IntoCString, Signature};
+    use git2::{Index, IndexAddOption, IntoCString, Signature};
     use rm_rf;
     use std::panic;
 
-    fn setup_golden_dir() {
-        // Initialiase the Repository
-        let repo =
-            Repository::init("./data/git-test").expect("Failed to initialise './data/git-test'");
-
-        // Ensure we're in the correct working directory
-        repo.set_workdir(std::path::Path::new("./data/git-test"), true)
-            .expect("Failed to set working dir for './data/git-test'");
-
-        // We have to set up the Index, i.e. staging area
-        let mut index = repo.index().expect("Failed to get index");
-
-        // Add ALL THE FILES
+    fn make_commit<'repo>(
+        repo: &'repo Repository,
+        index: &mut Index,
+        file_pattern: &str,
+        message: &str,
+        parents: &[&Commit],
+    ) -> Commit<'repo> {
         index
-            .add_all("*".into_c_string(), IndexAddOption::DEFAULT, None)
+            .add_all(file_pattern.into_c_string(), IndexAddOption::DEFAULT, None)
             .expect("add all files failed");
 
         // Finally, we write the Tree via the Index, i.e. write the files
@@ -339,16 +366,36 @@ mod tests {
             .find_tree(tree_id)
             .expect("Failed to initialise Tree object");
 
-        // FIRST COMMIT!
-        repo.commit(
-            Some("HEAD"),
-            &signature,
-            &signature,
-            "Initial commit",
-            &tree,
-            &[],
-        )
-        .expect("Could not make first commit on './data/git-test'");
+        let commit_id = repo
+            .commit(
+                Some("HEAD"),
+                &signature,
+                &signature,
+                message,
+                &tree,
+                parents,
+            )
+            .expect("Could not make first commit './data/git-test'");
+
+        repo.find_commit(commit_id)
+            .expect("Failed to get commit just created")
+    }
+
+    fn setup_golden_dir() {
+        // Initialiase the Repository
+        let repo =
+            Repository::init("./data/git-test").expect("Failed to initialise './data/git-test'");
+
+        // Ensure we're in the correct working directory
+        repo.set_workdir(std::path::Path::new("./data/git-test"), true)
+            .expect("Failed to set working dir for './data/git-test'");
+
+        // We have to set up the Index, i.e. staging area
+        let mut index = repo.index().expect("Failed to get index");
+        let commit = make_commit(&repo, &mut index, "src/*", "First commit", &[]);
+
+        let mut index = repo.index().expect("Failed to get index");
+        make_commit(&repo, &mut index, "*", "Second, commit", &[&commit]);
     }
 
     fn teardown_golden_dir() {
@@ -356,22 +403,17 @@ mod tests {
             .expect("Failed to remove '.git' directory in './data/git-test'")
     }
 
-    fn run_git_test<T>(test: T) -> ()
-    where
-        T: FnOnce() -> () + panic::UnwindSafe,
-    {
+    #[test]
+    fn run_git_tests() {
         setup_golden_dir();
 
-        let result = panic::catch_unwind(|| test());
+        let result = panic::catch_unwind(|| test_dir())
+            .and(panic::catch_unwind(|| test_last_commit_head()))
+            .and(panic::catch_unwind(|| test_last_commit_before_head()));
 
         teardown_golden_dir();
 
         assert!(result.is_ok())
-    }
-
-    #[test]
-    fn run_test_dir() {
-        run_git_test(test_dir)
     }
 
     fn test_dir() {
@@ -419,5 +461,57 @@ mod tests {
         expected_src_directory_contents.sort();
 
         assert_eq!(src_directory_contents, expected_src_directory_contents);
+    }
+
+    fn test_last_commit_head() {
+        let repo = GitRepository::new("./data/git-test")
+            .expect("Could not retrieve ./data/git-test as git repository");
+        let browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
+        let head = browser.get_history().0.first().clone();
+
+        let toml_last_commit = browser
+            .last_commit(&Path::from_labels(Label::root(), &["Cargo.toml".into()]))
+            .map(|commit| commit.id());
+
+        assert_eq!(toml_last_commit, Some(head.id()));
+
+        let main_last_commit = browser
+            .last_commit(&Path::from_labels(
+                Label::root(),
+                &["src".into(), "main.rs".into()],
+            ))
+            .map(|commit| commit.id());
+
+        assert_eq!(main_last_commit, Some(head.id()));
+    }
+
+    fn test_last_commit_before_head() {
+        let repo = GitRepository::new("./data/git-test")
+            .expect("Could not retrieve ./data/git-test as git repository");
+        let mut browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
+
+        // Set history to HEAD~1
+        browser.view_at(browser.get_history(), |history| {
+            let history_vec: Vec<Commit> = history.0.clone().into();
+            Some(vcs::History(NonEmpty::new(history_vec[1].clone())))
+        });
+        let head = browser.get_history().0.first().clone();
+
+        // Cargo.toml is commited second so it should not exist here.
+        let toml_last_commit = browser
+            .last_commit(&Path::from_labels(Label::root(), &["Cargo.toml".into()]))
+            .map(|commit| commit.id());
+
+        assert_eq!(toml_last_commit, None);
+
+        // src/main.rs exists in this commit.
+        let main_last_commit = browser
+            .last_commit(&Path::from_labels(
+                Label::root(),
+                &["src".into(), "main.rs".into()],
+            ))
+            .map(|commit| commit.id());
+
+        assert_eq!(main_last_commit, Some(head.id()));
     }
 }
