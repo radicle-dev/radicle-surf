@@ -10,6 +10,7 @@
 //! ```
 //! use radicle_surf::vcs::git::{GitBrowser, GitRepository};
 //! use radicle_surf::file_system::{Label, Path, SystemType};
+//! use pretty_assertions::assert_eq;
 //!
 //! // We're going to point to this repo.
 //! let repo = GitRepository::new(".").unwrap();
@@ -35,9 +36,9 @@
 //!     SystemType::directory(".docker".into()),
 //!     SystemType::directory(".git".into()),
 //!     SystemType::file(".gitignore".into()),
+//!     SystemType::file(".gitmodules".into()),
 //!     SystemType::file("Cargo.toml".into()),
 //!     SystemType::file("README.md".into()),
-//!     SystemType::directory("data".into()),
 //!     SystemType::directory("docs".into()),
 //!     SystemType::directory("src".into()),
 //! ]);
