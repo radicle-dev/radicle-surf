@@ -56,7 +56,7 @@ impl<'repo> GitRepository {
         history: Reference<'repo>,
     ) -> Result<GitHistory, GitError> {
         let head = history.peel_to_commit()?;
-        let mut commits = NonEmpty::new(head.clone());
+        let mut commits = Vec::new();
         let mut revwalk = self.0.revwalk()?;
 
         // Set the revwalk to the head commit
@@ -70,7 +70,9 @@ impl<'repo> GitRepository {
             commits.push(commit.clone());
         }
 
-        Ok(vcs::History(commits))
+        NonEmpty::from_slice(&commits)
+            .map(vcs::History)
+            .ok_or(GitError::EmptyCommitHistory)
     }
 }
 
