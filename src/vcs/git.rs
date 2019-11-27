@@ -28,7 +28,7 @@ impl<'repo> GitRepository {
     /// }
     /// ```
     pub fn new(repo_uri: &str) -> Result<Self, Error> {
-        Repository::init(repo_uri).map(GitRepository)
+        Repository::open(repo_uri).map(GitRepository)
     }
 
     pub(crate) fn head(&'repo self) -> Result<GitHistory, Error> {
@@ -278,76 +278,12 @@ impl<'repo> GitBrowser<'repo> {
 mod tests {
     use crate::file_system::*;
     use crate::vcs::git::*;
-    use git2::{IndexAddOption, IntoCString, Signature};
-    use rm_rf;
     use std::panic;
 
-    fn setup_golden_dir() {
-        // Initialiase the Repository
-        let repo =
-            Repository::init("./data/git-test").expect("Failed to initialise './data/git-test'");
-
-        // Ensure we're in the correct working directory
-        repo.set_workdir(std::path::Path::new("./data/git-test"), true)
-            .expect("Failed to set working dir for './data/git-test'");
-
-        // We have to set up the Index, i.e. staging area
-        let mut index = repo.index().expect("Failed to get index");
-
-        // Add ALL THE FILES
-        index
-            .add_all("*".into_c_string(), IndexAddOption::DEFAULT, None)
-            .expect("add all files failed");
-
-        // Finally, we write the Tree via the Index, i.e. write the files
-        let tree_id = index.write_tree().expect("Failed to write Tree object");
-
-        let signature = Signature::now("monadic.xyz", "test@monadic.xyz")
-            .expect("Failed to initialise signature");
-
-        // Get back the tree we wrote via the Oid
-        let tree = repo
-            .find_tree(tree_id)
-            .expect("Failed to initialise Tree object");
-
-        // FIRST COMMIT!
-        repo.commit(
-            Some("HEAD"),
-            &signature,
-            &signature,
-            "Initial commit",
-            &tree,
-            &[],
-        )
-        .expect("Could not make first commit on './data/git-test'");
-    }
-
-    fn teardown_golden_dir() {
-        rm_rf::ensure_removed("./data/git-test/.git")
-            .expect("Failed to remove '.git' directory in './data/git-test'")
-    }
-
-    fn run_git_test<T>(test: T) -> ()
-    where
-        T: FnOnce() -> () + panic::UnwindSafe,
-    {
-        setup_golden_dir();
-
-        let result = panic::catch_unwind(|| test());
-
-        teardown_golden_dir();
-
-        assert!(result.is_ok())
-    }
-
     #[test]
-    fn run_test_dir() {
-        run_git_test(test_dir)
-    }
-
     fn test_dir() {
-        let repo = GitRepository::new("./data/git-test")
-            .expect("Could not retrieve ./data/git-test as git repository");
+        let repo = GitRepository::new("./data/git-golden")
+            .expect("Could not retrieve ./data/git-golden as git repository");
         let browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
         let directory = browser.get_directory().expect("Could not render Directory");
         let mut directory_contents = directory.list_directory();
@@ -357,7 +293,11 @@ mod tests {
 
         // Root files set up, note that we're ignoring
         // file contents
-        let root_files = NonEmpty::new(File::new("Cargo.toml".into(), &[]));
+        let root_files = (
+            File::new("Cargo.toml".into(), &[]),
+            vec![File::new(".gitignore".into(), &[])],
+        )
+            .into();
         directory_map.insert(Path::root(), root_files);
 
         // src files set up
