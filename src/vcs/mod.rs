@@ -36,6 +36,13 @@ impl<A> History<A> {
         new_history.map(History)
     }
 
+    pub fn find<F, B>(&self, f: F) -> Option<B>
+    where
+        F: Fn(&A) -> Option<B>,
+    {
+        self.iter().find_map(f)
+    }
+
     /// Find an atrifact in the given `History` using the artifacts ID.
     ///
     /// This operation may fail if the artifact does not exist in the history.
@@ -116,7 +123,7 @@ impl<'browser, Repo, A, Error> Browser<'browser, Repo, A, Error> {
     /// using the default `History` provided if the operation fails.
     pub fn view_at<F>(&mut self, default_history: History<A>, f: F)
     where
-        A: PartialEq + Clone,
+        A: Clone,
         F: Fn(&History<A>) -> Option<History<A>>,
     {
         self.modify_history(|history| f(history).unwrap_or_else(|| default_history.clone()))
