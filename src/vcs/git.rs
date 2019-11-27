@@ -41,7 +41,7 @@ impl<'repo> GitRepository {
     /// }
     /// ```
     pub fn new(repo_uri: &str) -> Result<Self, GitError> {
-        Repository::init(repo_uri)
+        Repository::open(repo_uri)
             .map(GitRepository)
             .map_err(GitError::from)
     }
@@ -288,6 +288,7 @@ impl<'repo> GitBrowser<'repo> {
                             let file = file_system::File {
                                 filename: filename.into(),
                                 contents: blob.content().to_owned(),
+                                size: blob.size(),
                             };
                             dir.entry(path)
                                 .and_modify(|entries| entries.push(file.clone()))
@@ -339,85 +340,12 @@ impl<'repo> GitBrowser<'repo> {
 mod tests {
     use crate::file_system::*;
     use crate::vcs::git::*;
-    use git2::{Index, IndexAddOption, IntoCString, Signature};
-    use rm_rf;
     use std::panic;
 
-    fn make_commit<'repo>(
-        repo: &'repo Repository,
-        index: &mut Index,
-        file_pattern: &str,
-        message: &str,
-        parents: &[&Commit],
-    ) -> Commit<'repo> {
-        index
-            .add_all(file_pattern.into_c_string(), IndexAddOption::DEFAULT, None)
-            .expect("add all files failed");
-
-        // Finally, we write the Tree via the Index, i.e. write the files
-        let tree_id = index.write_tree().expect("Failed to write Tree object");
-
-        let signature = Signature::now("monadic.xyz", "test@monadic.xyz")
-            .expect("Failed to initialise signature");
-
-        // Get back the tree we wrote via the Oid
-        let tree = repo
-            .find_tree(tree_id)
-            .expect("Failed to initialise Tree object");
-
-        let commit_id = repo
-            .commit(
-                Some("HEAD"),
-                &signature,
-                &signature,
-                message,
-                &tree,
-                parents,
-            )
-            .expect("Could not make first commit './data/git-test'");
-
-        repo.find_commit(commit_id)
-            .expect("Failed to get commit just created")
-    }
-
-    fn setup_golden_dir() {
-        // Initialiase the Repository
-        let repo =
-            Repository::init("./data/git-test").expect("Failed to initialise './data/git-test'");
-
-        // Ensure we're in the correct working directory
-        repo.set_workdir(std::path::Path::new("./data/git-test"), true)
-            .expect("Failed to set working dir for './data/git-test'");
-
-        // We have to set up the Index, i.e. staging area
-        let mut index = repo.index().expect("Failed to get index");
-        let commit = make_commit(&repo, &mut index, "src/*", "First commit", &[]);
-
-        let mut index = repo.index().expect("Failed to get index");
-        make_commit(&repo, &mut index, "*", "Second, commit", &[&commit]);
-    }
-
-    fn teardown_golden_dir() {
-        rm_rf::ensure_removed("./data/git-test/.git")
-            .expect("Failed to remove '.git' directory in './data/git-test'")
-    }
-
     #[test]
-    fn run_git_tests() {
-        setup_golden_dir();
-
-        let result = panic::catch_unwind(|| test_dir())
-            .and(panic::catch_unwind(|| test_last_commit_head()))
-            .and(panic::catch_unwind(|| test_last_commit_before_head()));
-
-        teardown_golden_dir();
-
-        assert!(result.is_ok())
-    }
-
     fn test_dir() {
-        let repo = GitRepository::new("./data/git-test")
-            .expect("Could not retrieve ./data/git-test as git repository");
+        let repo = GitRepository::new("./data/git-golden")
+            .expect("Could not retrieve ./data/git-golden as git repository");
         let browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
         let directory = browser.get_directory().expect("Could not render Directory");
         let mut directory_contents = directory.list_directory();
@@ -427,17 +355,15 @@ mod tests {
 
         // Root files set up, note that we're ignoring
         // file contents
-        let root_files = NonEmpty::new(File {
-            filename: "Cargo.toml".into(),
-            contents: "".as_bytes().to_vec(),
-        });
+        let root_files = (
+            File::new("Cargo.toml".into(), &[]),
+            vec![File::new(".gitignore".into(), &[])],
+        )
+            .into();
         directory_map.insert(Path::root(), root_files);
 
         // src files set up
-        let src_files = NonEmpty::new(File {
-            filename: "main.rs".into(),
-            contents: "".as_bytes().to_vec(),
-        });
+        let src_files = NonEmpty::new(File::new("main.rs".into(), &[]));
         directory_map.insert(Path(NonEmpty::new("src".into())), src_files);
 
         let expected = file_system::Directory::from::<GitRepository>(directory_map);
@@ -462,8 +388,9 @@ mod tests {
         assert_eq!(src_directory_contents, expected_src_directory_contents);
     }
 
+    #[test]
     fn test_last_commit_head() {
-        let repo = GitRepository::new("./data/git-test")
+        let repo = GitRepository::new("./data/git-golden")
             .expect("Could not retrieve ./data/git-test as git repository");
         let browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
         let head = browser.get_history().0.first().clone();
@@ -484,15 +411,16 @@ mod tests {
         assert_eq!(main_last_commit, Some(head.id()));
     }
 
+    #[test]
     fn test_last_commit_before_head() {
-        let repo = GitRepository::new("./data/git-test")
-            .expect("Could not retrieve ./data/git-test as git repository");
+        let repo = GitRepository::new("./data/git-golden")
+            .expect("Could not retrieve ./data/git-golden as git repository");
         let mut browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
 
-        // Set history to HEAD~1
+        // Set history to HEAD~2
         browser.view_at(browser.get_history(), |history| {
             let history_vec: Vec<Commit> = history.0.clone().into();
-            Some(vcs::History(NonEmpty::new(history_vec[1].clone())))
+            Some(vcs::History(NonEmpty::new(history_vec[2].clone())))
         });
         let head = browser.get_history().0.first().clone();
 
