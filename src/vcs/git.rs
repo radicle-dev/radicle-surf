@@ -37,10 +37,12 @@ use git2::{Commit, Error, Oid, Reference, Repository, TreeWalkMode, TreeWalkResu
 use nonempty::NonEmpty;
 use std::collections::HashMap;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum GitError {
     EmptyCommitHistory,
     BranchDecode,
+    NotBranch,
+    NotTag,
     Internal(Error),
 }
 
