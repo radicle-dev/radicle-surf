@@ -2,6 +2,14 @@ env:
   DOCKER_FILE: .docker/build/Dockerfile
 
 steps:
+- label: "Submodule Fetch Remote"
+  command: git submodule foreach "git fetch origin"
+  agents:
+    production: "true"
+    platform: "linux"
+
+- wait
+
 - label: "Tests"
   command: "cargo test --all"
   agents:
