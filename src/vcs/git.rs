@@ -63,9 +63,9 @@ pub struct GitRepository(pub(crate) Repository);
 impl<'repo> GitRepository {
     /// Open a git repository given its URI.
     ///
-    /// # Example
+    /// # Examples
     /// ```
-    /// use radicle_surf::vcs::git::{GitBrowser, GitRepository};
+    /// use radicle_surf::vcs::git::{BranchName, GitBrowser, GitRepository};
     ///
     /// let repo = GitRepository::new("./data/git-golden").unwrap();
     /// let browser = GitBrowser::new(&repo).unwrap();
@@ -75,10 +75,10 @@ impl<'repo> GitRepository {
     /// assert_eq!(
     ///     branches,
     ///     Ok(vec![
-    ///         "master".into(),
-    ///         "origin/HEAD".into(),
-    ///         "origin/add-tests".into(),
-    ///         "origin/master".into()
+    ///         BranchName::new("master"),
+    ///         BranchName::new("origin/HEAD"),
+    ///         BranchName::new("origin/add-tests"),
+    ///         BranchName::new("origin/master"),
     ///     ])
     /// );
     /// ```
@@ -88,14 +88,24 @@ impl<'repo> GitRepository {
             .map_err(GitError::from)
     }
 
-    pub(crate) fn head(&'repo self) -> Result<GitHistory, GitError> {
-        let head = self.0.head()?;
-        self.to_history(head)
+    /// Get a particular `Commit`.
+    pub(crate) fn get_commit(&'repo self, sha: Sha1) -> Result<Commit<'repo>, GitError> {
+        let oid = Oid::from_str(&sha.0)?;
+        let commit = self.0.find_commit(oid)?;
+        Ok(commit)
     }
 
+    /// Build a `GitHistory` using the `head` reference.
+    pub(crate) fn head(&'repo self) -> Result<GitHistory, GitError> {
+        let head = self.0.head()?;
+        self.to_history(&head)
+    }
+
+    /// Turn a `git2::Reference` into a `GitHistory` by completing
+    /// a revwalk over the first commit in the reference.
     pub(crate) fn to_history(
         &'repo self,
-        history: Reference<'repo>,
+        history: &Reference<'repo>,
     ) -> Result<GitHistory, GitError> {
         let head = history.peel_to_commit()?;
         let mut commits = Vec::new();
@@ -128,15 +138,98 @@ impl<'repo> vcs::GetVCS<'repo, GitError> for GitRepository {
     }
 }
 
+/// A newtype wrapper over `String` to separate out
+/// the fact that a caller wants to fetch a branch.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct BranchName(String);
+
+impl BranchName {
+    pub fn new(name: &str) -> Self {
+        BranchName(name.into())
+    }
+
+    pub fn name(&self) -> String {
+        self.0.clone()
+    }
+}
+
+/// A newtype wrapper over `String` to separate out
+/// the fact that a caller wants to fetch a tag.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct TagName(String);
+
+impl TagName {
+    pub fn new(name: &str) -> Self {
+        TagName(name.into())
+    }
+
+    pub fn name(&self) -> String {
+        self.0.clone()
+    }
+}
+
+/// A newtype wrapper over `String` to separate out
+/// the fact that a caller wants to fetch a commit.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Sha1(String);
+
+impl Sha1 {
+    pub fn new(name: &str) -> Self {
+        Sha1(name.into())
+    }
+
+    pub fn name(&self) -> String {
+        self.0.clone()
+    }
+}
+
+/// An enumeration of git objects we can fetch and turn
+/// into a [`GitHistory`](struct.GitHistory.html).
+#[derive(Debug, Clone)]
+pub enum GitObject {
+    Branch(BranchName),
+    Tag(TagName),
+}
+
+impl GitObject {
+    pub fn branch(name: &str) -> Self {
+        GitObject::Branch(BranchName::new(name))
+    }
+
+    pub fn tag(name: &str) -> Self {
+        GitObject::Tag(TagName::new(name))
+    }
+
+    fn get_name(&self) -> String {
+        match self {
+            GitObject::Branch(name) => name.0.clone(),
+            GitObject::Tag(name) => name.0.clone(),
+        }
+    }
+}
+
 impl<'repo> vcs::VCS<'repo, Commit<'repo>, GitError> for GitRepository {
-    type HistoryId = &'repo str;
+    type HistoryId = GitObject;
     type ArtefactId = Oid;
 
     fn get_history(&'repo self, history_id: Self::HistoryId) -> Result<GitHistory, GitError> {
-        self.0
-            .resolve_reference_from_short_name(&history_id)
-            .map_err(GitError::from)
-            .and_then(|reference| self.to_history(reference))
+        let reference = self
+            .0
+            .resolve_reference_from_short_name(&history_id.get_name())?;
+        let to_history = |pred, err| {
+            if pred {
+                self.to_history(&reference)
+            } else {
+                Err(err)
+            }
+        };
+        match history_id {
+            GitObject::Branch(_) => to_history(
+                reference.is_branch() || reference.is_remote(),
+                GitError::NotBranch,
+            ),
+            GitObject::Tag(_) => to_history(reference.is_tag(), GitError::NotTag),
+        }
     }
 
     fn get_histories(&'repo self) -> Result<Vec<GitHistory>, GitError> {
@@ -146,7 +239,7 @@ impl<'repo> vcs::VCS<'repo, Commit<'repo>, GitError> for GitRepository {
             .and_then(|mut references| {
                 references.try_fold(vec![], |mut acc, reference| {
                     reference.map_err(GitError::from).and_then(|r| {
-                        let history = self.to_history(r)?;
+                        let history = self.to_history(&r)?;
                         acc.push(history);
                         Ok(acc)
                     })
@@ -174,23 +267,20 @@ impl std::fmt::Debug for GitRepository {
     }
 }
 
-/// A `Browser` that uses `GitRepository` as the underlying repository backend,
-/// `git2::Commit` as the artifact, and `git2::Error` for error reporting.
+/// A `Browser` that uses [`GitRepository`](struct.GitRepository.html) as the underlying repository backend,
+/// `git2::Commit` as the artifact, and [`GitError`](enum.GitError.html) for error reporting.
 pub type GitBrowser<'repo> = vcs::Browser<'repo, GitRepository, Commit<'repo>, GitError>;
 
 impl<'repo> GitBrowser<'repo> {
     /// Create a new browser to interact with.
     ///
-    /// # Example
+    /// # Examples
+    ///
     /// ```
     /// use radicle_surf::vcs::git::{GitBrowser, GitRepository};
     ///
-    /// let repo = GitRepository::new(".").unwrap();
+    /// let repo = GitRepository::new("./data/git-golden").unwrap();
     /// let browser = GitBrowser::new(&repo).unwrap();
-    ///
-    /// for branch in browser.list_tags().unwrap() {
-    ///     println!("Branch: {}", branch);
-    /// }
     /// ```
     pub fn new(repository: &'repo GitRepository) -> Result<Self, GitError> {
         let history = repository.head()?;
@@ -205,14 +295,14 @@ impl<'repo> GitBrowser<'repo> {
         })
     }
 
-    /// Set the current `GitBrowser` history to the
-    /// HEAD commit of the underlying repository.
+    /// Set the current `GitBrowser` history to the `HEAD` commit of the underlying repository.
     ///
-    /// # Example
+    /// # Examples
+    ///
     /// ```
     /// use radicle_surf::vcs::git::{GitBrowser, GitRepository};
     ///
-    /// let repo = GitRepository::new(".").unwrap();
+    /// let repo = GitRepository::new("./data/git-golden").unwrap();
     /// let mut browser = GitBrowser::new(&repo).unwrap();
     ///
     /// // ensure we're at HEAD
@@ -229,10 +319,11 @@ impl<'repo> GitBrowser<'repo> {
         Ok(())
     }
 
-    /// Set the current `GitBrowser` history to the
-    /// branch name provided.
+    /// Set the current `GitBrowser` history to the [`BranchName`](struct.BranchName.html)
+    /// provided.
     ///
     /// # Examples
+    ///
     /// ```
     /// use radicle_surf::vcs::git::{BranchName, GitBrowser, GitRepository};
     ///
@@ -247,28 +338,143 @@ impl<'repo> GitBrowser<'repo> {
     /// // We are able to render the directory
     /// assert!(directory.is_ok());
     /// ```
-    pub fn branch(&mut self, branch_name: &'repo str) -> Result<(), GitError> {
-        let branch = self.repository.get_history(branch_name)?;
+    ///
+    /// ```
+    /// use radicle_surf::vcs::git::{BranchName, GitBrowser, GitRepository};
+    /// use radicle_surf::file_system::{Label, Path, SystemType};
+    ///
+    /// let repo = GitRepository::new("./data/git-golden").unwrap();
+    /// let mut browser = GitBrowser::new(&repo).unwrap();
+    /// browser
+    ///     .branch(BranchName::new("origin/add-tests"))
+    ///     .expect("Failed to change branch to add-tests");
+    ///
+    /// let directory = browser.get_directory().expect("Failed to get directory");
+    /// let mut directory_contents = directory.list_directory();
+    /// directory_contents.sort();
+    ///
+    /// assert_eq!(
+    ///     directory_contents,
+    ///     vec![
+    ///         SystemType::directory(".git".into()),
+    ///         SystemType::file(".gitignore".into()),
+    ///         SystemType::file("Cargo.toml".into()),
+    ///         SystemType::directory("src".into()),
+    ///         SystemType::directory("tests".into()),
+    ///     ]
+    /// );
+    ///
+    /// let tests = directory
+    ///     .find_directory(&Path::from_labels(Label::root(), &["tests".into()]))
+    ///     .expect("tests not found");
+    /// let mut tests_contents = tests.list_directory();
+    /// tests_contents.sort();
+    ///
+    /// assert_eq!(
+    ///     tests_contents,
+    ///     vec![SystemType::file("mod.rs".into())]
+    /// );
+    /// ```
+    pub fn branch(&mut self, branch_name: BranchName) -> Result<(), GitError> {
+        let branch = self
+            .repository
+            .get_history(GitObject::Branch(branch_name))?;
         self.set_history(branch);
         Ok(())
     }
 
-    /// List the names of the branches that are contained in the
-    /// underlying `GitRepository`.
+    /// Set the current `GitBrowser` history to the [`TagName`](struct.TagName.html)
+    /// provided.
     ///
-    /// # Example
+    /// # Examples
+    ///
     /// ```
-    /// use radicle_surf::vcs::git::{GitBrowser, GitRepository};
+    /// use git2::Oid;
+    /// use radicle_surf::vcs::History;
+    /// use radicle_surf::vcs::git::{TagName, GitBrowser, GitRepository};
     ///
-    /// let repo = GitRepository::new(".").unwrap();
+    /// let repo = GitRepository::new("./data/git-golden").unwrap();
+    /// let mut browser = GitBrowser::new(&repo).unwrap();
+    ///
+    /// // Switch to "v0.0.1"
+    /// browser.tag(TagName::new("v0.0.1"));
+    ///
+    /// let expected_history = History((
+    ///     Oid::from_str("74ba370ee5643f310873fb288af1c99d639da8ca").unwrap(),
+    ///     vec![
+    ///         Oid::from_str("8eb5ace23086a588200d9aae1374f46c346bccec").unwrap(),
+    ///         Oid::from_str("cd3971c01606a0b1df2f3429aeb5766d234d7893").unwrap(),
+    ///     ]
+    /// ).into());
+    ///
+    /// let history_ids = browser.get_history().map(|commit| commit.id());
+    ///
+    /// // We are able to render the directory
+    /// assert_eq!(history_ids, expected_history);
+    /// ```
+    pub fn tag(&mut self, tag_name: TagName) -> Result<(), GitError> {
+        let branch = self.repository.get_history(GitObject::Tag(tag_name))?;
+        self.set_history(branch);
+        Ok(())
+    }
+
+    /// Set the current `GitBrowser` history to the [`Sha1`](struct.Sha1.html)
+    /// provided. The history will consist of a single [`Commit`](struct.Commit.html).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use radicle_surf::file_system::SystemType;
+    /// use radicle_surf::vcs::git::{GitBrowser, GitRepository, Sha1};
+    ///
+    /// let repo = GitRepository::new("./data/git-golden")
+    ///     .expect("Could not retrieve ./data/git-golden as git repository");
+    /// let mut browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
+    ///
+    /// // Set to the initial commit
+    /// browser
+    ///     .commit(Sha1::new("cd3971c01606a0b1df2f3429aeb5766d234d7893"))
+    ///     .unwrap();
+    ///
+    /// let directory = browser.get_directory().unwrap();
+    /// let mut directory_contents = directory.list_directory();
+    /// directory_contents.sort();
+    ///
+    /// // We should only have src and .git in our root
+    /// assert_eq!(
+    ///     directory_contents,
+    ///     vec![
+    ///         SystemType::directory(".git".into()),
+    ///         SystemType::directory("src".into()),
+    ///     ]
+    /// );
+    ///
+    /// // We have the single commit
+    /// assert!(browser.get_history().0.len() == 1);
+    /// ```
+    pub fn commit(&mut self, sha: Sha1) -> Result<(), GitError> {
+        let commit = self.repository.get_commit(sha)?;
+        self.set_history(vcs::History(NonEmpty::new(commit)));
+        Ok(())
+    }
+
+    /// List the names of the branches that are contained in the
+    /// underlying [`GitRepository`](struct.GitRepository.hmtl).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use radicle_surf::vcs::git::{BranchName, GitBrowser, GitRepository};
+    ///
+    /// let repo = GitRepository::new("./data/git-golden").unwrap();
     /// let mut browser = GitBrowser::new(&repo).unwrap();
     ///
     /// let branches = browser.list_branches().unwrap();
     ///
     /// // 'master' exists in the list of branches
-    /// assert!(branches.contains(&"master".to_string()));
+    /// assert!(branches.contains(&BranchName::new("master")));
     /// ```
-    pub fn list_branches(&self) -> Result<Vec<String>, GitError> {
+    pub fn list_branches(&self) -> Result<Vec<BranchName>, GitError> {
         self.repository
             .0
             .branches(None)
@@ -278,7 +484,7 @@ impl<'repo> GitBrowser<'repo> {
                     let (branch, _) = branch?;
                     let branch_name = branch.name()?;
                     if let Some(name) = branch_name {
-                        acc.push(name.to_string());
+                        acc.push(BranchName(name.to_string()));
                         Ok(acc)
                     } else {
                         Err(GitError::BranchDecode)
@@ -288,9 +494,9 @@ impl<'repo> GitBrowser<'repo> {
     }
 
     /// List the names of the tags that are contained in the
-    /// underlying `GitRepository`.
+    /// underlying [`GitRepository`](struct.GitRepository.hmtl).
     ///
-    /// # Example
+    /// # Examples
     /// ```
     /// use radicle_surf::vcs::git::{GitBrowser, GitRepository};
     ///
@@ -304,7 +510,7 @@ impl<'repo> GitBrowser<'repo> {
     /// ```
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{GitBrowser, GitRepository};
+    /// use radicle_surf::vcs::git::{GitBrowser, GitRepository, TagName};
     ///
     /// let repo = GitRepository::new("./data/git-golden").unwrap();
     /// let mut browser = GitBrowser::new(&repo).unwrap();
@@ -312,13 +518,13 @@ impl<'repo> GitBrowser<'repo> {
     /// let tags = browser.list_tags().unwrap();
     ///
     /// // We currently have no tags :(
-    /// assert_eq!(tags, vec!["v0.0.1"]);
+    /// assert_eq!(tags, vec![TagName::new("v0.0.1")]);
     /// ```
-    pub fn list_tags(&self) -> Result<Vec<String>, GitError> {
+    pub fn list_tags(&self) -> Result<Vec<TagName>, GitError> {
         let tags = self.repository.0.tag_names(None)?;
         Ok(tags
             .into_iter()
-            .filter_map(|tag| tag.map(String::from))
+            .filter_map(|tag| tag.map(TagName::new))
             .collect())
     }
 
