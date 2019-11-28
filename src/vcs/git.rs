@@ -322,68 +322,9 @@ impl<'repo> GitBrowser<'repo> {
             .collect())
     }
 
-    /// Do a pre-order TreeWalk of the given commit. This turns a Tree
-    /// into a HashMap of Paths and a list of Files. We can then turn that
-    /// into a Directory.
-    fn get_tree(
-        repo: &Repository,
-        commit: &Commit,
-    ) -> Result<HashMap<file_system::Path, NonEmpty<file_system::File>>, GitError> {
-        let mut dir: HashMap<file_system::Path, NonEmpty<file_system::File>> = HashMap::new();
-        let tree = commit.as_object().peel_to_tree()?;
-        tree.walk(TreeWalkMode::PreOrder, |s, entry| {
-            let path = file_system::Path::from_string(s);
-
-            entry
-                .to_object(repo)
-                .map(|object| {
-                    object.as_blob().and_then(|blob| {
-                        entry.name().and_then(|filename| {
-                            let file = file_system::File {
-                                filename: filename.into(),
-                                contents: blob.content().to_owned(),
-                                size: blob.size(),
-                            };
-                            dir.entry(path)
-                                .and_modify(|entries| entries.push(file.clone()))
-                                .or_insert_with(|| NonEmpty::new(file));
-                            Some(TreeWalkResult::Ok)
-                        })
-                    });
-                    TreeWalkResult::Ok
-                })
-                .unwrap_or(TreeWalkResult::Skip)
-        })?;
-        Ok(dir)
-    }
-
-    fn commit_contains_path(
-        &self,
-        commit: Commit<'repo>,
-        path: &file_system::Path,
-    ) -> Option<Commit<'repo>> {
-        let (directory, filename) = path.split_last();
-        let commit_tree = commit.tree().ok()?;
-
-        if directory == vec![file_system::Label::root()] {
-            commit_tree.get_name(&filename.0).map(|_| commit)
-        } else {
-            let mut directory_path = std::path::PathBuf::new();
-            for dir in directory {
-                if dir == file_system::Label::root() {
-                    continue;
-                }
-
-                directory_path.push(dir.0);
-            }
-
-            let tree_entry = commit_tree.get_path(directory_path.as_path()).ok()?;
-            let object = tree_entry.to_object(&self.repository.0).ok()?;
-            let tree = object.as_tree().map(|t| t.get_name(&filename.0));
-            tree.map(|_| commit)
-        }
-    }
-
+    /// Given a [`Path`](../../file_system/struct.Path.html) to a file, return the last `Commit`
+    /// that touched that file.
+    ///
     /// # Examples
     ///
     /// ```
@@ -445,5 +386,68 @@ impl<'repo> GitBrowser<'repo> {
     pub fn last_commit(&self, path: &file_system::Path) -> Option<Commit> {
         self.get_history()
             .find(|commit| self.commit_contains_path(commit.clone(), path))
+    }
+
+    /// Do a pre-order TreeWalk of the given commit. This turns a Tree
+    /// into a HashMap of Paths and a list of Files. We can then turn that
+    /// into a Directory.
+    fn get_tree(
+        repo: &Repository,
+        commit: &Commit,
+    ) -> Result<HashMap<file_system::Path, NonEmpty<file_system::File>>, GitError> {
+        let mut dir: HashMap<file_system::Path, NonEmpty<file_system::File>> = HashMap::new();
+        let tree = commit.as_object().peel_to_tree()?;
+        tree.walk(TreeWalkMode::PreOrder, |s, entry| {
+            let path = file_system::Path::from_string(s);
+
+            entry
+                .to_object(repo)
+                .map(|object| {
+                    object.as_blob().and_then(|blob| {
+                        entry.name().and_then(|filename| {
+                            let file = file_system::File {
+                                filename: filename.into(),
+                                contents: blob.content().to_owned(),
+                                size: blob.size(),
+                            };
+                            dir.entry(path)
+                                .and_modify(|entries| entries.push(file.clone()))
+                                .or_insert_with(|| NonEmpty::new(file));
+                            Some(TreeWalkResult::Ok)
+                        })
+                    });
+                    TreeWalkResult::Ok
+                })
+                .unwrap_or(TreeWalkResult::Skip)
+        })?;
+        Ok(dir)
+    }
+
+    /// Check that a given `Commit` touches the given `Path`.
+    fn commit_contains_path(
+        &self,
+        commit: Commit<'repo>,
+        path: &file_system::Path,
+    ) -> Option<Commit<'repo>> {
+        let (directory, filename) = path.split_last();
+        let commit_tree = commit.tree().ok()?;
+
+        if directory == vec![file_system::Label::root()] {
+            commit_tree.get_name(&filename.0).map(|_| commit)
+        } else {
+            let mut directory_path = std::path::PathBuf::new();
+            for dir in directory {
+                if dir == file_system::Label::root() {
+                    continue;
+                }
+
+                directory_path.push(dir.0);
+            }
+
+            let tree_entry = commit_tree.get_path(directory_path.as_path()).ok()?;
+            let object = tree_entry.to_object(&self.repository.0).ok()?;
+            let tree = object.as_tree().map(|t| t.get_name(&filename.0));
+            tree.map(|_| commit)
+        }
     }
 }
