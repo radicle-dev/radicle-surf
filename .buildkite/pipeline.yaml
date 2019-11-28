@@ -4,14 +4,14 @@ env:
 steps:
 - label: "Submodule Fetch Remote"
   command: git submodule foreach "git fetch origin"
+  key: "submodule-fetch"
   agents:
     production: "true"
     platform: "linux"
 
-- wait
-
 - label: "Tests"
   command: "cargo test --all"
+  depends_on: "submodule-fetch"
   agents:
     production: "true"
     platform: "linux"
