@@ -36,6 +36,13 @@ impl<A> History<A> {
         new_history.map(History)
     }
 
+    pub fn map<F, B>(&self, f: F) -> History<B>
+    where
+        F: Fn(&A) -> B,
+    {
+        History(self.0.map(f))
+    }
+
     pub fn find<F, B>(&self, f: F) -> Option<B>
     where
         F: Fn(&A) -> Option<B>,
