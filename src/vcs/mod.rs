@@ -6,7 +6,7 @@ pub mod git;
 /// A non-empty bag of artifacts which are used to
 /// derive a `Directory` view. Examples of artifacts
 /// would be commits in Git or patches in Pijul.
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct History<A>(pub NonEmpty<A>);
 
 impl<A> History<A> {
