@@ -1,3 +1,35 @@
+//! ```
+//! use nonempty::NonEmpty;
+//! use radicle_surf::file_system::{Directory, File, Path, SystemType};
+//! use radicle_surf::vcs::git::*;
+//! use std::collections::HashMap;
+//!
+//! let repo = GitRepository::new("./data/git-golden")
+//!     .expect("Could not retrieve ./data/git-golden as git repository");
+//! let browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
+//! let directory = browser.get_directory().expect("Could not render Directory");
+//! let mut directory_contents = directory.list_directory();
+//! directory_contents.sort();
+//!
+//! assert_eq!(directory_contents, vec![
+//!     SystemType::directory(".git".into()),
+//!     SystemType::file(".gitignore".into()),
+//!     SystemType::file("Cargo.toml".into()),
+//!     SystemType::directory("src".into()),
+//! ]);
+//!
+//! // find src directory in the Git directory and the in-memory directory
+//! let src_directory = directory
+//!     .find_directory(&Path::from_labels("~".into(), &["src".into()]))
+//!     .unwrap();
+//! let mut src_directory_contents = src_directory.list_directory();
+//! src_directory_contents.sort();
+//!
+//! assert_eq!(src_directory_contents, vec![
+//!     SystemType::file("main.rs".into()),
+//! ]);
+//! ```
+
 use crate::file_system;
 use crate::vcs;
 use crate::vcs::VCS;
@@ -33,12 +65,20 @@ impl<'repo> GitRepository {
     /// ```
     /// use radicle_surf::vcs::git::{GitBrowser, GitRepository};
     ///
-    /// let repo = GitRepository::new(".").unwrap();
+    /// let repo = GitRepository::new("./data/git-golden").unwrap();
     /// let browser = GitBrowser::new(&repo).unwrap();
     ///
-    /// for branch in browser.list_branches().unwrap() {
-    ///     println!("Branch: {}", branch);
-    /// }
+    /// let branches = browser.list_branches();
+    ///
+    /// assert_eq!(
+    ///     branches,
+    ///     Ok(vec![
+    ///         "master".into(),
+    ///         "origin/HEAD".into(),
+    ///         "origin/add-tests".into(),
+    ///         "origin/master".into()
+    ///     ])
+    /// );
     /// ```
     pub fn new(repo_uri: &str) -> Result<Self, GitError> {
         Repository::open(repo_uri)
@@ -190,15 +230,15 @@ impl<'repo> GitBrowser<'repo> {
     /// Set the current `GitBrowser` history to the
     /// branch name provided.
     ///
-    /// # Example
+    /// # Examples
     /// ```
-    /// use radicle_surf::vcs::git::{GitBrowser, GitRepository};
+    /// use radicle_surf::vcs::git::{BranchName, GitBrowser, GitRepository};
     ///
-    /// let repo = GitRepository::new(".").unwrap();
+    /// let repo = GitRepository::new("./data/git-golden").unwrap();
     /// let mut browser = GitBrowser::new(&repo).unwrap();
     ///
-    /// // ensure we're at 'master'
-    /// browser.branch("master");
+    /// // ensure we're on 'master'
+    /// browser.branch(BranchName::new("master"));
     ///
     /// let directory = browser.get_directory();
     ///
@@ -259,6 +299,18 @@ impl<'repo> GitBrowser<'repo> {
     ///
     /// // We currently have no tags :(
     /// assert!(tags.is_empty());
+    /// ```
+    ///
+    /// ```
+    /// use radicle_surf::vcs::git::{GitBrowser, GitRepository};
+    ///
+    /// let repo = GitRepository::new("./data/git-golden").unwrap();
+    /// let mut browser = GitBrowser::new(&repo).unwrap();
+    ///
+    /// let tags = browser.list_tags().unwrap();
+    ///
+    /// // We currently have no tags :(
+    /// assert_eq!(tags, vec!["v0.0.1"]);
     /// ```
     pub fn list_tags(&self) -> Result<Vec<String>, GitError> {
         let tags = self.repository.0.tag_names(None)?;
@@ -330,115 +382,66 @@ impl<'repo> GitBrowser<'repo> {
         }
     }
 
+    /// # Examples
+    ///
+    /// ```
+    /// use radicle_surf::vcs::git::{GitBrowser, GitRepository, Sha1};
+    /// use radicle_surf::file_system::{Label, Path, SystemType};
+    ///
+    /// let repo = GitRepository::new("./data/git-golden")
+    ///     .expect("Could not retrieve ./data/git-test as git repository");
+    /// let browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
+    ///
+    /// let head_commit = browser.get_history().0.first().clone();
+    ///
+    /// let toml_last_commit = browser
+    ///     .last_commit(&Path::from_labels(Label::root(), &["Cargo.toml".into()]))
+    ///     .map(|commit| commit.id());
+    ///
+    /// assert_eq!(toml_last_commit, Some(head_commit.id()));
+    ///
+    /// let main_last_commit = browser
+    ///     .last_commit(&Path::from_labels(
+    ///         Label::root(),
+    ///         &["src".into(), "main.rs".into()],
+    ///     ))
+    ///     .map(|commit| commit.id());
+    ///
+    /// assert_eq!(main_last_commit, Some(head_commit.id()));
+    /// ```
+    ///
+    /// ```
+    /// use radicle_surf::vcs::git::{GitBrowser, GitRepository, Sha1};
+    /// use radicle_surf::file_system::{Label, Path, SystemType};
+    ///
+    /// let repo = GitRepository::new("./data/git-golden")
+    ///     .expect("Could not retrieve ./data/git-golden as git repository");
+    /// let mut browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
+    ///
+    /// // Set the browser history to the initial commit
+    /// browser.commit(Sha1::new("cd3971c01606a0b1df2f3429aeb5766d234d7893")).unwrap();
+    ///
+    /// let head_commit = browser.get_history().0.first().clone();
+    ///
+    /// // Cargo.toml is commited second so it should not exist here.
+    /// let toml_last_commit = browser
+    ///     .last_commit(&Path::from_labels(Label::root(), &["Cargo.toml".into()]))
+    ///     .map(|commit| commit.id());
+    ///
+    /// assert_eq!(toml_last_commit, None);
+    ///
+    /// // src/main.rs exists in this commit.
+    /// let main_last_commit = browser
+    ///     .last_commit(&Path::from_labels(
+    ///         Label::root(),
+    ///         &["src".into(), "main.rs".into()],
+    ///     ))
+    ///     .map(|commit| commit.id());
+    ///
+    /// assert_eq!(main_last_commit, Some(head_commit.id()));
+    /// ```
     pub fn last_commit(&self, path: &file_system::Path) -> Option<Commit> {
         self.get_history()
             .find(|commit| self.commit_contains_path(commit.clone(), path))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::file_system::*;
-    use crate::vcs::git::*;
-    use std::panic;
-
-    #[test]
-    fn test_dir() {
-        let repo = GitRepository::new("./data/git-golden")
-            .expect("Could not retrieve ./data/git-golden as git repository");
-        let browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
-        let directory = browser.get_directory().expect("Could not render Directory");
-        let mut directory_contents = directory.list_directory();
-        directory_contents.sort();
-
-        let mut directory_map = HashMap::new();
-
-        // Root files set up, note that we're ignoring
-        // file contents
-        let root_files = (
-            File::new("Cargo.toml".into(), &[]),
-            vec![File::new(".gitignore".into(), &[])],
-        )
-            .into();
-        directory_map.insert(Path::root(), root_files);
-
-        // src files set up
-        let src_files = NonEmpty::new(File::new("main.rs".into(), &[]));
-        directory_map.insert(Path(NonEmpty::new("src".into())), src_files);
-
-        let expected = file_system::Directory::from::<GitRepository>(directory_map);
-        let mut expected_contents = expected.list_directory();
-        expected_contents.sort();
-
-        assert_eq!(directory_contents, expected_contents);
-
-        // find src directory in the Git directory and the in-memory directory
-        let src_directory = directory
-            .find_directory(&Path::from_labels("~".into(), &["src".into()]))
-            .unwrap();
-        let mut src_directory_contents = src_directory.list_directory();
-        src_directory_contents.sort();
-
-        let expected_src_directory = expected
-            .find_directory(&Path::from_labels("~".into(), &["src".into()]))
-            .unwrap();
-        let mut expected_src_directory_contents = expected_src_directory.list_directory();
-        expected_src_directory_contents.sort();
-
-        assert_eq!(src_directory_contents, expected_src_directory_contents);
-    }
-
-    #[test]
-    fn test_last_commit_head() {
-        let repo = GitRepository::new("./data/git-golden")
-            .expect("Could not retrieve ./data/git-test as git repository");
-        let browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
-        let head = browser.get_history().0.first().clone();
-
-        let toml_last_commit = browser
-            .last_commit(&Path::from_labels(Label::root(), &["Cargo.toml".into()]))
-            .map(|commit| commit.id());
-
-        assert_eq!(toml_last_commit, Some(head.id()));
-
-        let main_last_commit = browser
-            .last_commit(&Path::from_labels(
-                Label::root(),
-                &["src".into(), "main.rs".into()],
-            ))
-            .map(|commit| commit.id());
-
-        assert_eq!(main_last_commit, Some(head.id()));
-    }
-
-    #[test]
-    fn test_last_commit_before_head() {
-        let repo = GitRepository::new("./data/git-golden")
-            .expect("Could not retrieve ./data/git-golden as git repository");
-        let mut browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
-
-        // Set history to HEAD~2
-        browser.view_at(browser.get_history(), |history| {
-            let history_vec: Vec<Commit> = history.0.clone().into();
-            Some(vcs::History(NonEmpty::new(history_vec[2].clone())))
-        });
-        let head = browser.get_history().0.first().clone();
-
-        // Cargo.toml is commited second so it should not exist here.
-        let toml_last_commit = browser
-            .last_commit(&Path::from_labels(Label::root(), &["Cargo.toml".into()]))
-            .map(|commit| commit.id());
-
-        assert_eq!(toml_last_commit, None);
-
-        // src/main.rs exists in this commit.
-        let main_last_commit = browser
-            .last_commit(&Path::from_labels(
-                Label::root(),
-                &["src".into(), "main.rs".into()],
-            ))
-            .map(|commit| commit.id());
-
-        assert_eq!(main_last_commit, Some(head.id()));
     }
 }
