@@ -20,7 +20,7 @@
 //!
 //! // find src directory in the Git directory and the in-memory directory
 //! let src_directory = directory
-//!     .find_directory(&Path::from_labels("~".into(), &["src".into()]))
+//!     .find_directory(&Path::with_root(&["src".into()]))
 //!     .unwrap();
 //! let mut src_directory_contents = src_directory.list_directory();
 //! src_directory_contents.sort();
@@ -365,7 +365,7 @@ impl<'repo> GitBrowser<'repo> {
     /// );
     ///
     /// let tests = directory
-    ///     .find_directory(&Path::from_labels(Label::root(), &["tests".into()]))
+    ///     .find_directory(&Path::with_root(&["tests".into()]))
     ///     .expect("tests not found");
     /// let mut tests_contents = tests.list_directory();
     /// tests_contents.sort();
@@ -544,16 +544,13 @@ impl<'repo> GitBrowser<'repo> {
     /// let head_commit = browser.get_history().0.first().clone();
     ///
     /// let toml_last_commit = browser
-    ///     .last_commit(&Path::from_labels(Label::root(), &["Cargo.toml".into()]))
+    ///     .last_commit(&Path::with_root(&["Cargo.toml".into()]))
     ///     .map(|commit| commit.id());
     ///
     /// assert_eq!(toml_last_commit, Some(head_commit.id()));
     ///
     /// let main_last_commit = browser
-    ///     .last_commit(&Path::from_labels(
-    ///         Label::root(),
-    ///         &["src".into(), "main.rs".into()],
-    ///     ))
+    ///     .last_commit(&Path::with_root(&["src".into(), "main.rs".into()]))
     ///     .map(|commit| commit.id());
     ///
     /// assert_eq!(main_last_commit, Some(head_commit.id()));
@@ -574,17 +571,14 @@ impl<'repo> GitBrowser<'repo> {
     ///
     /// // Cargo.toml is commited second so it should not exist here.
     /// let toml_last_commit = browser
-    ///     .last_commit(&Path::from_labels(Label::root(), &["Cargo.toml".into()]))
+    ///     .last_commit(&Path::with_root(&["Cargo.toml".into()]))
     ///     .map(|commit| commit.id());
     ///
     /// assert_eq!(toml_last_commit, None);
     ///
     /// // src/main.rs exists in this commit.
     /// let main_last_commit = browser
-    ///     .last_commit(&Path::from_labels(
-    ///         Label::root(),
-    ///         &["src".into(), "main.rs".into()],
-    ///     ))
+    ///     .last_commit(&Path::with_root(&["src".into(), "main.rs".into()]))
     ///     .map(|commit| commit.id());
     ///
     /// assert_eq!(main_last_commit, Some(head_commit.id()));

@@ -97,7 +97,7 @@ impl Path {
     /// use radicle_surf::file_system::{Label, Path};
     ///
     /// let root = Path::root();
-    /// let not_root = Path::from_labels(Label::root(), &["src".into(), "lib.rs".into()]);
+    /// let not_root = Path::with_root(&["src".into(), "lib.rs".into()]);
     ///
     /// assert!(root.is_root());
     /// assert!(!not_root.is_root());
@@ -133,7 +133,7 @@ impl Path {
     /// root.push("src".into());
     /// root.push("lib.rs".into());
     ///
-    /// assert_eq!(root, Path::from_labels(Label::root(), &["src".into(), "lib.rs".into()]));
+    /// assert_eq!(root, Path::with_root(&["src".into(), "lib.rs".into()]));
     /// ```
     pub fn push(&mut self, label: Label) {
         self.0.push(label)
@@ -146,7 +146,7 @@ impl Path {
     /// ```
     /// use radicle_surf::file_system::{Label, Path};
     ///
-    /// let path = Path::from_labels(Label::root(), &["src".into(), "lib.rs".into()]);
+    /// let path = Path::with_root(&["src".into(), "lib.rs".into()]);
     /// let mut path_iter = path.iter();
     ///
     /// assert_eq!(path_iter.next(), Some(&Label::root()));
@@ -165,7 +165,7 @@ impl Path {
     /// ```
     /// use radicle_surf::file_system::{Label, Path};
     ///
-    /// let path = Path::from_labels(Label::root(), &["src".into(), "lib.rs".into()]);
+    /// let path = Path::with_root(&["src".into(), "lib.rs".into()]);
     ///
     /// assert_eq!(path.split_first(), (&Label::root(), &["src".into(), "lib.rs".into()][..]));
     /// ```
@@ -191,7 +191,7 @@ impl Path {
     /// ```
     /// use radicle_surf::file_system::{Label, Path};
     ///
-    /// let path = Path::from_labels(Label::root(), &["src".into(), "lib.rs".into()]);
+    /// let path = Path::with_root(&["src".into(), "lib.rs".into()]);
     /// assert_eq!(path.split_last(), (vec![Label::root(), "src".into()], "lib.rs".into()));
     /// ```
     ///
@@ -233,7 +233,7 @@ impl Path {
     /// use radicle_surf::file_system::{Path, Label};
     /// use nonempty::NonEmpty;
     ///
-    /// let path = Path::from_labels(Label::root(), &["foo".into(), "bar".into(), "baz.rs".into()]);
+    /// let path = Path::with_root(&["foo".into(), "bar".into(), "baz.rs".into()]);
     ///
     /// let mut expected = Path::root();
     /// expected.push("foo".into());
@@ -246,6 +246,30 @@ impl Path {
     /// ```
     pub fn from_labels(root: Label, labels: &[Label]) -> Path {
         Path((root, labels.to_vec()).into())
+    }
+
+    /// Construct a `Path` using [`Label::root`](struct.Label.html#method.root)
+    /// as the head of the `Path.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use radicle_surf::file_system::{Path, Label};
+    /// use nonempty::NonEmpty;
+    ///
+    /// let path = Path::with_root(&["foo".into(), "bar".into(), "baz.rs".into()]);
+    ///
+    /// let mut expected = Path::root();
+    /// expected.push("foo".into());
+    /// expected.push("bar".into());
+    /// expected.push("baz.rs".into());
+    ///
+    /// assert_eq!(path, expected);
+    /// let path_vec: Vec<Label> = path.0.into();
+    /// assert_eq!(path_vec, vec!["~".into(), "foo".into(), "bar".into(), "baz.rs".into()]);
+    /// ```
+    pub fn with_root(labels: &[Label]) -> Path {
+        Path::from_labels(Label::root(), labels)
     }
 
     /// Convert a raw string literal to a `Path`.
@@ -753,7 +777,7 @@ pub mod tests {
 
     #[test]
     fn test_find_added_file() {
-        let file_path = Path::from_labels(Label::root(), &["foo.hs".into()]);
+        let file_path = Path::with_root(&["foo.hs".into()]);
 
         let file = File::new("foo.hs".into(), b"module Banana ...");
 
@@ -768,10 +792,7 @@ pub mod tests {
 
     #[test]
     fn test_find_added_file_long_path() {
-        let file_path = Path::from_labels(
-            Label::root(),
-            &["foo".into(), "bar".into(), "baz.hs".into()],
-        );
+        let file_path = Path::with_root(&["foo".into(), "bar".into(), "baz.hs".into()]);
 
         let file = File::new("baz.hs".into(), b"module Banana ...");
 
@@ -792,7 +813,7 @@ pub mod tests {
 
     #[test]
     fn test_404_file_not_found() {
-        let file_path = Path::from_labels(Label::root(), &["bar.hs".into()]);
+        let file_path = Path::with_root(&["bar.hs".into()]);
 
         let directory: Directory = Directory {
             label: Label::root(),
@@ -863,7 +884,7 @@ pub mod tests {
         );
 
         let sub_directory = directory
-            .find_directory(&Path::from_labels("~".into(), &["haskell".into()]))
+            .find_directory(&Path::with_root(&["haskell".into()]))
             .unwrap();
         let mut sub_directory_contents = sub_directory.list_directory();
         sub_directory_contents.sort();
