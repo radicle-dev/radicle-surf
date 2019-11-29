@@ -8,7 +8,6 @@ steps:
   # Ensure we have fetched the remote info in submodule
   - git submodule foreach "git fetch origin"
   - "cargo test --all"
-  depends_on: "submodule-fetch"
   agents:
     production: "true"
     platform: "linux"
