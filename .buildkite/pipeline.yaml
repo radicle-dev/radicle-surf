@@ -2,15 +2,11 @@ env:
   DOCKER_FILE: .docker/build/Dockerfile
 
 steps:
-- label: "Submodule Fetch Remote"
-  command: git submodule foreach "git fetch origin"
-  key: "submodule-fetch"
-  agents:
-    production: "true"
-    platform: "linux"
-
 - label: "Tests"
-  command: "cargo test --all"
+  command:
+  # Ensure we have fetched the remote info in submodule
+  - git submodule foreach "git fetch origin"
+  - "cargo test --all"
   depends_on: "submodule-fetch"
   agents:
     production: "true"
