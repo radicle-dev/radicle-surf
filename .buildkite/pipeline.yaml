@@ -1,4 +1,5 @@
 env:
+  DOCKER_IMAGE: "gcr.io/opensourcecoin/radicle-surf-build:8c5e5e90064cb89f5faeedfe2874cbc3efbe260c"
   DOCKER_FILE: .docker/build/Dockerfile
 
 steps:
