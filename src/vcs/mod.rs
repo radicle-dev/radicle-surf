@@ -49,13 +49,13 @@ impl<A> History<A> {
     pub fn find_in_history<Identifier, F>(&self, identifier: &Identifier, id_of: F) -> Option<A>
     where
         A: Clone,
-        F: Fn(&A) -> &Identifier,
+        F: Fn(&A) -> Identifier,
         Identifier: PartialEq,
     {
         self.iter()
             .find(|artifact| {
                 let current_id = id_of(&artifact);
-                *identifier == *current_id
+                *identifier == current_id
             })
             .cloned()
     }
@@ -68,7 +68,7 @@ impl<A> History<A> {
     ) -> Vec<Self>
     where
         A: Clone,
-        F: Fn(&A) -> &Identifier + Copy,
+        F: Fn(&A) -> Identifier + Copy,
         Identifier: PartialEq,
     {
         histories
