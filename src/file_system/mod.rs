@@ -3,6 +3,8 @@ use std::collections::HashMap;
 
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 
 /// A label for [`Directory`](struct.Directory.html)
 /// and [`File`](struct.File.html) to allow for search.
@@ -397,6 +399,14 @@ impl DirectoryContents {
     pub fn file(filename: Label, contents: &[u8]) -> Self {
         DirectoryContents::File(File::new(filename, contents))
     }
+
+    pub fn label(&self) -> Option<&Label> {
+        match self {
+            DirectoryContents::SubDirectory(dir) => Some(&dir.label),
+            DirectoryContents::File(file) => Some(&file.filename),
+            _ => None
+        }
+    }
 }
 
 /// A `Directory` consists of its [`Label`](struct.Label.html) and its entries.
@@ -445,6 +455,12 @@ impl File {
     /// ```
     pub fn size(&self) -> usize {
         self.size
+    }
+
+    pub fn checksum(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        self.contents.hash(&mut hasher);
+        hasher.finish()
     }
 }
 
