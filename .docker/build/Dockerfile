@@ -7,6 +7,7 @@ RUN apt-get update \
         pkg-config \
         jq \
         curl \
+        git \
     && apt-get autoremove \
     && rm -rf /var/lib/apt/lists/*
 

@@ -6,7 +6,7 @@ pub mod git;
 /// A non-empty bag of artifacts which are used to
 /// derive a `Directory` view. Examples of artifacts
 /// would be commits in Git or patches in Pijul.
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct History<A>(pub NonEmpty<A>);
 
 impl<A> History<A> {
@@ -34,6 +34,13 @@ impl<A> History<A> {
         );
 
         new_history.map(History)
+    }
+
+    pub fn map<F, B>(&self, f: F) -> History<B>
+    where
+        F: Fn(&A) -> B,
+    {
+        History(self.0.map(f))
     }
 
     pub fn find<F, B>(&self, f: F) -> Option<B>
