@@ -18,10 +18,7 @@ fn main() {
 
     match options.head_revision {
         HeadRevision::HEAD => {
-            if let Err(e) = browser.head() {
-                println!("Failed to set browser to HEAD: {:?}", e);
-                std::process::exit(1)
-            }
+            reset_browser_to_head_or_exit(&mut browser);
         },
         HeadRevision::Commit(id) => {
             set_browser_history_or_exit(&mut browser, &id);
@@ -75,7 +72,16 @@ fn init_browser_or_exit(repo: &GitRepository) -> GitBrowser {
     };
 }
 
+fn reset_browser_to_head_or_exit(browser: &mut GitBrowser) {
+    if let Err(e) = browser.head() {
+        println!("Failed to set browser to HEAD: {:?}", e);
+        std::process::exit(1);
+    }
+}
+
 fn set_browser_history_or_exit(browser: &mut GitBrowser, commit_id: &str) {
+    // TODO: Might consider to not require resetting to HEAD when history is not at HEAD
+    reset_browser_to_head_or_exit(browser);
     if let Err(e) = set_browser_history(browser, commit_id) {
         println!("Failed to set browser history: {:?}", e);
         std::process::exit(1);
