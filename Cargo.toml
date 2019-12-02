@@ -9,8 +9,6 @@ edition = "2018"
 [dependencies]
 git2 = "0.10.1"
 nonempty = "0.1.5"
-diffs = "0.3.0"
-diff-rs = "0.2.3"
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"
