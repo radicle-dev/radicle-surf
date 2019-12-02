@@ -10,7 +10,7 @@ use std::rc::Rc;
 type Result = std::result::Result<Diff, DiffError>;
 
 #[derive(Debug)]
-struct DiffError {
+pub struct DiffError {
     reason: String
 }
 
@@ -28,21 +28,21 @@ pub struct Diff {
 }
 
 pub struct CreateFile {
-    path: NonEmpty<Label>,
+    pub path: NonEmpty<Label>,
 }
 
 pub struct DeleteFile {
-    path: NonEmpty<Label>,
+    pub path: NonEmpty<Label>,
 }
 
 pub struct MoveFile {
-    old_path: NonEmpty<Label>,
-    new_path: NonEmpty<Label>,
+    pub old_path: NonEmpty<Label>,
+    pub new_path: NonEmpty<Label>,
 }
 
 pub struct ModifiedFile {
-    path: NonEmpty<Label>,
-    diff: FileDiff,
+    pub path: NonEmpty<Label>,
+    pub diff: FileDiff,
 }
 
 pub struct FileDiff {
@@ -61,7 +61,7 @@ impl Diff {
 
     // TODO: Direction of comparison is not obvious with this signature.
     // For now using conventional approach with the right being "newer".
-    fn diff(left: Directory, right: Directory) -> Result {
+    pub fn diff(left: Directory, right: Directory) -> Result {
         let mut diff = Diff::new();
         let path = Rc::new(RefCell::new(Vec::new()));
         Diff::collect_diff(&left, &right, &path, &mut diff)?;
@@ -86,6 +86,7 @@ impl Diff {
         let mut new_iter = new.iter();
         let mut old_entry = old_iter.next();
         let mut new_entry = new_iter.next();
+
         while old_entry.is_some() || new_entry.is_some() {
             // need to skip Repos
             while let Some(DirectoryContents::Repo) = old_entry {
@@ -273,65 +274,8 @@ fn into_non_empty<T>(vec: &Vec<T>) -> std::result::Result<NonEmpty<T>, String> w
     Ok(NonEmpty::from((vec[0].clone(), vec[1..].to_vec())))
 }
 
-#[derive(Eq)]
-struct ComparableFile<'a> {
-    file: &'a File,
-    path: Vec<Label>
-}
-
-impl Ord for ComparableFile<'_> {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.path.cmp(&other.path)
-    }
-}
-
-impl PartialOrd for ComparableFile<'_> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.path.partial_cmp(&other.path)
-    }
-}
-
-impl PartialEq for ComparableFile<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        self.path.eq(&other.path)
-    }
-}
-
 #[cfg(test)]
 #[allow(unused_imports)]
 mod tests {
-    use crate::vcs::git::{GitBrowser, GitRepository};
-    use pretty_assertions::assert_eq;
-    use git2::Oid;
-    use nonempty::NonEmpty;
-    use crate::vcs::History;
-    use crate::diff::{Diff, DiffError};
-    use crate::file_system::Directory;
-    use std::time::Instant;
 
-    // run `cargo test -- --nocapture` to see output
-    #[test]
-    fn test_diff() -> std::result::Result<(), DiffError> {
-        let repo = GitRepository::new(".").unwrap();
-        let mut browser = GitBrowser::new(&repo).unwrap();
-        browser.head().unwrap();
-        let head_directory = browser.get_directory().unwrap();
-        let old_commit_id = "e88d1d8e34212f2dfa9d34d2d2005932fd84cb06"; // one of the old commits
-        let old_commit = browser.get_history()
-            .find_in_history(&Oid::from_str(old_commit_id).unwrap(), |artifact| artifact.id()).unwrap();
-        browser.set_history(History(NonEmpty::new(old_commit)));
-        let old_directory = browser.get_directory().unwrap();
-
-        let now = Instant::now();
-        let diff = Diff::diff(old_directory, head_directory)?;
-        println!("diff took {} micros ", now.elapsed().as_nanos() / 1000);
-        print_diff_summary(&diff);
-        Ok(())
-    }
-
-    fn print_diff_summary(diff: &Diff) {
-        diff.created.iter().for_each(|created| { println!("+++ {:?}", created.path); });
-        diff.deleted.iter().for_each(|deleted| { println!("--- {:?}", deleted.path); });
-        diff.modified.iter().for_each(|modified| { println!("mod {:?}", modified.path); });
-    }
 }
