@@ -167,7 +167,7 @@ impl Diff {
                 let mapped = mapper(file, &RefCell::borrow(parent_path));
                 Ok(vec![mapped])
             },
-            _ => Err(String::from("Unexpected entry type"))
+            DirectoryContents::Repo => Err(String::from("Unexpected entry type"))
         }
     }
 
@@ -249,15 +249,11 @@ impl Diff {
     }
 
     fn build_path(file: &File, parent_path: &Vec<Label>) -> Path {
-        match parent_path.len() {
-            0 => {
-                // TODO: Path::from_label ?
-                Path::from_labels(file.filename.clone(), &[])
-            },
-            _ => {
-                Path::from_labels(parent_path[0].clone(),
-                                  &[&parent_path[1..], &[file.filename.clone()]].concat())
-            }
+        if parent_path.is_empty() {
+            Path::with_root(&[file.filename.clone()])
+        } else {
+            Path::from_labels(parent_path[0].clone(),
+                              &[&parent_path[1..], &[file.filename.clone()]].concat())
         }
     }
 }
