@@ -7,8 +7,6 @@ use std::cmp::Ordering;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-type Result = std::result::Result<Diff, DiffError>;
-
 #[derive(Debug)]
 pub struct DiffError {
     reason: String
@@ -61,7 +59,7 @@ impl Diff {
 
     // TODO: Direction of comparison is not obvious with this signature.
     // For now using conventional approach with the right being "newer".
-    pub fn diff(left: Directory, right: Directory) -> Result {
+    pub fn diff(left: Directory, right: Directory) -> Result<Diff, DiffError> {
         let mut diff = Diff::new();
         let path = Rc::new(RefCell::new(Vec::new()));
         Diff::collect_diff(&left, &right, &path, &mut diff)?;
@@ -76,7 +74,7 @@ impl Diff {
     }
 
     fn collect_diff(old: &Directory, new: &Directory, parent_path: &Rc<RefCell<Vec<Label>>>, diff: &mut Diff)
-        -> std::result::Result<(), String> {
+        -> Result<(), String> {
 
         // TODO: Consider storing directory contents in sorted order
         let old = get_sorted_contents(old);
@@ -84,59 +82,66 @@ impl Diff {
 
         let mut old_iter = old.iter();
         let mut new_iter = new.iter();
-        let mut old_entry = old_iter.next();
-        let mut new_entry = new_iter.next();
+        let mut old_entry_opt = old_iter.next();
+        let mut new_entry_opt = new_iter.next();
 
-        while old_entry.is_some() || new_entry.is_some() {
+        while old_entry_opt.is_some() || new_entry_opt.is_some() {
             // need to skip Repos
-            while let Some(DirectoryContents::Repo) = old_entry {
-                old_entry = old_iter.next();
+            while let Some(DirectoryContents::Repo) = old_entry_opt {
+                old_entry_opt = old_iter.next();
             }
-            while let Some(DirectoryContents::Repo) = new_entry {
-                new_entry = new_iter.next();
+            while let Some(DirectoryContents::Repo) = new_entry_opt {
+                new_entry_opt = new_iter.next();
             }
-            if new_entry.is_none() && old_entry.is_none() {
-                break;
-            }
-            let old_entry_label = old_entry.and_then(|dc| dc.label());
-            let new_entry_label = new_entry.and_then(|dc| dc.label());
-            let cmp = {
-                if old_entry.is_none() || new_entry.is_none() {
-                    Ordering::Equal
-                } else {
-                    new_entry_label.unwrap().cmp(&old_entry_label.unwrap())
-                }
-            };
-            if new_entry.is_none() || cmp == Ordering::Greater {
-                diff.add_deleted_files(old_entry.unwrap(), parent_path)?;
-                old_entry = old_iter.next();
-            } else if old_entry.is_none() || cmp == Ordering::Less {
-                diff.add_created_files(new_entry.unwrap(), parent_path)?;
-                new_entry = new_iter.next();
-            } else /*both entries are present and cmp == Ordering::Equal*/ {
-                match (new_entry.unwrap(), old_entry.unwrap()) {
-                    (DirectoryContents::File(new_file), DirectoryContents::File(old_file)) => {
-                        if old_file.size != new_file.size || &old_file.checksum() != &new_file.checksum() {
-                            diff.add_modified_file(new_file, parent_path);
+            match (old_entry_opt, new_entry_opt) {
+                (Some(old_entry), Some(new_entry)) => {
+                    let cmp = new_entry.label().cmp(&old_entry.label());
+                    match cmp {
+                        Ordering::Greater => {
+                            diff.add_deleted_files(old_entry, parent_path)?;
+                            old_entry_opt = old_iter.next();
+                        },
+                        Ordering::Less => {
+                            diff.add_created_files(new_entry, parent_path)?;
+                            new_entry_opt = new_iter.next();
+                        },
+                        Ordering::Equal => {
+                            use DirectoryContents::{File, SubDirectory};
+                            match (new_entry, old_entry) {
+                                (File(new_file), File(old_file)) => {
+                                    if old_file.size != new_file.size || &old_file.checksum() != &new_file.checksum() {
+                                        diff.add_modified_file(new_file, parent_path);
+                                    }
+                                },
+                                (File(new_file), SubDirectory(old_dir)) => {
+                                    diff.add_created_file(new_file, parent_path);
+                                    diff.add_deleted_files(old_entry, parent_path)?;
+                                },
+                                (SubDirectory(new_dir), File(old_file)) => {
+                                    diff.add_created_files(new_entry, parent_path)?;
+                                    diff.add_deleted_file(old_file, parent_path);
+                                },
+                                (SubDirectory(new_dir), SubDirectory(old_dir)) => {
+                                    parent_path.borrow_mut().push(new_dir.label.clone());
+                                    Diff::collect_diff(&**old_dir, &**new_dir, parent_path, diff)?;
+                                    parent_path.borrow_mut().pop();
+                                },
+                                _ => panic!("should not happen unless the algo is incorrect")
+                            }
+                            old_entry_opt = old_iter.next();
+                            new_entry_opt = new_iter.next();
                         }
-                    },
-                    (DirectoryContents::File(new_file), DirectoryContents::SubDirectory(old_dir)) => {
-                        diff.add_created_file(new_file, parent_path);
-                        diff.add_deleted_files(old_entry.unwrap(), parent_path)?;
-                    },
-                    (DirectoryContents::SubDirectory(new_dir), DirectoryContents::File(old_file)) => {
-                        diff.add_created_files(new_entry.unwrap(), parent_path)?;
-                        diff.add_deleted_file(old_file, parent_path);
-                    },
-                    (DirectoryContents::SubDirectory(new_dir), DirectoryContents::SubDirectory(old_dir)) => {
-                        parent_path.borrow_mut().push(new_dir.label.clone());
-                        Diff::collect_diff(&**old_dir, &**new_dir, parent_path, diff)?;
-                        parent_path.borrow_mut().pop();
-                    },
-                    _ => panic!("should not happen unless the algo is incorrect")
-                }
-                old_entry = old_iter.next();
-                new_entry = new_iter.next();
+                    }
+                },
+                (Some(old_entry), None) => {
+                    diff.add_deleted_files(old_entry, parent_path)?;
+                    old_entry_opt = old_iter.next();
+                },
+                (None, Some(new_entry)) => {
+                    diff.add_created_files(new_entry, parent_path)?;
+                    new_entry_opt = new_iter.next();
+                },
+                (None, None) => break
             }
         }
         Ok(())
@@ -145,8 +150,8 @@ impl Diff {
     // if entry is a file, then return this file,
     // or a list of files in the directory tree otherwise
     fn collect_files_from_entry<F, T>(entry: &DirectoryContents, parent_path: &Rc<RefCell<Vec<Label>>>, mapper: F)
-        -> std::result::Result<Vec<T>, String>
-        where F: Fn(&File, Vec<Label>) -> std::result::Result<T, String> + Copy {
+        -> Result<Vec<T>, String>
+        where F: Fn(&File, Vec<Label>) -> Result<T, String> + Copy {
 
         match entry {
             DirectoryContents::SubDirectory(dir) => Diff::collect_files(dir, parent_path, mapper),
@@ -161,8 +166,8 @@ impl Diff {
     }
 
     fn collect_files<F, T>(dir: &Directory, parent_path: &Rc<RefCell<Vec<Label>>>, mapper: F)
-        -> std::result::Result<Vec<T>, String>
-        where F: Fn(&File, Vec<Label>) -> std::result::Result<T, String> + Copy {
+        -> Result<Vec<T>, String>
+        where F: Fn(&File, Vec<Label>) -> Result<T, String> + Copy {
 
         let mut files: Vec<T> = Vec::new();
         Diff::collect_files_inner(dir, parent_path, mapper, &mut files)?;
@@ -170,8 +175,8 @@ impl Diff {
     }
 
     fn collect_files_inner<'a, F, T>(dir: &'a Directory, parent_path: &Rc<RefCell<Vec<Label>>>, mapper: F, files: &mut Vec<T>)
-        -> std::result::Result<(), String>
-        where F: Fn(&File, Vec<Label>) -> std::result::Result<T, String> + Copy {
+        -> Result<(), String>
+        where F: Fn(&File, Vec<Label>) -> Result<T, String> + Copy {
 
         parent_path.borrow_mut().push(dir.label.clone());
         for entry in dir.entries.iter() {
@@ -193,15 +198,15 @@ impl Diff {
         Ok(())
     }
 
-    fn convert_to_deleted(file: &File, path: Vec<Label>) -> std::result::Result<DeleteFile, String> {
+    fn convert_to_deleted(file: &File, path: Vec<Label>) -> Result<DeleteFile, String> {
         Ok(DeleteFile {
-            path: into_non_empty(&path)?
+            path: NonEmpty::from_slice(&path).ok_or("Empty path")?
         })
     }
 
-    fn convert_to_created(file: &File, path: Vec<Label>) -> std::result::Result<CreateFile, String> {
+    fn convert_to_created(file: &File, path: Vec<Label>) -> Result<CreateFile, String> {
         Ok(CreateFile {
-            path: into_non_empty(&path)?
+            path: NonEmpty::from_slice(&path).ok_or("Empty path")?
         })
     }
 
@@ -222,7 +227,7 @@ impl Diff {
     }
 
     fn add_created_files(&mut self, dc: &DirectoryContents, parent_path: &Rc<RefCell<Vec<Label>>>)
-        -> std::result::Result<(), String> {
+        -> Result<(), String> {
 
         let mut new_files: Vec<CreateFile> = Diff::collect_files_from_entry(
             dc, &parent_path, Diff::convert_to_created)?;
@@ -237,7 +242,7 @@ impl Diff {
     }
 
     fn add_deleted_files(&mut self, dc: &DirectoryContents, parent_path: &Rc<RefCell<Vec<Label>>>)
-                         -> std::result::Result<(), String> {
+        -> Result<(), String> {
 
         let mut new_files: Vec<DeleteFile> = Diff::collect_files_from_entry(
             dc, &parent_path, Diff::convert_to_deleted)?;
@@ -249,7 +254,7 @@ impl Diff {
         let mut path = parent_path.borrow().to_vec();
         path.push(file.filename.clone());
         // path is always non-empty, so we can use unwrap()
-        into_non_empty(&path).unwrap()
+        NonEmpty::from_slice(&path).unwrap()
     }
 }
 
@@ -258,20 +263,12 @@ fn get_sorted_contents(dir: &Directory) -> Vec<&DirectoryContents> {
     let mut vec: Vec<&DirectoryContents> = dir.entries.iter().collect();
     vec.sort_by_key(|e| {
         match e {
-            DirectoryContents::SubDirectory(subdir) => subdir.label.clone(),
-            DirectoryContents::File(file) => file.filename.clone(),
-            DirectoryContents::Repo => Label::from(""),
+            DirectoryContents::SubDirectory(subdir) => Some(subdir.label.clone()),
+            DirectoryContents::File(file) => Some(file.filename.clone()),
+            DirectoryContents::Repo => None,
         }
     });
     vec
-}
-
-// TODO: Move somewhere?
-fn into_non_empty<T>(vec: &Vec<T>) -> std::result::Result<NonEmpty<T>, String> where T: Clone {
-    if vec.is_empty() {
-        return Err(String::from("Empty vec"))
-    }
-    Ok(NonEmpty::from((vec[0].clone(), vec[1..].to_vec())))
 }
 
 #[cfg(test)]
