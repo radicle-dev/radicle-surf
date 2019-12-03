@@ -202,13 +202,13 @@ impl Diff {
 
     fn convert_to_deleted(file: &File, parent_path: &Vec<Label>) -> DeleteFile {
         DeleteFile {
-            path: Path::from_labels(file.filename.clone(), &parent_path)
+            path: Diff::build_path(file, &parent_path)
         }
     }
 
     fn convert_to_created(file: &File, parent_path: &Vec<Label>) -> CreateFile {
         CreateFile {
-            path: Path::from_labels(file.filename.clone(), parent_path)
+            path: Diff::build_path(file, &parent_path)
         }
     }
 
@@ -217,7 +217,7 @@ impl Diff {
         // Use pijul's transaction diff as an inspiration?
         // https://nest.pijul.com/pijul_org/pijul:master/1468b7281a6f3785e9#anesp4Qdq3V
         self.modified.push(ModifiedFile {
-            path: Path::from_labels(file.filename.clone(), parent_path),
+            path: Diff::build_path(file, &parent_path),
             diff: FileDiff {}
         });
     }
@@ -246,6 +246,19 @@ impl Diff {
             dc, &parent_path, Diff::convert_to_deleted)?;
         self.deleted.append(&mut new_files);
         Ok(())
+    }
+
+    fn build_path(file: &File, parent_path: &Vec<Label>) -> Path {
+        match parent_path.len() {
+            0 => {
+                // TODO: Path::from_label ?
+                Path::from_labels(file.filename.clone(), &[])
+            },
+            _ => {
+                Path::from_labels(parent_path[0].clone(),
+                                  &[&parent_path[1..], &[file.filename.clone()]].concat())
+            }
+        }
     }
 }
 
