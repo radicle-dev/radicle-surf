@@ -1,11 +1,11 @@
 #![allow(dead_code, unused_variables)]
 
-use crate::file_system::{Directory, Label};
-use nonempty::NonEmpty;
+use crate::file_system::{Directory, Label, Path};
 use crate::file_system::{DirectoryContents, File};
 use std::cmp::Ordering;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::ops::Deref;
 
 #[derive(Debug)]
 pub struct DiffError {
@@ -26,20 +26,20 @@ pub struct Diff {
 }
 
 pub struct CreateFile {
-    pub path: NonEmpty<Label>,
+    pub path: Path,
 }
 
 pub struct DeleteFile {
-    pub path: NonEmpty<Label>,
+    pub path: Path,
 }
 
 pub struct MoveFile {
-    pub old_path: NonEmpty<Label>,
-    pub new_path: NonEmpty<Label>,
+    pub old_path: Path,
+    pub new_path: Path,
 }
 
 pub struct ModifiedFile {
-    pub path: NonEmpty<Label>,
+    pub path: Path,
     pub diff: FileDiff,
 }
 
@@ -88,8 +88,7 @@ impl Diff {
         while old_entry_opt.is_some() || new_entry_opt.is_some() {
             match (old_entry_opt, new_entry_opt) {
                 (Some(old_entry), Some(new_entry)) => {
-                    let cmp = new_entry.label().cmp(&old_entry.label());
-                    match cmp {
+                    match new_entry.label().cmp(&old_entry.label()) {
                         Ordering::Greater => {
                             diff.add_deleted_files(old_entry, parent_path)?;
                             old_entry_opt = old_iter.next();
@@ -103,26 +102,26 @@ impl Diff {
                             match (new_entry, old_entry) {
                                 (File(new_file), File(old_file)) => {
                                     if old_file.size != new_file.size || &old_file.checksum() != &new_file.checksum() {
-                                        diff.add_modified_file(new_file, parent_path);
+                                        diff.add_modified_file(new_file, &RefCell::borrow(parent_path));
                                     }
                                     old_entry_opt = old_iter.next();
                                     new_entry_opt = new_iter.next();
                                 },
                                 (File(new_file), SubDirectory(old_dir)) => {
-                                    diff.add_created_file(new_file, parent_path);
+                                    diff.add_created_file(new_file, &RefCell::borrow(parent_path));
                                     diff.add_deleted_files(old_entry, parent_path)?;
                                     old_entry_opt = old_iter.next();
                                     new_entry_opt = new_iter.next();
                                 },
                                 (SubDirectory(new_dir), File(old_file)) => {
                                     diff.add_created_files(new_entry, parent_path)?;
-                                    diff.add_deleted_file(old_file, parent_path);
+                                    diff.add_deleted_file(old_file, &RefCell::borrow(parent_path));
                                     old_entry_opt = old_iter.next();
                                     new_entry_opt = new_iter.next();
                                 },
                                 (SubDirectory(new_dir), SubDirectory(old_dir)) => {
                                     parent_path.borrow_mut().push(new_dir.label.clone());
-                                    Diff::collect_diff(&**old_dir, &**new_dir, parent_path, diff)?;
+                                    Diff::collect_diff(old_dir.deref(), new_dir.deref(), parent_path, diff)?;
                                     parent_path.borrow_mut().pop();
                                     old_entry_opt = old_iter.next();
                                     new_entry_opt = new_iter.next();
@@ -158,14 +157,12 @@ impl Diff {
     // or a list of files in the directory tree otherwise
     fn collect_files_from_entry<F, T>(entry: &DirectoryContents, parent_path: &Rc<RefCell<Vec<Label>>>, mapper: F)
         -> Result<Vec<T>, String>
-        where F: Fn(&File, Vec<Label>) -> Result<T, String> + Copy {
+        where F: Fn(&File, &Vec<Label>) -> T + Copy {
 
         match entry {
             DirectoryContents::SubDirectory(dir) => Diff::collect_files(dir, parent_path, mapper),
             DirectoryContents::File(file) => {
-                parent_path.borrow_mut().push(file.filename.clone());
-                let mapped = mapper(file, parent_path.borrow().to_vec())?;
-                parent_path.borrow_mut().pop();
+                let mapped = mapper(file, &RefCell::borrow(parent_path));
                 Ok(vec![mapped])
             },
             _ => Err(String::from("Unexpected entry type"))
@@ -174,7 +171,7 @@ impl Diff {
 
     fn collect_files<F, T>(dir: &Directory, parent_path: &Rc<RefCell<Vec<Label>>>, mapper: F)
         -> Result<Vec<T>, String>
-        where F: Fn(&File, Vec<Label>) -> Result<T, String> + Copy {
+        where F: Fn(&File, &Vec<Label>) -> T + Copy {
 
         let mut files: Vec<T> = Vec::new();
         Diff::collect_files_inner(dir, parent_path, mapper, &mut files)?;
@@ -183,20 +180,16 @@ impl Diff {
 
     fn collect_files_inner<'a, F, T>(dir: &'a Directory, parent_path: &Rc<RefCell<Vec<Label>>>, mapper: F, files: &mut Vec<T>)
         -> Result<(), String>
-        where F: Fn(&File, Vec<Label>) -> Result<T, String> + Copy {
+        where F: Fn(&File, &Vec<Label>) -> T + Copy {
 
         parent_path.borrow_mut().push(dir.label.clone());
         for entry in dir.entries.iter() {
             match entry {
                 DirectoryContents::SubDirectory(subdir) => {
-                    parent_path.borrow_mut().push(subdir.label.clone());
-                    Diff::collect_files_inner(&**subdir, parent_path, mapper, files)?;
-                    parent_path.borrow_mut().pop();
+                    Diff::collect_files_inner(subdir.deref(), parent_path, mapper, files)?;
                 },
                 DirectoryContents::File(file) => {
-                    let mut path = parent_path.borrow().clone();
-                    path.push(file.filename.clone());
-                    files.push(mapper(file, path)?);
+                    files.push(mapper(file, &RefCell::borrow(parent_path)));
                 },
                 DirectoryContents::Repo => { /* Skip repo directory */ }
             }
@@ -205,32 +198,30 @@ impl Diff {
         Ok(())
     }
 
-    fn convert_to_deleted(file: &File, path: Vec<Label>) -> Result<DeleteFile, String> {
-        Ok(DeleteFile {
-            path: NonEmpty::from_slice(&path).ok_or("Empty path")?
-        })
+    fn convert_to_deleted(file: &File, parent_path: &Vec<Label>) -> DeleteFile {
+        DeleteFile {
+            path: Path::from_labels(file.filename.clone(), &parent_path)
+        }
     }
 
-    fn convert_to_created(file: &File, path: Vec<Label>) -> Result<CreateFile, String> {
-        Ok(CreateFile {
-            path: NonEmpty::from_slice(&path).ok_or("Empty path")?
-        })
+    fn convert_to_created(file: &File, parent_path: &Vec<Label>) -> CreateFile {
+        CreateFile {
+            path: Path::from_labels(file.filename.clone(), parent_path)
+        }
     }
 
-    fn add_modified_file(&mut self, file: &File, parent_path: &Rc<RefCell<Vec<Label>>>) {
+    fn add_modified_file(&mut self, file: &File, parent_path: &Vec<Label>) {
         // TODO: file diff can be calculated at this point
         // Use pijul's transaction diff as an inspiration?
         // https://nest.pijul.com/pijul_org/pijul:master/1468b7281a6f3785e9#anesp4Qdq3V
         self.modified.push(ModifiedFile {
-            path: Diff::build_non_empty_path(file, parent_path),
+            path: Path::from_labels(file.filename.clone(), parent_path),
             diff: FileDiff {}
         });
     }
 
-    fn add_created_file(&mut self, file: &File, parent_path: &Rc<RefCell<Vec<Label>>>) {
-        self.created.push(CreateFile {
-            path: Diff::build_non_empty_path(file, parent_path)
-        });
+    fn add_created_file(&mut self, file: &File, parent_path: &Vec<Label>) {
+        self.created.push(Diff::convert_to_created(file, parent_path));
     }
 
     fn add_created_files(&mut self, dc: &DirectoryContents, parent_path: &Rc<RefCell<Vec<Label>>>)
@@ -242,10 +233,8 @@ impl Diff {
         Ok(())
     }
 
-    fn add_deleted_file(&mut self, file: &File, parent_path: &Rc<RefCell<Vec<Label>>>) {
-        self.deleted.push(DeleteFile {
-            path: Diff::build_non_empty_path(file, parent_path)
-        });
+    fn add_deleted_file(&mut self, file: &File, parent_path: &Vec<Label>) {
+        self.deleted.push(Diff::convert_to_deleted(file, parent_path));
     }
 
     fn add_deleted_files(&mut self, dc: &DirectoryContents, parent_path: &Rc<RefCell<Vec<Label>>>)
@@ -255,13 +244,6 @@ impl Diff {
             dc, &parent_path, Diff::convert_to_deleted)?;
         self.deleted.append(&mut new_files);
         Ok(())
-    }
-
-    fn build_non_empty_path(file: &File, parent_path: &Rc<RefCell<Vec<Label>>>) -> NonEmpty<Label> {
-        let mut path = parent_path.borrow().to_vec();
-        path.push(file.filename.clone());
-        // path is always non-empty, so we can use unwrap()
-        NonEmpty::from_slice(&path).unwrap()
     }
 }
 
