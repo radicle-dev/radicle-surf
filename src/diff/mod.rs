@@ -98,7 +98,7 @@ impl Diff {
                             new_entry_opt = new_iter.next();
                         },
                         Ordering::Equal => {
-                            use DirectoryContents::{File, SubDirectory};
+                            use DirectoryContents::{File, SubDirectory, Repo};
                             match (new_entry, old_entry) {
                                 (File(new_file), File(old_file)) => {
                                     if old_file.size != new_file.size || &old_file.checksum() != &new_file.checksum() {
@@ -126,14 +126,16 @@ impl Diff {
                                     old_entry_opt = old_iter.next();
                                     new_entry_opt = new_iter.next();
                                 },
-                                (_, _) => {
-                                    // need to skip Repos
-                                    while let Some(DirectoryContents::Repo) = old_entry_opt {
-                                        old_entry_opt = old_iter.next();
-                                    }
-                                    while let Some(DirectoryContents::Repo) = new_entry_opt {
-                                        new_entry_opt = new_iter.next();
-                                    }
+                                // need to skip Repos
+                                (Repo, Repo) => {
+                                    old_entry_opt = old_iter.next();
+                                    new_entry_opt = new_iter.next();
+                                },
+                                (Repo, _) => {
+                                    old_entry_opt = old_iter.next();
+                                },
+                                (_, Repo) => {
+                                    new_entry_opt = new_iter.next();
                                 }
                             }
                         }
