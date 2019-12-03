@@ -167,7 +167,7 @@ impl Diff {
                 let mapped = mapper(file, &RefCell::borrow(parent_path));
                 Ok(vec![mapped])
             },
-            DirectoryContents::Repo => Err(String::from("Unexpected entry type"))
+            DirectoryContents::Repo => Ok(vec![])
         }
     }
 
