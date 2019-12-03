@@ -869,8 +869,8 @@ pub mod tests {
     }
 
     fn label_strategy() -> impl Strategy<Value = Label> {
-        // ASCII regex, see: https://catonmat.net/my-favorite-regex
-        "[ -~]*".prop_map(|label| label.into())
+        // ASCII regex, excluding '/' because of posix file paths
+        "[ -.|0-~]+".prop_map(|label| label.into())
     }
 
     fn path_strategy(max_size: usize) -> impl Strategy<Value = Path> {
@@ -882,6 +882,7 @@ pub mod tests {
     }
 
     fn file_strategy() -> impl Strategy<Value = File> {
+        // ASCII regex, see: https://catonmat.net/my-favorite-regex
         (label_strategy(), "[ -~]*")
             .prop_map(|(filename, contents)| File::new(filename, contents.as_bytes()))
     }
