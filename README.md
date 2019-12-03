@@ -26,7 +26,7 @@ let browser = GitBrowser::new(&repo).unwrap();
 let directory = browser.get_directory().unwrap();
 
 // Let's get a Path to this file
-let this_file = Path::from_labels(Label::root(), &["src".into(), "lib.rs".into()]);
+let this_file = Path::with_root(&["src".into(), "lib.rs".into()]);
 
 // And assert that we can find it!
 assert!(directory.find_file(&this_file).is_some());
@@ -46,7 +46,7 @@ assert_eq!(root_contents, vec![
   SystemType::directory("src".into()),
 ]);
 
-let src = directory.find_directory(&Path::from_labels(Label::root(), &["src".into()])).unwrap();
+let src = directory.find_directory(&Path::with_root(&["src".into()])).unwrap();
 let mut src_contents = src.list_directory();
 src_contents.sort();
 
