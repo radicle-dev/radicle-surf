@@ -86,13 +86,6 @@ impl Diff {
         let mut new_entry_opt = new_iter.next();
 
         while old_entry_opt.is_some() || new_entry_opt.is_some() {
-            // need to skip Repos
-            while let Some(DirectoryContents::Repo) = old_entry_opt {
-                old_entry_opt = old_iter.next();
-            }
-            while let Some(DirectoryContents::Repo) = new_entry_opt {
-                new_entry_opt = new_iter.next();
-            }
             match (old_entry_opt, new_entry_opt) {
                 (Some(old_entry), Some(new_entry)) => {
                     let cmp = new_entry.label().cmp(&old_entry.label());
@@ -112,24 +105,38 @@ impl Diff {
                                     if old_file.size != new_file.size || &old_file.checksum() != &new_file.checksum() {
                                         diff.add_modified_file(new_file, parent_path);
                                     }
+                                    old_entry_opt = old_iter.next();
+                                    new_entry_opt = new_iter.next();
                                 },
                                 (File(new_file), SubDirectory(old_dir)) => {
                                     diff.add_created_file(new_file, parent_path);
                                     diff.add_deleted_files(old_entry, parent_path)?;
+                                    old_entry_opt = old_iter.next();
+                                    new_entry_opt = new_iter.next();
                                 },
                                 (SubDirectory(new_dir), File(old_file)) => {
                                     diff.add_created_files(new_entry, parent_path)?;
                                     diff.add_deleted_file(old_file, parent_path);
+                                    old_entry_opt = old_iter.next();
+                                    new_entry_opt = new_iter.next();
                                 },
                                 (SubDirectory(new_dir), SubDirectory(old_dir)) => {
                                     parent_path.borrow_mut().push(new_dir.label.clone());
                                     Diff::collect_diff(&**old_dir, &**new_dir, parent_path, diff)?;
                                     parent_path.borrow_mut().pop();
+                                    old_entry_opt = old_iter.next();
+                                    new_entry_opt = new_iter.next();
                                 },
-                                _ => panic!("should not happen unless the algo is incorrect")
+                                (_, _) => {
+                                    // need to skip Repos
+                                    while let Some(DirectoryContents::Repo) = old_entry_opt {
+                                        old_entry_opt = old_iter.next();
+                                    }
+                                    while let Some(DirectoryContents::Repo) = new_entry_opt {
+                                        new_entry_opt = new_iter.next();
+                                    }
+                                }
                             }
-                            old_entry_opt = old_iter.next();
-                            new_entry_opt = new_iter.next();
                         }
                     }
                 },
