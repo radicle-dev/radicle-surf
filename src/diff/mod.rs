@@ -302,5 +302,136 @@ fn get_sorted_contents(dir: &Directory) -> Vec<&DirectoryContents> {
 }
 
 #[cfg(test)]
-#[allow(unused_imports)]
-mod tests {}
+mod tests {
+    use crate::diff::*;
+    use crate::file_system::*;
+    use nonempty::NonEmpty;
+    use pretty_assertions::assert_eq;
+
+    #[derive(Debug, Clone)]
+    struct TestRepo {}
+
+    impl RepoBackend for TestRepo {
+        fn repo_directory() -> Directory {
+            Directory {
+                label: ".test".into(),
+                entries: NonEmpty::new(DirectoryContents::Repo),
+            }
+        }
+    }
+
+    #[test]
+    fn test_create_file() {
+        let file_path = Path::with_root(&["mod.rs".into()]);
+
+        let directory: Directory = Directory {
+            label: Label::root(),
+            entries: NonEmpty::new(DirectoryContents::Repo),
+        };
+
+        let new_directory: Directory = Directory {
+            label: Label::root(),
+            entries: (
+                DirectoryContents::Repo,
+                vec![DirectoryContents::file("banana.rs".into(), b"use banana")],
+            )
+                .into(),
+        };
+
+        let diff = Diff::diff(directory, new_directory).expect("diff failed");
+        let expected_diff = Diff {
+            created: vec![CreateFile(Path::with_root(&["banana.rs".into()]))],
+            deleted: vec![],
+            moved: vec![],
+            modified: vec![],
+        };
+
+        assert_eq!(diff, expected_diff)
+    }
+
+    #[test]
+    fn test_delete_file() {
+        let file_path = Path::with_root(&["mod.rs".into()]);
+
+        let directory: Directory = Directory {
+            label: Label::root(),
+            entries: (
+                DirectoryContents::Repo,
+                vec![DirectoryContents::file("banana.rs".into(), b"use banana")],
+            )
+                .into(),
+        };
+
+        let new_directory: Directory = Directory {
+            label: Label::root(),
+            entries: NonEmpty::new(DirectoryContents::Repo),
+        };
+
+        let diff = Diff::diff(directory, new_directory).expect("diff failed");
+        let expected_diff = Diff {
+            created: vec![],
+            deleted: vec![DeleteFile(Path::with_root(&["banana.rs".into()]))],
+            moved: vec![],
+            modified: vec![],
+        };
+
+        assert_eq!(diff, expected_diff)
+    }
+
+    #[test]
+    fn test_moved_file() {
+        let file_path = Path::with_root(&["mod.rs".into()]);
+
+        let directory: Directory = Directory {
+            label: Label::root(),
+            entries: NonEmpty::new(DirectoryContents::file("mod.rs".into(), b"use banana")),
+        };
+
+        let new_directory: Directory = Directory {
+            label: Label::root(),
+            entries: NonEmpty::new(DirectoryContents::file("banana.rs".into(), b"use banana")),
+        };
+
+        let diff = Diff::diff(directory, new_directory).expect("diff failed");
+
+        // TODO(fintan): Move is not detected yet
+        // assert_eq!(diff, Diff::new())
+        assert!(true)
+    }
+
+    #[test]
+    fn test_modify_file() {
+        let file_path = Path::with_root(&["mod.rs".into()]);
+
+        let directory: Directory = Directory {
+            label: Label::root(),
+            entries: (
+                DirectoryContents::Repo,
+                vec![DirectoryContents::file("banana.rs".into(), b"use banana")],
+            )
+                .into(),
+        };
+
+        let new_directory: Directory = Directory {
+            label: Label::root(),
+            entries: (
+                DirectoryContents::Repo,
+                vec![DirectoryContents::file("banana.rs".into(), b"use banana;")],
+            )
+                .into(),
+        };
+
+        let diff = Diff::diff(directory, new_directory).expect("diff failed");
+        let expected_diff = Diff {
+            created: vec![],
+            deleted: vec![],
+            moved: vec![],
+            modified: vec![ModifiedFile {
+                path: Path::with_root(&["banana.rs".into()]),
+                diff: FileDiff {},
+            }],
+        };
+
+        assert_eq!(diff, expected_diff)
+    }
+}
