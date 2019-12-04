@@ -40,6 +40,7 @@
 //!     SystemType::file("Cargo.toml".into()),
 //!     SystemType::file("README.md".into()),
 //!     SystemType::directory("docs".into()),
+//!     SystemType::directory("examples".into()),
 //!     SystemType::directory("src".into()),
 //! ]);
 //!
