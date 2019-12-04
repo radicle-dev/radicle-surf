@@ -90,9 +90,7 @@ impl fmt::Display for Path {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (prefix, suffix) = self.split_last();
         for p in prefix {
-            if !p.is_root() {
-                write!(f, "{}/", p)?;
-            }
+            write!(f, "{}/", p)?;
         }
         write!(f, "{}", suffix)
     }
