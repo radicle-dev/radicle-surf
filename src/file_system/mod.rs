@@ -1,5 +1,6 @@
 use nonempty::NonEmpty;
 use std::collections::HashMap;
+use std::fmt;
 
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
@@ -40,6 +41,16 @@ impl Label {
     pub fn root() -> Self {
         "~".into()
     }
+
+    pub fn is_root(&self) -> bool {
+        *self == Self::root()
+    }
+}
+
+impl fmt::Display for Label {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
 }
 
 #[cfg(test)]
@@ -72,6 +83,18 @@ impl Arbitrary for Path {
         let head = Arbitrary::arbitrary(g);
         let tail: Vec<Label> = Arbitrary::arbitrary(g);
         Path::from_labels(head, &tail)
+    }
+}
+
+impl fmt::Display for Path {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let (prefix, suffix) = self.split_last();
+        for p in prefix {
+            if !p.is_root() {
+                write!(f, "{}/", p)?;
+            }
+        }
+        write!(f, "{}", suffix)
     }
 }
 
@@ -428,7 +451,7 @@ impl DirectoryContents {
         match self {
             DirectoryContents::SubDirectory(dir) => Some(&dir.label),
             DirectoryContents::File(file) => Some(&file.filename),
-            _ => None
+            _ => None,
         }
     }
 }
