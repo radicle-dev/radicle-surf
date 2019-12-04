@@ -19,7 +19,7 @@ fn main() {
     match options.head_revision {
         HeadRevision::HEAD => {
             reset_browser_to_head_or_exit(&mut browser);
-        },
+        }
         HeadRevision::Commit(id) => {
             set_browser_history_or_exit(&mut browser, &id);
         }
@@ -34,7 +34,7 @@ fn main() {
         Ok(diff) => {
             let elapsed_nanos = now.elapsed().as_nanos();
             print_diff_summary(&diff, elapsed_nanos);
-        },
+        }
         Err(e) => {
             println!("Failed to build diff: {:?}", e);
             std::process::exit(1);
@@ -91,12 +91,14 @@ fn set_browser_history_or_exit(browser: &mut GitBrowser, commit_id: &str) {
 fn set_browser_history(browser: &mut GitBrowser, commit_id: &str) -> Result<(), String> {
     let oid = match Oid::from_str(commit_id) {
         Ok(oid) => oid,
-        Err(e) => return Err(format!("{}", e))
+        Err(e) => return Err(format!("{}", e)),
     };
-    let commit = match browser.get_history()
-        .find_in_history(&oid, |artifact| artifact.id()) {
+    let commit = match browser
+        .get_history()
+        .find_in_history(&oid, |artifact| artifact.id())
+    {
         Some(commit) => commit,
-        None => return Err(format!("Git commit not found: {}", commit_id))
+        None => return Err(format!("Git commit not found: {}", commit_id)),
     };
     browser.set_history(History(NonEmpty::new(commit)));
     Ok(())
@@ -113,13 +115,23 @@ fn get_directory_or_exit(browser: &GitBrowser) -> Directory {
 }
 
 fn print_diff_summary(diff: &Diff, elapsed_nanos: u128) {
-    diff.created.iter().for_each(|created| { println!("+++ {:?}", created.path); });
-    diff.deleted.iter().for_each(|deleted| { println!("--- {:?}", deleted.path); });
-    diff.modified.iter().for_each(|modified| { println!("mod {:?}", modified.path); });
+    diff.created.iter().for_each(|created| {
+        println!("+++ {}", created.path);
+    });
+    diff.deleted.iter().for_each(|deleted| {
+        println!("--- {}", deleted.path);
+    });
+    diff.modified.iter().for_each(|modified| {
+        println!("mod {}", modified.path);
+    });
 
-    println!("created {} / deleted {} / modified {} / total {}",
-             diff.created.len(), diff.deleted.len(), diff.modified.len(),
-             diff.created.len() + diff.deleted.len() + diff.modified.len());
+    println!(
+        "created {} / deleted {} / modified {} / total {}",
+        diff.created.len(),
+        diff.deleted.len(),
+        diff.modified.len(),
+        diff.created.len() + diff.deleted.len() + diff.modified.len()
+    );
     println!("diff took {} micros ", elapsed_nanos / 1000);
 }
 
@@ -131,7 +143,7 @@ struct Options {
 
 enum HeadRevision {
     HEAD,
-    Commit(String)
+    Commit(String),
 }
 
 impl Options {
