@@ -434,4 +434,42 @@ mod tests {
 
         assert_eq!(diff, expected_diff)
     }
+
+    #[test]
+    fn test_create_directory() {
+        let file_path = Path::with_root(&["mod.rs".into()]);
+
+        let directory: Directory = Directory {
+            label: Label::root(),
+            entries: NonEmpty::new(DirectoryContents::Repo),
+        };
+
+        let new_directory: Directory = Directory {
+            label: Label::root(),
+            entries: (
+                DirectoryContents::Repo,
+                vec![DirectoryContents::sub_directory(Directory {
+                    label: "src".into(),
+                    entries: NonEmpty::new(DirectoryContents::file(
+                        "banana.rs".into(),
+                        b"use banana",
+                    )),
+                })],
+            )
+                .into(),
+        };
+
+        let diff = Diff::diff(directory, new_directory).expect("diff failed");
+        let expected_diff = Diff {
+            created: vec![CreateFile(Path::with_root(&[
+                "src".into(),
+                "banana.rs".into(),
+            ]))],
+            deleted: vec![],
+            moved: vec![],
+            modified: vec![],
+        };
+
+        assert_eq!(diff, expected_diff)
+    }
 }
