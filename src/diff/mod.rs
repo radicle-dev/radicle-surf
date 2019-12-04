@@ -18,6 +18,7 @@ impl From<String> for DiffError {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct Diff {
     pub created: Vec<CreateFile>,
     pub deleted: Vec<DeleteFile>,
@@ -25,24 +26,25 @@ pub struct Diff {
     pub modified: Vec<ModifiedFile>,
 }
 
-pub struct CreateFile {
-    pub path: Path,
-}
+#[derive(Debug, PartialEq, Eq)]
+pub struct CreateFile(pub Path);
 
-pub struct DeleteFile {
-    pub path: Path,
-}
+#[derive(Debug, PartialEq, Eq)]
+pub struct DeleteFile(pub Path);
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct MoveFile {
     pub old_path: Path,
     pub new_path: Path,
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct ModifiedFile {
     pub path: Path,
     pub diff: FileDiff,
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct FileDiff {
     // TODO
 }
@@ -227,15 +229,11 @@ impl Diff {
     }
 
     fn convert_to_deleted(file: &File, parent_path: &[Label]) -> DeleteFile {
-        DeleteFile {
-            path: Diff::build_path(file, parent_path),
-        }
+        DeleteFile(Diff::build_path(file, parent_path))
     }
 
     fn convert_to_created(file: &File, parent_path: &[Label]) -> CreateFile {
-        CreateFile {
-            path: Diff::build_path(file, parent_path),
-        }
+        CreateFile(Diff::build_path(file, parent_path))
     }
 
     fn add_modified_file(&mut self, file: &File, parent_path: &[Label]) {
