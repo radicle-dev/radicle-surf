@@ -1,8 +1,11 @@
 use nonempty::NonEmpty;
 use std::collections::HashMap;
+use std::fmt;
 
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 
 /// A label for [`Directory`](struct.Directory.html)
 /// and [`File`](struct.File.html) to allow for search.
@@ -38,6 +41,16 @@ impl Label {
     pub fn root() -> Self {
         "~".into()
     }
+
+    pub fn is_root(&self) -> bool {
+        *self == Self::root()
+    }
+}
+
+impl fmt::Display for Label {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
 }
 
 #[cfg(test)]
@@ -70,6 +83,16 @@ impl Arbitrary for Path {
         let head = Arbitrary::arbitrary(g);
         let tail: Vec<Label> = Arbitrary::arbitrary(g);
         Path::from_labels(head, &tail)
+    }
+}
+
+impl fmt::Display for Path {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let (prefix, suffix) = self.split_last();
+        for p in prefix {
+            write!(f, "{}/", p)?;
+        }
+        write!(f, "{}", suffix)
     }
 }
 
@@ -137,6 +160,10 @@ impl Path {
     /// ```
     pub fn push(&mut self, label: Label) {
         self.0.push(label)
+    }
+
+    pub fn pop(&mut self) -> Option<Label> {
+        self.0.pop()
     }
 
     /// Iterator over the [`Label`](struct.Label.html)s in the `Path`.
@@ -421,6 +448,14 @@ impl DirectoryContents {
     pub fn file(filename: Label, contents: &[u8]) -> Self {
         DirectoryContents::File(File::new(filename, contents))
     }
+
+    pub fn label(&self) -> Option<&Label> {
+        match self {
+            DirectoryContents::SubDirectory(dir) => Some(&dir.label),
+            DirectoryContents::File(file) => Some(&file.filename),
+            _ => None,
+        }
+    }
 }
 
 /// A `Directory` consists of its [`Label`](struct.Label.html) and its entries.
@@ -469,6 +504,12 @@ impl File {
     /// ```
     pub fn size(&self) -> usize {
         self.size
+    }
+
+    pub fn checksum(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        self.contents.hash(&mut hasher);
+        hasher.finish()
     }
 }
 
