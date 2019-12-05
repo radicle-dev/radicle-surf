@@ -1,10 +1,7 @@
 use nonempty::NonEmpty;
+use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::fmt;
-
-#[cfg(test)]
-use quickcheck::{Arbitrary, Gen};
-use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
 /// A label for [`Directory`](struct.Directory.html)
@@ -53,13 +50,6 @@ impl fmt::Display for Label {
     }
 }
 
-#[cfg(test)]
-impl Arbitrary for Label {
-    fn arbitrary<G: Gen>(g: &mut G) -> Self {
-        Label(Arbitrary::arbitrary(g))
-    }
-}
-
 impl From<&str> for Label {
     fn from(item: &str) -> Self {
         Label(item.into())
@@ -76,15 +66,6 @@ impl From<String> for Label {
 /// in a directory or file search.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Path(pub NonEmpty<Label>);
-
-#[cfg(test)]
-impl Arbitrary for Path {
-    fn arbitrary<G: Gen>(g: &mut G) -> Self {
-        let head = Arbitrary::arbitrary(g);
-        let tail: Vec<Label> = Arbitrary::arbitrary(g);
-        Path::from_labels(head, &tail)
-    }
-}
 
 impl fmt::Display for Path {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -513,15 +494,6 @@ impl File {
     }
 }
 
-#[cfg(test)]
-impl Arbitrary for File {
-    fn arbitrary<G: Gen>(g: &mut G) -> Self {
-        let filename = Arbitrary::arbitrary(g);
-        let contents: Vec<u8> = Arbitrary::arbitrary(g);
-        File::new(filename, &contents)
-    }
-}
-
 impl std::fmt::Debug for File {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "File {{ filename: {:#?} }}", self.filename)
@@ -803,6 +775,8 @@ impl Directory {
 pub mod tests {
     use crate::file_system::*;
     use pretty_assertions::assert_eq;
+    use proptest::collection;
+    use proptest::prelude::*;
 
     #[derive(Debug, Clone)]
     struct TestRepo {}
@@ -956,14 +930,47 @@ pub mod tests {
         assert!(prop_all_directories_and_files(directory_map))
     }
 
-    /* TODO(fintan): this quickcheck takes far too long to complete
-    #[quickcheck]
-    fn prop_all_directories_and_files_quickcheck(
-        directory_map: SmallHashMap<Path, (File, Vec<File>)>,
-    ) -> bool {
-        prop_all_directories_and_files(directory_map.get_small_hashmap)
+    fn label_strategy() -> impl Strategy<Value = Label> {
+        // ASCII regex, excluding '/' because of posix file paths
+        "[ -.|0-~]+".prop_map(|label| label.into())
     }
-    */
+
+    fn path_strategy(max_size: usize) -> impl Strategy<Value = Path> {
+        (
+            label_strategy(),
+            collection::vec(label_strategy(), 0..max_size),
+        )
+            .prop_map(|(label, labels)| Path((label, labels).into()))
+    }
+
+    fn file_strategy() -> impl Strategy<Value = File> {
+        // ASCII regex, see: https://catonmat.net/my-favorite-regex
+        (label_strategy(), "[ -~]*")
+            .prop_map(|(filename, contents)| File::new(filename, contents.as_bytes()))
+    }
+
+    fn directory_map_strategy(
+        path_size: usize,
+        n_files: usize,
+        map_size: usize,
+    ) -> impl Strategy<Value = HashMap<Path, (File, Vec<File>)>> {
+        collection::hash_map(
+            path_strategy(path_size),
+            (
+                file_strategy(),
+                collection::vec(file_strategy(), 0..n_files),
+            ),
+            0..map_size,
+        )
+    }
+
+    // TODO(fintan): This is a bit slow. Could be time to benchmark some functions.
+    proptest! {
+        #[test]
+        fn prop_test_all_directories_and_files(directory_map in directory_map_strategy(10, 10, 10)) {
+            prop_all_directories_and_files(directory_map);
+        }
+    }
 
     fn prop_all_directories_and_files(directory_map: HashMap<Path, (File, Vec<File>)>) -> bool {
         let mut new_directory_map = HashMap::new();
