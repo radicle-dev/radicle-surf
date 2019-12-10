@@ -60,5 +60,3 @@ pub mod file_system;
 pub mod vcs;
 
 pub use crate::vcs::git;
-
-pub use git2;
