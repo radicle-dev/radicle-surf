@@ -30,6 +30,8 @@
 //! ]);
 //! ```
 
+pub use git2;
+
 use crate::file_system;
 use crate::vcs;
 use crate::vcs::VCS;
