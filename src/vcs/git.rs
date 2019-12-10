@@ -30,17 +30,15 @@
 //! ]);
 //! ```
 
+// Re-export git2 as sub-module
 pub use git2;
 
 use crate::file_system;
 use crate::vcs;
 use crate::vcs::VCS;
-use git2::{Commit, Error, Oid, Reference, Repository, TreeWalkMode, TreeWalkResult};
+use git2::{BranchType, Commit, Error, Oid, Reference, Repository, TreeWalkMode, TreeWalkResult};
 use nonempty::NonEmpty;
 use std::collections::HashMap;
-
-// Re-export `BranchType` from here
-pub use git2::BranchType;
 
 #[derive(Debug, PartialEq)]
 pub enum GitError {
@@ -494,7 +492,8 @@ impl<'repo> GitBrowser<'repo> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Branch, BranchName, BranchType, GitBrowser, GitRepository};
+    /// use radicle_surf::vcs::git::{Branch, BranchName, GitBrowser, GitRepository};
+    /// use radicle_surf::vcs::git::git2::BranchType;
     ///
     /// let repo = GitRepository::new("./data/git-golden").unwrap();
     /// let mut browser = GitBrowser::new(&repo).unwrap();
