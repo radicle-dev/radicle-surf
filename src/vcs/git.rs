@@ -499,17 +499,6 @@ impl<'repo> GitBrowser<'repo> {
     /// underlying [`GitRepository`](struct.GitRepository.hmtl).
     ///
     /// # Examples
-    /// ```
-    /// use radicle_surf::vcs::git::{GitBrowser, GitRepository};
-    ///
-    /// let repo = GitRepository::new(".").unwrap();
-    /// let mut browser = GitBrowser::new(&repo).unwrap();
-    ///
-    /// let tags = browser.list_tags().unwrap();
-    ///
-    /// // We currently have no tags :(
-    /// assert!(tags.is_empty());
-    /// ```
     ///
     /// ```
     /// use radicle_surf::vcs::git::{GitBrowser, GitRepository, TagName};
