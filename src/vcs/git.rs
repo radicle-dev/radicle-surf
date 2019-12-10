@@ -72,16 +72,17 @@ impl<'repo> GitRepository {
     /// let repo = GitRepository::new("./data/git-golden").unwrap();
     /// let browser = GitBrowser::new(&repo).unwrap();
     ///
-    /// let branches = browser.list_branches();
+    /// let mut branches = browser.list_branches().unwrap();
+    /// branches.sort();
     ///
     /// assert_eq!(
     ///     branches,
-    ///     Ok(vec![
+    ///     vec![
     ///         BranchName::new("master"),
     ///         BranchName::new("origin/HEAD"),
     ///         BranchName::new("origin/add-tests"),
     ///         BranchName::new("origin/master"),
-    ///     ])
+    ///     ]
     /// );
     /// ```
     pub fn new(repo_uri: &str) -> Result<Self, GitError> {
