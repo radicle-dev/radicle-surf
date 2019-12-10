@@ -12,7 +12,6 @@
 //! directory_contents.sort();
 //!
 //! assert_eq!(directory_contents, vec![
-//!     SystemType::directory(".git".into()),
 //!     SystemType::file(".gitignore".into()),
 //!     SystemType::file("Cargo.toml".into()),
 //!     SystemType::directory("src".into()),
@@ -255,7 +254,10 @@ impl<'repo> vcs::VCS<'repo, Commit<'repo>, GitError> for GitRepository {
 impl file_system::RepoBackend for GitRepository {
     fn repo_directory() -> file_system::Directory {
         file_system::Directory {
-            label: ".git".into(),
+            name: file_system::Label {
+                label: ".git".into(),
+                hidden: true,
+            },
             entries: NonEmpty::new(file_system::DirectoryContents::Repo),
         }
     }
@@ -356,7 +358,6 @@ impl<'repo> GitBrowser<'repo> {
     /// assert_eq!(
     ///     directory_contents,
     ///     vec![
-    ///         SystemType::directory(".git".into()),
     ///         SystemType::file(".gitignore".into()),
     ///         SystemType::file("Cargo.toml".into()),
     ///         SystemType::directory("src".into()),
@@ -440,11 +441,10 @@ impl<'repo> GitBrowser<'repo> {
     /// let mut directory_contents = directory.list_directory();
     /// directory_contents.sort();
     ///
-    /// // We should only have src and .git in our root
+    /// // We should only have src in our root
     /// assert_eq!(
     ///     directory_contents,
     ///     vec![
-    ///         SystemType::directory(".git".into()),
     ///         SystemType::directory("src".into()),
     ///     ]
     /// );

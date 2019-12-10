@@ -19,7 +19,10 @@ use std::hash::{Hash, Hasher};
 /// let lib_filepath = Path::from_labels(src_directory_name, &[lib_filename]);
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Label(pub String);
+pub struct Label {
+    pub label: String,
+    pub(crate) hidden: bool,
+}
 
 impl Label {
     /// The root label for the root directory, i.e. `"~"`.
@@ -46,19 +49,25 @@ impl Label {
 
 impl fmt::Display for Label {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "{}", self.label)
     }
 }
 
 impl From<&str> for Label {
     fn from(item: &str) -> Self {
-        Label(item.into())
+        Label {
+            label: item.into(),
+            hidden: false,
+        }
     }
 }
 
 impl From<String> for Label {
-    fn from(item: String) -> Self {
-        Label(item)
+    fn from(label: String) -> Self {
+        Label {
+            label,
+            hidden: false,
+        }
     }
 }
 
@@ -598,7 +607,14 @@ impl Directory {
             .iter()
             .cloned()
             .filter_map(|entry| match entry {
-                DirectoryContents::SubDirectory(dir) => Some(SystemType::directory(dir.name)),
+                DirectoryContents::SubDirectory(dir) => {
+                    let name = dir.name;
+                    if !name.hidden {
+                        Some(SystemType::directory(name))
+                    } else {
+                        None
+                    }
+                }
                 DirectoryContents::File(file) => Some(SystemType::file(file.name)),
                 DirectoryContents::Repo => None,
             })
@@ -784,7 +800,10 @@ pub mod tests {
     impl RepoBackend for TestRepo {
         fn repo_directory() -> Directory {
             Directory {
-                label: ".test".into(),
+                name: Label {
+                    label: ".test".into(),
+                    hidden: true,
+                },
                 entries: NonEmpty::new(DirectoryContents::Repo),
             }
         }
@@ -891,7 +910,6 @@ pub mod tests {
         assert_eq!(
             directory_contents,
             vec![
-                SystemType::directory(".test".into()),
                 SystemType::file("bar.rs".into()),
                 SystemType::file("foo.rs".into()),
                 SystemType::directory("haskell".into()),
@@ -1000,9 +1018,9 @@ pub mod tests {
 
     #[test]
     fn test_file_name_is_same_as_root() {
-        // This test ensures that if the filename is the same the root of the
+        // This test ensures that if the name is the same the root of the
         // directory, that search_path.split_last() doesn't toss away the prefix.
-        let path = Path::from_labels(Label("foo".into()), &[Label("bar".into())]);
+        let path = Path::from_labels("foo".into(), &["bar".into()]);
         let files = (File::new(Label::root(), &[]), vec![]);
         let mut directory_map = HashMap::new();
         directory_map.insert(path, files);
