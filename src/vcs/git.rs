@@ -37,6 +37,9 @@ use git2::{Commit, Error, Oid, Reference, Repository, TreeWalkMode, TreeWalkResu
 use nonempty::NonEmpty;
 use std::collections::HashMap;
 
+// Re-export `BranchType` from here
+pub use git2::BranchType;
+
 #[derive(Debug, PartialEq)]
 pub enum GitError {
     EmptyCommitHistory,
@@ -65,20 +68,20 @@ impl<'repo> GitRepository {
     ///
     /// # Examples
     /// ```
-    /// use radicle_surf::vcs::git::{BranchName, GitBrowser, GitRepository};
+    /// use radicle_surf::vcs::git::{Branch, BranchName, GitBrowser, GitRepository};
     ///
     /// let repo = GitRepository::new("./data/git-golden").unwrap();
     /// let browser = GitBrowser::new(&repo).unwrap();
     ///
-    /// let branches = browser.list_branches();
+    /// let branches = browser.list_branches(None);
     ///
     /// assert_eq!(
     ///     branches,
     ///     Ok(vec![
-    ///         BranchName::new("master"),
-    ///         BranchName::new("origin/HEAD"),
-    ///         BranchName::new("origin/add-tests"),
-    ///         BranchName::new("origin/master"),
+    ///         Branch::local(BranchName::new("master")),
+    ///         Branch::remote(BranchName::new("origin/HEAD")),
+    ///         Branch::remote(BranchName::new("origin/add-tests")),
+    ///         Branch::remote(BranchName::new("origin/master")),
     ///     ])
     /// );
     /// ```
@@ -135,6 +138,31 @@ impl<'repo> vcs::GetVCS<'repo, GitError> for GitRepository {
         Repository::open(repo_id)
             .map(GitRepository)
             .map_err(GitError::from)
+    }
+}
+
+/// The combination of a branch's name and where its locality (remote or local).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Branch {
+    pub name: BranchName,
+    pub locality: BranchType,
+}
+
+impl Branch {
+    /// Helper to create a remote `Branch` with a name
+    pub fn remote(name: BranchName) -> Self {
+        Branch {
+            name,
+            locality: BranchType::Remote,
+        }
+    }
+
+    /// Helper to create a remote `Branch` with a name
+    pub fn local(name: BranchName) -> Self {
+        Branch {
+            name,
+            locality: BranchType::Local,
+        }
     }
 }
 
@@ -464,27 +492,40 @@ impl<'repo> GitBrowser<'repo> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{BranchName, GitBrowser, GitRepository};
+    /// use radicle_surf::vcs::git::{Branch, BranchName, BranchType, GitBrowser, GitRepository};
     ///
     /// let repo = GitRepository::new("./data/git-golden").unwrap();
     /// let mut browser = GitBrowser::new(&repo).unwrap();
     ///
-    /// let branches = browser.list_branches().unwrap();
+    /// let branches = browser.list_branches(None).unwrap();
     ///
     /// // 'master' exists in the list of branches
-    /// assert!(branches.contains(&BranchName::new("master")));
+    /// assert!(branches.contains(&Branch::local(BranchName::new("master"))));
+    ///
+    /// // Filter the branches by `Remote`.
+    /// let branches = browser.list_branches(Some(BranchType::Remote)).unwrap();
+    ///
+    /// assert_eq!(branches, vec![
+    ///     Branch::remote(BranchName::new("origin/HEAD")),
+    ///     Branch::remote(BranchName::new("origin/add-tests")),
+    ///     Branch::remote(BranchName::new("origin/master")),
+    /// ]);
     /// ```
-    pub fn list_branches(&self) -> Result<Vec<BranchName>, GitError> {
+    pub fn list_branches(&self, filter: Option<BranchType>) -> Result<Vec<Branch>, GitError> {
         self.repository
             .0
-            .branches(None)
+            .branches(filter)
             .map_err(GitError::from)
             .and_then(|mut branches| {
                 branches.try_fold(vec![], |mut acc, branch| {
-                    let (branch, _) = branch?;
+                    let (branch, branch_type) = branch?;
                     let branch_name = branch.name()?;
                     if let Some(name) = branch_name {
-                        acc.push(BranchName(name.to_string()));
+                        let branch = Branch {
+                            name: BranchName(name.to_string()),
+                            locality: branch_type,
+                        };
+                        acc.push(branch);
                         Ok(acc)
                     } else {
                         Err(GitError::BranchDecode)
