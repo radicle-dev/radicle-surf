@@ -63,7 +63,7 @@ impl Diff {
     // For now using conventional approach with the right being "newer".
     pub fn diff(left: Directory, right: Directory) -> Result<Diff, DiffError> {
         let mut diff = Diff::new();
-        let path = Rc::new(RefCell::new(Path::from_labels(right.label.clone(), &[])));
+        let path = Rc::new(RefCell::new(Path::from_labels(right.name.clone(), &[])));
         Diff::collect_diff(&left, &right, &path, &mut diff)?;
 
         // TODO: Some of the deleted files may actually be moved (renamed) to one of the created files.
@@ -130,7 +130,7 @@ impl Diff {
                                     new_entry_opt = new_iter.next();
                                 }
                                 (SubDirectory(new_dir), SubDirectory(old_dir)) => {
-                                    parent_path.borrow_mut().push(new_dir.label.clone());
+                                    parent_path.borrow_mut().push(new_dir.name.clone());
                                     Diff::collect_diff(
                                         old_dir.deref(),
                                         new_dir.deref(),
@@ -212,7 +212,7 @@ impl Diff {
     where
         F: Fn(&File, &Path) -> T + Copy,
     {
-        parent_path.borrow_mut().push(dir.label.clone());
+        parent_path.borrow_mut().push(dir.name.clone());
         for entry in dir.entries.iter() {
             match entry {
                 DirectoryContents::SubDirectory(subdir) => {
@@ -280,7 +280,7 @@ impl Diff {
 
     fn build_path(file: &File, parent_path: &Path) -> Path {
         let mut result_path = parent_path.clone();
-        result_path.push(file.filename.clone());
+        result_path.push(file.name.clone());
         result_path
     }
 }
@@ -289,8 +289,8 @@ impl Diff {
 fn get_sorted_contents(dir: &Directory) -> Vec<&DirectoryContents> {
     let mut vec: Vec<&DirectoryContents> = dir.entries.iter().collect();
     vec.sort_by_key(|e| match e {
-        DirectoryContents::SubDirectory(subdir) => Some(subdir.label.clone()),
-        DirectoryContents::File(file) => Some(file.filename.clone()),
+        DirectoryContents::SubDirectory(subdir) => Some(subdir.name.clone()),
+        DirectoryContents::File(file) => Some(file.name.clone()),
         DirectoryContents::Repo => None,
     });
     vec
@@ -309,7 +309,7 @@ mod tests {
     impl RepoBackend for TestRepo {
         fn repo_directory() -> Directory {
             Directory {
-                label: ".test".into(),
+                name: ".test".into(),
                 entries: NonEmpty::new(DirectoryContents::Repo),
             }
         }
@@ -318,12 +318,12 @@ mod tests {
     #[test]
     fn test_create_file() {
         let directory: Directory = Directory {
-            label: Label::root(),
+            name: Label::root(),
             entries: NonEmpty::new(DirectoryContents::Repo),
         };
 
         let new_directory: Directory = Directory {
-            label: Label::root(),
+            name: Label::root(),
             entries: (
                 DirectoryContents::Repo,
                 vec![DirectoryContents::file("banana.rs".into(), b"use banana")],
@@ -345,7 +345,7 @@ mod tests {
     #[test]
     fn test_delete_file() {
         let directory: Directory = Directory {
-            label: Label::root(),
+            name: Label::root(),
             entries: (
                 DirectoryContents::Repo,
                 vec![DirectoryContents::file("banana.rs".into(), b"use banana")],
@@ -354,7 +354,7 @@ mod tests {
         };
 
         let new_directory: Directory = Directory {
-            label: Label::root(),
+            name: Label::root(),
             entries: NonEmpty::new(DirectoryContents::Repo),
         };
 
@@ -372,12 +372,12 @@ mod tests {
     #[test]
     fn test_moved_file() {
         let directory: Directory = Directory {
-            label: Label::root(),
+            name: Label::root(),
             entries: NonEmpty::new(DirectoryContents::file("mod.rs".into(), b"use banana")),
         };
 
         let new_directory: Directory = Directory {
-            label: Label::root(),
+            name: Label::root(),
             entries: NonEmpty::new(DirectoryContents::file("banana.rs".into(), b"use banana")),
         };
 
@@ -391,7 +391,7 @@ mod tests {
     #[test]
     fn test_modify_file() {
         let directory: Directory = Directory {
-            label: Label::root(),
+            name: Label::root(),
             entries: (
                 DirectoryContents::Repo,
                 vec![DirectoryContents::file("banana.rs".into(), b"use banana")],
@@ -400,7 +400,7 @@ mod tests {
         };
 
         let new_directory: Directory = Directory {
-            label: Label::root(),
+            name: Label::root(),
             entries: (
                 DirectoryContents::Repo,
                 vec![DirectoryContents::file("banana.rs".into(), b"use banana;")],
@@ -425,16 +425,16 @@ mod tests {
     #[test]
     fn test_create_directory() {
         let directory: Directory = Directory {
-            label: Label::root(),
+            name: Label::root(),
             entries: NonEmpty::new(DirectoryContents::Repo),
         };
 
         let new_directory: Directory = Directory {
-            label: Label::root(),
+            name: Label::root(),
             entries: (
                 DirectoryContents::Repo,
                 vec![DirectoryContents::sub_directory(Directory {
-                    label: "src".into(),
+                    name: "src".into(),
                     entries: NonEmpty::new(DirectoryContents::file(
                         "banana.rs".into(),
                         b"use banana",
@@ -461,11 +461,11 @@ mod tests {
     #[test]
     fn test_delete_directory() {
         let directory: Directory = Directory {
-            label: Label::root(),
+            name: Label::root(),
             entries: (
                 DirectoryContents::Repo,
                 vec![DirectoryContents::sub_directory(Directory {
-                    label: "src".into(),
+                    name: "src".into(),
                     entries: NonEmpty::new(DirectoryContents::file(
                         "banana.rs".into(),
                         b"use banana",
@@ -476,7 +476,7 @@ mod tests {
         };
 
         let new_directory: Directory = Directory {
-            label: Label::root(),
+            name: Label::root(),
             entries: NonEmpty::new(DirectoryContents::Repo),
         };
 
@@ -497,11 +497,11 @@ mod tests {
     #[test]
     fn test_modify_file_directory() {
         let directory: Directory = Directory {
-            label: Label::root(),
+            name: Label::root(),
             entries: (
                 DirectoryContents::Repo,
                 vec![DirectoryContents::sub_directory(Directory {
-                    label: "src".into(),
+                    name: "src".into(),
                     entries: NonEmpty::new(DirectoryContents::file(
                         "banana.rs".into(),
                         b"use banana",
@@ -512,11 +512,11 @@ mod tests {
         };
 
         let new_directory: Directory = Directory {
-            label: Label::root(),
+            name: Label::root(),
             entries: (
                 DirectoryContents::Repo,
                 vec![DirectoryContents::sub_directory(Directory {
-                    label: "src".into(),
+                    name: "src".into(),
                     entries: NonEmpty::new(DirectoryContents::file(
                         "banana.rs".into(),
                         b"use banana;",
@@ -543,17 +543,17 @@ mod tests {
     #[test]
     fn test_disjoint_directories() {
         let directory: Directory = Directory {
-            label: "foo".into(),
+            name: "foo".into(),
             entries: NonEmpty::new(DirectoryContents::sub_directory(Directory {
-                label: "src".into(),
+                name: "src".into(),
                 entries: NonEmpty::new(DirectoryContents::file("banana.rs".into(), b"use banana")),
             })),
         };
 
         let other_directory: Directory = Directory {
-            label: "bar".into(),
+            name: "bar".into(),
             entries: NonEmpty::new(DirectoryContents::sub_directory(Directory {
-                label: "src".into(),
+                name: "src".into(),
                 entries: NonEmpty::new(DirectoryContents::file(
                     "pineapple.rs".into(),
                     b"use pineapple",

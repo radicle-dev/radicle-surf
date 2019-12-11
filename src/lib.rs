@@ -38,7 +38,6 @@
 //! assert_eq!(root_contents, vec![
 //!     SystemType::directory(".buildkite".into()),
 //!     SystemType::directory(".docker".into()),
-//!     SystemType::directory(".git".into()),
 //!     SystemType::file(".gitignore".into()),
 //!     SystemType::file(".gitmodules".into()),
 //!     SystemType::file("Cargo.toml".into()),
