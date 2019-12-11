@@ -8,7 +8,7 @@
 //! Let's start surfing (and apologies for the `unwrap`s):
 //!
 //! ```
-//! use radicle_surf::vcs::git::{GitBrowser, GitRepository};
+//! use radicle_surf::vcs::git::{GitBrowser, GitRepository, Sha1};
 //! use radicle_surf::file_system::{Label, Path, SystemType};
 //! use pretty_assertions::assert_eq;
 //!
@@ -16,7 +16,11 @@
 //! let repo = GitRepository::new(".").unwrap();
 //!
 //! // Here we initialise a new Broswer for a the git repo.
-//! let browser = GitBrowser::new(&repo).unwrap();
+//! let mut browser = GitBrowser::new(&repo).unwrap();
+//!
+//! // Set the history to a particular commit
+//! browser.commit(Sha1::new("840e75edc46c84b6392b3f38e1d830547fac89a4"))
+//!        .expect("Failed to set commit");
 //!
 //! // Get the snapshot of the directory for our current
 //! // HEAD of history.

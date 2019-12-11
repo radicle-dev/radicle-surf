@@ -37,6 +37,7 @@ use crate::vcs;
 use crate::vcs::VCS;
 use git2::{BranchType, Commit, Error, Oid, Reference, Repository, TreeWalkMode, TreeWalkResult};
 use nonempty::NonEmpty;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq)]
@@ -72,16 +73,17 @@ impl<'repo> GitRepository {
     /// let repo = GitRepository::new("./data/git-golden").unwrap();
     /// let browser = GitBrowser::new(&repo).unwrap();
     ///
-    /// let branches = browser.list_branches(None);
+    /// let mut branches = browser.list_branches(None).unwrap();
+    /// branches.sort();
     ///
     /// assert_eq!(
     ///     branches,
-    ///     Ok(vec![
+    ///     vec![
     ///         Branch::local(BranchName::new("master")),
     ///         Branch::remote(BranchName::new("origin/HEAD")),
     ///         Branch::remote(BranchName::new("origin/add-tests")),
     ///         Branch::remote(BranchName::new("origin/master")),
-    ///     ])
+    ///     ]
     /// );
     /// ```
     pub fn new(repo_uri: &str) -> Result<Self, GitError> {
@@ -141,10 +143,25 @@ impl<'repo> vcs::GetVCS<'repo, GitError> for GitRepository {
 }
 
 /// The combination of a branch's name and where its locality (remote or local).
+///
+/// **Note**: The `PartialOrd` and `Ord` implementations compare on `BranchName`
+/// only.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Branch {
     pub name: BranchName,
     pub locality: BranchType,
+}
+
+impl PartialOrd for Branch {
+    fn partial_cmp(&self, other: &Branch) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Branch {
+    fn cmp(&self, other: &Branch) -> Ordering {
+        self.name.cmp(&other.name)
+    }
 }
 
 impl Branch {
@@ -539,17 +556,6 @@ impl<'repo> GitBrowser<'repo> {
     /// underlying [`GitRepository`](struct.GitRepository.hmtl).
     ///
     /// # Examples
-    /// ```
-    /// use radicle_surf::vcs::git::{GitBrowser, GitRepository};
-    ///
-    /// let repo = GitRepository::new(".").unwrap();
-    /// let mut browser = GitBrowser::new(&repo).unwrap();
-    ///
-    /// let tags = browser.list_tags().unwrap();
-    ///
-    /// // We currently have no tags :(
-    /// assert!(tags.is_empty());
-    /// ```
     ///
     /// ```
     /// use radicle_surf::vcs::git::{GitBrowser, GitRepository, TagName};
