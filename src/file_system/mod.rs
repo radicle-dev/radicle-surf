@@ -19,7 +19,10 @@ use std::hash::{Hash, Hasher};
 /// let lib_filepath = Path::from_labels(src_directory_name, &[lib_filename]);
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Label(pub String);
+pub struct Label {
+    pub label: String,
+    pub(crate) hidden: bool,
+}
 
 impl Label {
     /// The root label for the root directory, i.e. `"~"`.
@@ -46,19 +49,25 @@ impl Label {
 
 impl fmt::Display for Label {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "{}", self.label)
     }
 }
 
 impl From<&str> for Label {
     fn from(item: &str) -> Self {
-        Label(item.into())
+        Label {
+            label: item.into(),
+            hidden: false,
+        }
     }
 }
 
 impl From<String> for Label {
-    fn from(item: String) -> Self {
-        Label(item)
+    fn from(label: String) -> Self {
+        Label {
+            label,
+            hidden: false,
+        }
     }
 }
 
@@ -358,11 +367,11 @@ where
     /// use nonempty::NonEmpty;
     ///
     /// let repo = Directory {
-    ///     label: Label::root(),
+    ///     name: Label::root(),
     ///     entries: NonEmpty::new(
     ///         DirectoryContents::SubDirectory(Box::new(
     ///             Directory {
-    ///                 label: ".git".into(),
+    ///                 name: ".git".into(),
     ///                 entries: NonEmpty::new(DirectoryContents::Repo),
     ///             }
     ///         ))
@@ -394,7 +403,7 @@ impl DirectoryContents {
     /// use radicle_surf::file_system::{File, Directory, DirectoryContents};
     ///
     /// let lib = Directory {
-    ///     label: "src".into(),
+    ///     name: "src".into(),
     ///     entries: NonEmpty::new(DirectoryContents::File(File::new(
     ///         "lib.rs".into(),
     ///         b"pub mod file_system;",
@@ -418,7 +427,7 @@ impl DirectoryContents {
     /// use radicle_surf::file_system::{File, Directory, DirectoryContents};
     ///
     /// let lib = Directory {
-    ///     label: "src".into(),
+    ///     name: "src".into(),
     ///     entries: NonEmpty::new(DirectoryContents::file("lib.rs".into(), b"pub mod file_system;")),
     /// };
     ///
@@ -426,15 +435,15 @@ impl DirectoryContents {
     ///
     /// assert_eq!(sub_dir, DirectoryContents::SubDirectory(Box::new(lib)));
     /// ```
-    pub fn file(filename: Label, contents: &[u8]) -> Self {
-        DirectoryContents::File(File::new(filename, contents))
+    pub fn file(name: Label, contents: &[u8]) -> Self {
+        DirectoryContents::File(File::new(name, contents))
     }
 
     pub fn label(&self) -> Option<&Label> {
         match self {
-            DirectoryContents::SubDirectory(dir) => Some(&dir.label),
-            DirectoryContents::File(file) => Some(&file.filename),
-            _ => None,
+            DirectoryContents::SubDirectory(dir) => Some(&dir.name),
+            DirectoryContents::File(file) => Some(&file.name),
+            DirectoryContents::Repo => None,
         }
     }
 }
@@ -445,7 +454,7 @@ impl DirectoryContents {
 /// This is because empty directories do not generally exist in VCSes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Directory {
-    pub label: Label,
+    pub name: Label,
     pub entries: NonEmpty<DirectoryContents>,
 }
 
@@ -453,16 +462,16 @@ pub struct Directory {
 /// and its file contents (a `Vec` of bytes).
 #[derive(Clone, PartialEq, Eq)]
 pub struct File {
-    pub filename: Label,
+    pub name: Label,
     pub contents: Vec<u8>,
     pub(crate) size: usize,
 }
 
 impl File {
-    pub fn new(filename: Label, contents: &[u8]) -> Self {
+    pub fn new(name: Label, contents: &[u8]) -> Self {
         let size = contents.len();
         File {
-            filename,
+            name,
             contents: contents.to_vec(),
             size,
         }
@@ -496,7 +505,7 @@ impl File {
 
 impl std::fmt::Debug for File {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "File {{ filename: {:#?} }}", self.filename)
+        write!(f, "File {{ name: {:#?} }}", self.name)
     }
 }
 
@@ -548,7 +557,7 @@ impl Directory {
     /// ).into();
     ///
     /// let directory = Directory {
-    ///     label: Label::root(),
+    ///     name: Label::root(),
     ///     entries: files,
     /// };
     ///
@@ -565,7 +574,7 @@ impl Directory {
     /// ).into();
     ///
     /// let subdir = DirectoryContents::sub_directory(Directory {
-    ///     label: "test".into(),
+    ///     name: "test".into(),
     ///     entries: NonEmpty::new(DirectoryContents::file(
     ///         "mod.rs".into(),
     ///         b"assert_eq!(1 + 1, 2);",
@@ -575,7 +584,7 @@ impl Directory {
     /// entries.push(subdir);
     ///
     /// let directory = Directory {
-    ///     label: Label::root(),
+    ///     name: Label::root(),
     ///     entries: entries,
     /// };
     ///
@@ -598,8 +607,15 @@ impl Directory {
             .iter()
             .cloned()
             .filter_map(|entry| match entry {
-                DirectoryContents::SubDirectory(dir) => Some(SystemType::directory(dir.label)),
-                DirectoryContents::File(file) => Some(SystemType::file(file.filename)),
+                DirectoryContents::SubDirectory(dir) => {
+                    let name = dir.name;
+                    if !name.hidden {
+                        Some(SystemType::directory(name))
+                    } else {
+                        None
+                    }
+                }
+                DirectoryContents::File(file) => Some(SystemType::file(file.name)),
                 DirectoryContents::Repo => None,
             })
             .collect()
@@ -615,13 +631,13 @@ impl Directory {
     /// This operation fails if the path does not lead to
     /// the `File`.
     pub fn find_file(&self, path: &Path) -> Option<File> {
-        let (path, filename) = path.split_last();
+        let (path, name) = path.split_last();
         let path = NonEmpty::from_slice(&path);
 
         // Find the file in the current directoy if the prefix path is empty.
         // Otherwise find it in the directory found in the given path (if it exists).
         path.map_or(Some(self.clone()), |p| self.find_directory(&Path(p)))
-            .and_then(|dir| dir.file_in_directory(&filename))
+            .and_then(|dir| dir.file_in_directory(&name))
     }
 
     /// Find a `Directory` in the directory given the `Path` to
@@ -631,7 +647,7 @@ impl Directory {
     /// the `Directory`.
     pub fn find_directory(&self, path: &Path) -> Option<Self> {
         let (label, labels) = path.split_first();
-        if *label == self.label {
+        if *label == self.name {
             // recursively dig down into sub-directories
             labels
                 .iter()
@@ -678,7 +694,7 @@ impl Directory {
         self.sub_directories()
             .iter()
             .cloned()
-            .find(|directory| directory.label == *label)
+            .find(|directory| directory.name == *label)
     }
 
     /// Get the a sub directory of a `Directory` given its name.
@@ -687,7 +703,7 @@ impl Directory {
     fn sub_directory_mut(&mut self, label: &Label) -> Option<&mut Self> {
         self.sub_directories_mut()
             .into_iter()
-            .find(|directory| directory.label == *label)
+            .find(|directory| directory.name == *label)
     }
 
     /// Get the `File` in the current `Directory` if it exists in
@@ -697,7 +713,7 @@ impl Directory {
     fn file_in_directory(&self, label: &Label) -> Option<File> {
         for entry in self.entries.iter() {
             match entry {
-                DirectoryContents::File(file) if file.filename == *label => {
+                DirectoryContents::File(file) if file.name == *label => {
                     return Some(file.clone());
                 }
                 DirectoryContents::File(..) => {}
@@ -709,9 +725,9 @@ impl Directory {
     }
 
     /// Helper function for creating a `Directory` with a given sub-directory.
-    pub(crate) fn mkdir(label: Label, dir: Self) -> Self {
+    pub(crate) fn mkdir(name: Label, dir: Self) -> Self {
         Directory {
-            label,
+            name,
             entries: NonEmpty::new(DirectoryContents::sub_directory(dir)),
         }
     }
@@ -735,7 +751,7 @@ impl Directory {
                 let (prefix, current) = dir.split_last();
 
                 let mut directory = Directory {
-                    label: current,
+                    name: current,
                     entries: file_entries,
                 };
                 for label in prefix.into_iter().rev() {
@@ -749,7 +765,7 @@ impl Directory {
     }
 
     fn combine(&mut self, other: &Directory) {
-        match self.sub_directory_mut(&other.label) {
+        match self.sub_directory_mut(&other.name) {
             Some(ref mut subdir) => {
                 for entry in other.entries.iter() {
                     match entry {
@@ -784,7 +800,10 @@ pub mod tests {
     impl RepoBackend for TestRepo {
         fn repo_directory() -> Directory {
             Directory {
-                label: ".test".into(),
+                name: Label {
+                    label: ".test".into(),
+                    hidden: true,
+                },
                 entries: NonEmpty::new(DirectoryContents::Repo),
             }
         }
@@ -797,7 +816,7 @@ pub mod tests {
         let file = File::new("foo.hs".into(), b"module Banana ...");
 
         let directory: Directory = Directory {
-            label: Label::root(),
+            name: Label::root(),
             entries: NonEmpty::new(DirectoryContents::File(file.clone())),
         };
 
@@ -816,7 +835,7 @@ pub mod tests {
             Directory::mkdir(
                 "foo".into(),
                 Directory {
-                    label: "bar".into(),
+                    name: "bar".into(),
                     entries: NonEmpty::new(DirectoryContents::File(file.clone())),
                 },
             ),
@@ -831,7 +850,7 @@ pub mod tests {
         let file_path = Path::with_root(&["bar.hs".into()]);
 
         let directory: Directory = Directory {
-            label: Label::root(),
+            name: Label::root(),
             entries: NonEmpty::new(DirectoryContents::file(
                 "foo.hs".into(),
                 "module Banana ...".as_bytes(),
@@ -849,7 +868,7 @@ pub mod tests {
         let baz = DirectoryContents::file("baz.hs".into(), "module Banana ...".as_bytes());
 
         let directory: Directory = Directory {
-            label: Label::root(),
+            name: Label::root(),
             entries: (foo, vec![bar, baz]).into(),
         };
 
@@ -891,7 +910,6 @@ pub mod tests {
         assert_eq!(
             directory_contents,
             vec![
-                SystemType::directory(".test".into()),
                 SystemType::file("bar.rs".into()),
                 SystemType::file("foo.rs".into()),
                 SystemType::directory("haskell".into()),
@@ -946,7 +964,7 @@ pub mod tests {
     fn file_strategy() -> impl Strategy<Value = File> {
         // ASCII regex, see: https://catonmat.net/my-favorite-regex
         (label_strategy(), "[ -~]*")
-            .prop_map(|(filename, contents)| File::new(filename, contents.as_bytes()))
+            .prop_map(|(name, contents)| File::new(name, contents.as_bytes()))
     }
 
     fn directory_map_strategy(
@@ -989,7 +1007,7 @@ pub mod tests {
                     return false;
                 }
 
-                path.push(file.filename.clone());
+                path.push(file.name.clone());
                 if !directory.find_file(&path).is_some() {
                     return false;
                 }
@@ -1000,9 +1018,9 @@ pub mod tests {
 
     #[test]
     fn test_file_name_is_same_as_root() {
-        // This test ensures that if the filename is the same the root of the
+        // This test ensures that if the name is the same the root of the
         // directory, that search_path.split_last() doesn't toss away the prefix.
-        let path = Path::from_labels(Label("foo".into()), &[Label("bar".into())]);
+        let path = Path::from_labels("foo".into(), &["bar".into()]);
         let files = (File::new(Label::root(), &[]), vec![]);
         let mut directory_map = HashMap::new();
         directory_map.insert(path, files);
@@ -1037,7 +1055,7 @@ pub mod tests {
             Directory::mkdir(
                 "bar".into(),
                 Directory {
-                    label: "baz".into(),
+                    name: "baz".into(),
                     entries: NonEmpty::new(DirectoryContents::file("quux.rs".into(), b"")),
                 },
             ),
@@ -1049,7 +1067,7 @@ pub mod tests {
             Directory::mkdir(
                 "bar".into(),
                 Directory {
-                    label: "quux".into(),
+                    name: "quux".into(),
                     entries: NonEmpty::new(DirectoryContents::file("hallo.rs".into(), b"")),
                 },
             ),
@@ -1057,11 +1075,11 @@ pub mod tests {
 
         let mut expected_root = Directory::empty_root::<TestRepo>();
         let expected_quux = DirectoryContents::sub_directory(Directory {
-            label: "baz".into(),
+            name: "baz".into(),
             entries: NonEmpty::new(DirectoryContents::file("quux.rs".into(), b"")),
         });
         let expected_hallo = DirectoryContents::sub_directory(Directory {
-            label: "quux".into(),
+            name: "quux".into(),
             entries: NonEmpty::new(DirectoryContents::file("hallo.rs".into(), b"")),
         });
 
@@ -1070,7 +1088,7 @@ pub mod tests {
         let expected = Directory::mkdir(
             "foo".into(),
             Directory {
-                label: "bar".into(),
+                name: "bar".into(),
                 entries: subdirs,
             },
         );
@@ -1103,7 +1121,7 @@ pub mod tests {
         let baz = Directory::mkdir(
             "foo".into(),
             Directory {
-                label: "bar".into(),
+                name: "bar".into(),
                 entries: NonEmpty::new(DirectoryContents::file("baz.rs".into(), b"")),
             },
         );
@@ -1112,7 +1130,7 @@ pub mod tests {
         let quux = Directory::mkdir(
             "foo".into(),
             Directory {
-                label: "bar".into(),
+                name: "bar".into(),
                 entries: NonEmpty::new(DirectoryContents::file("quux.rs".into(), b"")),
             },
         );
@@ -1126,7 +1144,7 @@ pub mod tests {
         let expected = Directory::mkdir(
             "foo".into(),
             Directory {
-                label: "bar".into(),
+                name: "bar".into(),
                 entries: files,
             },
         );

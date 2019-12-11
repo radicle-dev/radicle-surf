@@ -12,7 +12,6 @@
 //! directory_contents.sort();
 //!
 //! assert_eq!(directory_contents, vec![
-//!     SystemType::directory(".git".into()),
 //!     SystemType::file(".gitignore".into()),
 //!     SystemType::file("Cargo.toml".into()),
 //!     SystemType::directory("src".into()),
@@ -257,7 +256,10 @@ impl<'repo> vcs::VCS<'repo, Commit<'repo>, GitError> for GitRepository {
 impl file_system::RepoBackend for GitRepository {
     fn repo_directory() -> file_system::Directory {
         file_system::Directory {
-            label: ".git".into(),
+            name: file_system::Label {
+                label: ".git".into(),
+                hidden: true,
+            },
             entries: NonEmpty::new(file_system::DirectoryContents::Repo),
         }
     }
@@ -358,7 +360,6 @@ impl<'repo> GitBrowser<'repo> {
     /// assert_eq!(
     ///     directory_contents,
     ///     vec![
-    ///         SystemType::directory(".git".into()),
     ///         SystemType::file(".gitignore".into()),
     ///         SystemType::file("Cargo.toml".into()),
     ///         SystemType::directory("src".into()),
@@ -442,11 +443,10 @@ impl<'repo> GitBrowser<'repo> {
     /// let mut directory_contents = directory.list_directory();
     /// directory_contents.sort();
     ///
-    /// // We should only have src and .git in our root
+    /// // We should only have src in our root
     /// assert_eq!(
     ///     directory_contents,
     ///     vec![
-    ///         SystemType::directory(".git".into()),
     ///         SystemType::directory("src".into()),
     ///     ]
     /// );
@@ -606,9 +606,9 @@ impl<'repo> GitBrowser<'repo> {
                 .to_object(repo)
                 .map(|object| {
                     object.as_blob().and_then(|blob| {
-                        entry.name().and_then(|filename| {
+                        entry.name().and_then(|name| {
                             let file = file_system::File {
-                                filename: filename.into(),
+                                name: name.into(),
                                 contents: blob.content().to_owned(),
                                 size: blob.size(),
                             };
@@ -631,11 +631,11 @@ impl<'repo> GitBrowser<'repo> {
         commit: Commit<'repo>,
         path: &file_system::Path,
     ) -> Option<Commit<'repo>> {
-        let (directory, filename) = path.split_last();
+        let (directory, name) = path.split_last();
         let commit_tree = commit.tree().ok()?;
 
         if directory == vec![file_system::Label::root()] {
-            commit_tree.get_name(&filename.0).map(|_| commit)
+            commit_tree.get_name(&name.label).map(|_| commit)
         } else {
             let mut directory_path = std::path::PathBuf::new();
             for dir in directory {
@@ -643,12 +643,12 @@ impl<'repo> GitBrowser<'repo> {
                     continue;
                 }
 
-                directory_path.push(dir.0);
+                directory_path.push(dir.label);
             }
 
             let tree_entry = commit_tree.get_path(directory_path.as_path()).ok()?;
             let object = tree_entry.to_object(&self.repository.0).ok()?;
-            let tree = object.as_tree().map(|t| t.get_name(&filename.0));
+            let tree = object.as_tree().map(|t| t.get_name(&name.label));
             tree.map(|_| commit)
         }
     }
