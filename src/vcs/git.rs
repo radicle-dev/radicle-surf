@@ -630,6 +630,22 @@ impl<'repo> GitBrowser<'repo> {
     ///     .map(|commit| commit.id());
     ///
     /// assert_eq!(main_last_commit, Some(head_commit.id()));
+    ///
+    /// // Query for root directory shows proper commit.
+    ///
+    /// let root_last_commit = browser
+    ///     .last_commit(&Path::root())
+    ///     .map(|commit| commit.id());
+    ///
+    /// assert_eq!(root_last_commit, Some(head_commit.id()));
+    ///
+    /// // Query for src directory shows proper commit.
+    ///
+    /// let src_last_commit = browser
+    ///     .last_commit(&Path::with_root(&["src".into()]))
+    ///     .map(|commit| commit.id());
+    ///
+    /// assert_eq!(src_last_commit, Some(head_commit.id()));
     /// ```
     pub fn last_commit(&self, path: &file_system::Path) -> Option<Commit> {
         self.get_history()
