@@ -111,9 +111,11 @@ impl Path {
     ///
     /// let root = Path::root();
     /// let not_root = Path::with_root(&["src".into(), "lib.rs".into()]);
+    /// let empty = Path::with_root(&["".into()]);
     ///
     /// assert!(root.is_root());
     /// assert!(!not_root.is_root());
+    /// assert!(empty.is_root());
     /// ```
     pub fn is_root(&self) -> bool {
         *self == Self::root()
