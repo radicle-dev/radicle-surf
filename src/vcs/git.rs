@@ -605,7 +605,8 @@ impl<'repo> GitBrowser<'repo> {
     /// ```
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{GitBrowser, GitRepository, Sha1};
+    /// use radicle_surf::vcs::git::{BranchName, GitBrowser, GitRepository, Sha1};
+    /// use radicle_surf::vcs::git::git2::{Oid};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     ///
     /// let repo = GitRepository::new("./data/git-golden")
@@ -630,6 +631,17 @@ impl<'repo> GitBrowser<'repo> {
     ///     .map(|commit| commit.id());
     ///
     /// assert_eq!(main_last_commit, Some(head_commit.id()));
+    ///
+    /// // Check that last commit is the actual last commit even if head commit differs.
+    /// browser.commit(Sha1::new("b9053ab4916e8ba50a78c243c3440ebdd7500263")).unwrap();
+    ///
+    /// let expected_commit_id =
+    ///     Oid::from_str("74ba370ee5643f310873fb288af1c99d639da8ca").unwrap();
+    /// let gitignore_last_commit_id = browser
+    ///     .last_commit(&Path::with_root(&[".gitignore".into()]))
+    ///     .map(|commit| commit.id());
+    ///
+    /// assert_eq!(gitignore_last_commit_id, Some(expected_commit_id));
     /// ```
     pub fn last_commit(&self, path: &file_system::Path) -> Option<Commit> {
         self.get_history()
