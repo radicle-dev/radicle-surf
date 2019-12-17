@@ -4,17 +4,21 @@
 //! use radicle_surf::vcs::git::*;
 //! use std::collections::HashMap;
 //!
-//! let repo = GitRepository::new("./data/git-golden")
-//!     .expect("Could not retrieve ./data/git-golden as git repository");
+//! let repo = GitRepository::new("./data/git-platinum")
+//!     .expect("Could not retrieve ./data/git-platinum as git repository");
 //! let browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
 //! let directory = browser.get_directory().expect("Could not render Directory");
 //! let mut directory_contents = directory.list_directory();
 //! directory_contents.sort();
 //!
 //! assert_eq!(directory_contents, vec![
-//!     SystemType::file(".gitignore".into()),
-//!     SystemType::file("Cargo.toml".into()),
+//!     SystemType::file(".i-am-well-hidden".into()),
+//!     SystemType::file(".i-too-am-hidden".into()),
+//!     SystemType::file("README.md".into()),
+//!     SystemType::directory("bin".into()),
 //!     SystemType::directory("src".into()),
+//!     SystemType::directory("text".into()),
+//!     SystemType::directory("this".into()),
 //! ]);
 //!
 //! // find src directory in the Git directory and the in-memory directory
@@ -25,7 +29,9 @@
 //! src_directory_contents.sort();
 //!
 //! assert_eq!(src_directory_contents, vec![
-//!     SystemType::file("main.rs".into()),
+//!     SystemType::file("Eval.hs".into()),
+//!     SystemType::file("Folder.svelte".into()),
+//!     SystemType::file("memory.rs".into()),
 //! ]);
 //! ```
 
@@ -70,7 +76,7 @@ impl<'repo> GitRepository {
     /// ```
     /// use radicle_surf::vcs::git::{Branch, BranchName, GitBrowser, GitRepository};
     ///
-    /// let repo = GitRepository::new("./data/git-golden").unwrap();
+    /// let repo = GitRepository::new("./data/git-platinum").unwrap();
     /// let browser = GitBrowser::new(&repo).unwrap();
     ///
     /// let mut branches = browser.list_branches(None).unwrap();
@@ -81,7 +87,7 @@ impl<'repo> GitRepository {
     ///     vec![
     ///         Branch::local(BranchName::new("master")),
     ///         Branch::remote(BranchName::new("origin/HEAD")),
-    ///         Branch::remote(BranchName::new("origin/add-tests")),
+    ///         Branch::remote(BranchName::new("origin/dev")),
     ///         Branch::remote(BranchName::new("origin/master")),
     ///     ]
     /// );
@@ -326,7 +332,7 @@ impl<'repo> GitBrowser<'repo> {
     /// ```
     /// use radicle_surf::vcs::git::{GitBrowser, GitRepository};
     ///
-    /// let repo = GitRepository::new("./data/git-golden").unwrap();
+    /// let repo = GitRepository::new("./data/git-platinum").unwrap();
     /// let browser = GitBrowser::new(&repo).unwrap();
     /// ```
     pub fn new(repository: &'repo GitRepository) -> Result<Self, GitError> {
@@ -349,7 +355,7 @@ impl<'repo> GitBrowser<'repo> {
     /// ```
     /// use radicle_surf::vcs::git::{GitBrowser, GitRepository};
     ///
-    /// let repo = GitRepository::new("./data/git-golden").unwrap();
+    /// let repo = GitRepository::new("./data/git-platinum").unwrap();
     /// let mut browser = GitBrowser::new(&repo).unwrap();
     ///
     /// // ensure we're at HEAD
@@ -374,7 +380,7 @@ impl<'repo> GitBrowser<'repo> {
     /// ```
     /// use radicle_surf::vcs::git::{BranchName, GitBrowser, GitRepository};
     ///
-    /// let repo = GitRepository::new("./data/git-golden").unwrap();
+    /// let repo = GitRepository::new("./data/git-platinum").unwrap();
     /// let mut browser = GitBrowser::new(&repo).unwrap();
     ///
     /// // ensure we're on 'master'
@@ -390,11 +396,11 @@ impl<'repo> GitBrowser<'repo> {
     /// use radicle_surf::vcs::git::{BranchName, GitBrowser, GitRepository};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     ///
-    /// let repo = GitRepository::new("./data/git-golden").unwrap();
+    /// let repo = GitRepository::new("./data/git-platinum").unwrap();
     /// let mut browser = GitBrowser::new(&repo).unwrap();
     /// browser
-    ///     .branch(BranchName::new("origin/add-tests"))
-    ///     .expect("Failed to change branch to add-tests");
+    ///     .branch(BranchName::new("origin/dev"))
+    ///     .expect("Failed to change branch to dev");
     ///
     /// let directory = browser.get_directory().expect("Failed to get directory");
     /// let mut directory_contents = directory.list_directory();
@@ -403,22 +409,30 @@ impl<'repo> GitBrowser<'repo> {
     /// assert_eq!(
     ///     directory_contents,
     ///     vec![
-    ///         SystemType::file(".gitignore".into()),
-    ///         SystemType::file("Cargo.toml".into()),
+    ///         SystemType::file(".i-am-well-hidden".into()),
+    ///         SystemType::file(".i-too-am-hidden".into()),
+    ///         SystemType::file("README.md".into()),
+    ///         SystemType::directory("bin".into()),
+    ///         SystemType::file("here-we-are-on-a-dev-branch.lol".into()),
     ///         SystemType::directory("src".into()),
-    ///         SystemType::directory("tests".into()),
+    ///         SystemType::directory("text".into()),
+    ///         SystemType::directory("this".into()),
     ///     ]
     /// );
     ///
     /// let tests = directory
-    ///     .find_directory(&Path::with_root(&["tests".into()]))
-    ///     .expect("tests not found");
+    ///     .find_directory(&Path::with_root(&["bin".into()]))
+    ///     .expect("bin not found");
     /// let mut tests_contents = tests.list_directory();
     /// tests_contents.sort();
     ///
     /// assert_eq!(
     ///     tests_contents,
-    ///     vec![SystemType::file("mod.rs".into())]
+    ///     vec![
+    ///         SystemType::file("cat".into()),
+    ///         SystemType::file("ls".into()),
+    ///         SystemType::file("test".into()),
+    ///     ]
     /// );
     /// ```
     pub fn branch(&mut self, branch_name: BranchName) -> Result<(), GitError> {
@@ -439,17 +453,18 @@ impl<'repo> GitBrowser<'repo> {
     /// use radicle_surf::vcs::History;
     /// use radicle_surf::vcs::git::{TagName, GitBrowser, GitRepository};
     ///
-    /// let repo = GitRepository::new("./data/git-golden").unwrap();
+    /// let repo = GitRepository::new("./data/git-platinum").unwrap();
     /// let mut browser = GitBrowser::new(&repo).unwrap();
     ///
-    /// // Switch to "v0.0.1"
-    /// browser.tag(TagName::new("v0.0.1"));
+    /// // Switch to "v0.3.0"
+    /// browser.tag(TagName::new("v0.3.0")).expect("Failed to switch tag");
     ///
     /// let expected_history = History((
-    ///     Oid::from_str("74ba370ee5643f310873fb288af1c99d639da8ca").unwrap(),
+    ///     Oid::from_str("19bec071db6474af89c866a1bd0e4b1ff76e2b97").unwrap(),
     ///     vec![
-    ///         Oid::from_str("8eb5ace23086a588200d9aae1374f46c346bccec").unwrap(),
-    ///         Oid::from_str("cd3971c01606a0b1df2f3429aeb5766d234d7893").unwrap(),
+    ///         Oid::from_str("f3a089488f4cfd1a240a9c01b3fcc4c34a4e97b2").unwrap(),
+    ///         Oid::from_str("2429f097664f9af0c5b7b389ab998b2199ffa977").unwrap(),
+    ///         Oid::from_str("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3").unwrap(),
     ///     ]
     /// ).into());
     ///
@@ -473,14 +488,14 @@ impl<'repo> GitBrowser<'repo> {
     /// use radicle_surf::file_system::SystemType;
     /// use radicle_surf::vcs::git::{GitBrowser, GitRepository, Sha1};
     ///
-    /// let repo = GitRepository::new("./data/git-golden")
-    ///     .expect("Could not retrieve ./data/git-golden as git repository");
+    /// let repo = GitRepository::new("./data/git-platinum")
+    ///     .expect("Could not retrieve ./data/git-platinum as git repository");
     /// let mut browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
     ///
     /// // Set to the initial commit
     /// browser
-    ///     .commit(Sha1::new("cd3971c01606a0b1df2f3429aeb5766d234d7893"))
-    ///     .unwrap();
+    ///     .commit(Sha1::new("e24124b7538658220b5aaf3b6ef53758f0a106dc"))
+    ///     .expect("Missing commit");
     ///
     /// let directory = browser.get_directory().unwrap();
     /// let mut directory_contents = directory.list_directory();
@@ -490,7 +505,10 @@ impl<'repo> GitBrowser<'repo> {
     /// assert_eq!(
     ///     directory_contents,
     ///     vec![
+    ///         SystemType::file("README.md".into()),
+    ///         SystemType::directory("bin".into()),
     ///         SystemType::directory("src".into()),
+    ///         SystemType::directory("this".into()),
     ///     ]
     /// );
     ///
@@ -512,7 +530,7 @@ impl<'repo> GitBrowser<'repo> {
     /// use radicle_surf::vcs::git::{Branch, BranchName, GitBrowser, GitRepository};
     /// use radicle_surf::vcs::git::git2::BranchType;
     ///
-    /// let repo = GitRepository::new("./data/git-golden").unwrap();
+    /// let repo = GitRepository::new("./data/git-platinum").unwrap();
     /// let mut browser = GitBrowser::new(&repo).unwrap();
     ///
     /// let branches = browser.list_branches(None).unwrap();
@@ -525,7 +543,7 @@ impl<'repo> GitBrowser<'repo> {
     ///
     /// assert_eq!(branches, vec![
     ///     Branch::remote(BranchName::new("origin/HEAD")),
-    ///     Branch::remote(BranchName::new("origin/add-tests")),
+    ///     Branch::remote(BranchName::new("origin/dev")),
     ///     Branch::remote(BranchName::new("origin/master")),
     /// ]);
     /// ```
@@ -560,13 +578,23 @@ impl<'repo> GitBrowser<'repo> {
     /// ```
     /// use radicle_surf::vcs::git::{GitBrowser, GitRepository, TagName};
     ///
-    /// let repo = GitRepository::new("./data/git-golden").unwrap();
+    /// let repo = GitRepository::new("./data/git-platinum").unwrap();
     /// let mut browser = GitBrowser::new(&repo).unwrap();
     ///
     /// let tags = browser.list_tags().unwrap();
     ///
     /// // We currently have no tags :(
-    /// assert_eq!(tags, vec![TagName::new("v0.0.1")]);
+    ///
+    /// assert_eq!(
+    ///     tags,
+    ///     vec![
+    ///         TagName::new("v0.1.0"),
+    ///         TagName::new("v0.2.0"),
+    ///         TagName::new("v0.3.0"),
+    ///         TagName::new("v0.4.0"),
+    ///         TagName::new("v0.5.0")
+    ///     ]
+    /// );
     /// ```
     pub fn list_tags(&self) -> Result<Vec<TagName>, GitError> {
         let tags = self.repository.0.tag_names(None)?;
@@ -585,51 +613,51 @@ impl<'repo> GitBrowser<'repo> {
     /// use radicle_surf::vcs::git::{GitBrowser, GitRepository, Sha1};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     ///
-    /// let repo = GitRepository::new("./data/git-golden")
+    /// let repo = GitRepository::new("./data/git-platinum")
     ///     .expect("Could not retrieve ./data/git-test as git repository");
     /// let browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
     ///
     /// let head_commit = browser.get_history().0.first().clone();
     ///
-    /// let toml_last_commit = browser
-    ///     .last_commit(&Path::with_root(&["Cargo.toml".into()]))
+    /// let readme_last_commit = browser
+    ///     .last_commit(&Path::with_root(&["README.md".into()]))
     ///     .map(|commit| commit.id());
     ///
-    /// assert_eq!(toml_last_commit, Some(head_commit.id()));
+    /// assert_eq!(readme_last_commit, Some(head_commit.id()));
     ///
-    /// let main_last_commit = browser
-    ///     .last_commit(&Path::with_root(&["src".into(), "main.rs".into()]))
+    /// let memory_last_commit = browser
+    ///     .last_commit(&Path::with_root(&["src".into(), "memory.rs".into()]))
     ///     .map(|commit| commit.id());
     ///
-    /// assert_eq!(main_last_commit, Some(head_commit.id()));
+    /// assert_eq!(memory_last_commit, Some(head_commit.id()));
     /// ```
     ///
     /// ```
     /// use radicle_surf::vcs::git::{GitBrowser, GitRepository, Sha1};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     ///
-    /// let repo = GitRepository::new("./data/git-golden")
-    ///     .expect("Could not retrieve ./data/git-golden as git repository");
+    /// let repo = GitRepository::new("./data/git-platinum")
+    ///     .expect("Could not retrieve ./data/git-platinum as git repository");
     /// let mut browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
     ///
     /// // Set the browser history to the initial commit
-    /// browser.commit(Sha1::new("cd3971c01606a0b1df2f3429aeb5766d234d7893")).unwrap();
+    /// browser.commit(Sha1::new("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3")).unwrap();
     ///
     /// let head_commit = browser.get_history().0.first().clone();
     ///
-    /// // Cargo.toml is commited second so it should not exist here.
-    /// let toml_last_commit = browser
-    ///     .last_commit(&Path::with_root(&["Cargo.toml".into()]))
+    /// // memory.rs is commited later so it should not exist here.
+    /// let memory_last_commit = browser
+    ///     .last_commit(&Path::with_root(&["src".into(), "memory.rs".into()]))
     ///     .map(|commit| commit.id());
     ///
-    /// assert_eq!(toml_last_commit, None);
+    /// assert_eq!(memory_last_commit, None);
     ///
-    /// // src/main.rs exists in this commit.
-    /// let main_last_commit = browser
-    ///     .last_commit(&Path::with_root(&["src".into(), "main.rs".into()]))
+    /// // README.md exists in this commit.
+    /// let readme_last_commit = browser
+    ///     .last_commit(&Path::with_root(&["README.md".into()]))
     ///     .map(|commit| commit.id());
     ///
-    /// assert_eq!(main_last_commit, Some(head_commit.id()));
+    /// assert_eq!(readme_last_commit, Some(head_commit.id()));
     /// ```
     pub fn last_commit(&self, path: &file_system::Path) -> Option<Commit> {
         self.get_history()
