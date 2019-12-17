@@ -23,7 +23,7 @@
 //!
 //! // find src directory in the Git directory and the in-memory directory
 //! let src_directory = directory
-//!     .find_directory(&Path::with_root(&["src".into()]))
+//!     .find_directory(&Path::new("src".into()))
 //!     .unwrap();
 //! let mut src_directory_contents = src_directory.list_directory();
 //! src_directory_contents.sort();
@@ -421,7 +421,7 @@ impl<'repo> GitBrowser<'repo> {
     /// );
     ///
     /// let tests = directory
-    ///     .find_directory(&Path::with_root(&["bin".into()]))
+    ///     .find_directory(&Path::new("bin".into()))
     ///     .expect("bin not found");
     /// let mut tests_contents = tests.list_directory();
     /// tests_contents.sort();
