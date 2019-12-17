@@ -44,7 +44,8 @@ use crate::file_system::error as file_error;
 use crate::vcs;
 use crate::vcs::VCS;
 use git2::{
-    BranchType, Commit, Error, Oid, Reference, Repository, TreeEntry, TreeWalkMode, TreeWalkResult,
+    BranchType, Commit, Diff, Error, Oid, Reference, Repository, TreeEntry, TreeWalkMode,
+    TreeWalkResult,
 };
 use nonempty::NonEmpty;
 use std::cmp::Ordering;
@@ -148,6 +149,68 @@ impl<'repo> GitRepository {
         NonEmpty::from_slice(&commits)
             .map(vcs::History)
             .ok_or(GitError::EmptyCommitHistory)
+    }
+
+    fn last_commit(
+        &'repo self,
+        commit: Commit<'repo>,
+    ) -> Result<HashMap<std::path::PathBuf, GitHistory<'repo>>, GitError> {
+        let mut file_histories = HashMap::new();
+        self.collect_file_history(commit, &mut file_histories)?;
+        Ok(file_histories)
+    }
+
+    fn collect_file_history(
+        &'repo self,
+        commit: Commit<'repo>,
+        file_histories: &mut HashMap<std::path::PathBuf, GitHistory<'repo>>,
+    ) -> Result<(), GitError> {
+        let mut revwalk = self.0.revwalk()?;
+
+        // Set the revwalk to the head commit
+        revwalk.push(commit.id())?;
+
+        let current = commit.clone();
+
+        for commit_result in revwalk {
+            let parent_id = commit_result?;
+
+            if parent_id == commit.id() {
+                continue;
+            }
+
+            let parent = self.0.find_commit(parent_id)?;
+            let diff = self.diff_commits(&current, &parent)?;
+
+            let deltas = diff.deltas();
+            for delta in deltas {
+                let path = delta
+                    .new_file()
+                    .path()
+                    .expect("TODO(finto): handle")
+                    .to_path_buf();
+                file_histories
+                    .entry(path)
+                    .and_modify(|commits: &mut GitHistory| commits.push(parent.clone()))
+                    .or_insert_with(|| vcs::History::new(commit.clone()));
+            }
+        }
+        Ok(())
+    }
+
+    fn diff_commits(
+        &'repo self,
+        left: &'repo Commit,
+        right: &'repo Commit,
+    ) -> Result<Diff, GitError> {
+        let left_tree = left.tree()?;
+        let right_tree = right.tree()?;
+
+        let diff = self
+            .0
+            .diff_tree_to_tree(Some(&left_tree), Some(&right_tree), None)?;
+
+        Ok(diff)
     }
 }
 
@@ -819,5 +882,25 @@ impl<'repo> GitBrowser<'repo> {
             let tree = object.as_tree().map(|t| t.get_name(&name.label));
             tree.map(|_| commit)
         }
+    }
+}
+
+#[cfg(test)]
+mod playground {
+    use super::*;
+    use git2::Oid;
+    #[test]
+    fn play_last_commit() {
+        let repo = GitRepository::new("./data/git-golden")
+            .expect("Could not retrieve ./data/git-golden as git repository");
+        let commit = repo
+            .0
+            .find_commit(Oid::from_str("74ba370ee5643f310873fb288af1c99d639da8ca").unwrap())
+            .expect("No Commit");
+        let histories = repo.last_commit(commit).expect("Failed to get history");
+        for (path, history) in histories {
+            println!("{:?}: {:?}", path, history.map(|c| c.id()))
+        }
+        assert!(false)
     }
 }
