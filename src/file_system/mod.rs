@@ -87,6 +87,10 @@ impl fmt::Display for Path {
 }
 
 impl Path {
+    pub fn new(label: Label) -> Path {
+        Path(NonEmpty::new(label))
+    }
+
     /// The root path is a `Path` made up of the single
     /// root label (see: [`Label::root`](stuct.Label.html#method.root).
     ///
@@ -646,15 +650,9 @@ impl Directory {
     /// This operation fails if the path does not lead to
     /// the `Directory`.
     pub fn find_directory(&self, path: &Path) -> Option<Self> {
-        let (label, labels) = path.split_first();
-        if *label == self.name {
-            // recursively dig down into sub-directories
-            labels
-                .iter()
-                .try_fold(self.clone(), |dir, label| dir.sub_directory(&label))
-        } else {
-            None
-        }
+        // recursively dig down into sub-directories
+        path.iter()
+            .try_fold(self.clone(), |dir, label| dir.sub_directory(&label))
     }
 
     // TODO(fintan): This is going to be a bit trickier so going to leave it out for now
@@ -811,7 +809,7 @@ pub mod tests {
 
     #[test]
     fn test_find_added_file() {
-        let file_path = Path::with_root(&["foo.hs".into()]);
+        let file_path = Path::new("foo.hs".into());
 
         let file = File::new("foo.hs".into(), b"module Banana ...");
 
@@ -826,7 +824,7 @@ pub mod tests {
 
     #[test]
     fn test_find_added_file_long_path() {
-        let file_path = Path::with_root(&["foo".into(), "bar".into(), "baz.hs".into()]);
+        let file_path = Path::from_labels("foo".into(), &["bar".into(), "baz.hs".into()]);
 
         let file = File::new("baz.hs".into(), b"module Banana ...");
 
@@ -917,8 +915,8 @@ pub mod tests {
         );
 
         let sub_directory = directory
-            .find_directory(&Path::with_root(&["haskell".into()]))
-            .unwrap();
+            .find_directory(&Path::new("haskell".into()))
+            .expect("Could not find sub-directory");
         let mut sub_directory_contents = sub_directory.list_directory();
         sub_directory_contents.sort();
 
@@ -1000,9 +998,7 @@ pub mod tests {
 
         for (directory_path, files) in new_directory_map {
             for file in files.iter() {
-                let mut path = Path::root();
-                path.append(&mut directory_path.clone());
-
+                let mut path = directory_path.clone();
                 if !directory.find_directory(&path).is_some() {
                     return false;
                 }
