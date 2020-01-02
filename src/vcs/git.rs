@@ -40,12 +40,16 @@
 pub use git2;
 
 use crate::file_system;
+use crate::file_system::error as file_error;
 use crate::vcs;
 use crate::vcs::VCS;
-use git2::{BranchType, Commit, Error, Oid, Reference, Repository, TreeWalkMode, TreeWalkResult};
+use git2::{
+    BranchType, Commit, Error, Oid, Reference, Repository, TreeEntry, TreeWalkMode, TreeWalkResult,
+};
 use nonempty::NonEmpty;
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::convert::TryFrom;
 
 #[derive(Debug, PartialEq)]
 pub enum GitError {
@@ -53,7 +57,15 @@ pub enum GitError {
     BranchDecode,
     NotBranch,
     NotTag,
+    NameDecode,
+    FileSystem(file_error::Error),
     Internal(Error),
+}
+
+impl From<file_error::Error> for GitError {
+    fn from(err: file_error::Error) -> Self {
+        GitError::FileSystem(err)
+    }
 }
 
 impl From<Error> for GitError {
@@ -324,6 +336,37 @@ impl std::fmt::Debug for GitRepository {
 /// A `Browser` that uses [`GitRepository`](struct.GitRepository.html) as the underlying repository backend,
 /// `git2::Commit` as the artifact, and [`GitError`](enum.GitError.html) for error reporting.
 pub type GitBrowser<'repo> = vcs::Browser<'repo, GitRepository, Commit<'repo>, GitError>;
+
+/// A private enum that captures a recoverable and
+/// non-recoverable error when walking the git tree.
+///
+/// In the case of `NotBlob` we abort the the computation but do
+/// a check for it and recover.
+///
+/// In the of `Git` we abort both computations.
+#[derive(Debug)]
+enum TreeWalkError {
+    NotBlob,
+    Git(GitError),
+}
+
+impl From<Error> for TreeWalkError {
+    fn from(err: Error) -> Self {
+        TreeWalkError::Git(err.into())
+    }
+}
+
+impl From<file_error::Path> for TreeWalkError {
+    fn from(err: file_error::Path) -> Self {
+        err.into()
+    }
+}
+
+impl From<GitError> for TreeWalkError {
+    fn from(err: GitError) -> Self {
+        err.into()
+    }
+}
 
 impl<'repo> GitBrowser<'repo> {
     /// Create a new browser to interact with.
@@ -676,32 +719,80 @@ impl<'repo> GitBrowser<'repo> {
         repo: &Repository,
         commit: &Commit,
     ) -> Result<HashMap<file_system::Path, NonEmpty<file_system::File>>, GitError> {
-        let mut dir: HashMap<file_system::Path, NonEmpty<file_system::File>> = HashMap::new();
-        let tree = commit.as_object().peel_to_tree()?;
-        tree.walk(TreeWalkMode::PreOrder, |s, entry| {
-            let path = file_system::Path::from_string(s);
+        let mut file_paths_or_error: Result<
+            HashMap<file_system::Path, NonEmpty<file_system::File>>,
+            GitError,
+        > = Ok(HashMap::new());
 
-            entry
-                .to_object(repo)
-                .map(|object| {
-                    object.as_blob().and_then(|blob| {
-                        entry.name().and_then(|name| {
-                            let file = file_system::File {
-                                name: name.into(),
-                                contents: blob.content().to_owned(),
-                                size: blob.size(),
-                            };
-                            dir.entry(path)
-                                .and_modify(|entries| entries.push(file.clone()))
-                                .or_insert_with(|| NonEmpty::new(file));
-                            Some(TreeWalkResult::Ok)
-                        })
-                    });
+        let tree = commit.as_object().peel_to_tree()?;
+
+        tree.walk(
+            TreeWalkMode::PreOrder,
+            |s, entry| match Self::tree_entry_to_file_and_path(repo, s, entry) {
+                Ok((path, file)) => {
+                    match file_paths_or_error.as_mut() {
+                        Ok(mut files) => Self::update_file_map(path, file, &mut files),
+
+                        // We don't need to update, we want to keep the error.
+                        Err(_err) => {}
+                    }
                     TreeWalkResult::Ok
-                })
-                .unwrap_or(TreeWalkResult::Skip)
-        })?;
-        Ok(dir)
+                }
+                Err(err) => match err {
+                    // We want to continue if the entry was not a Blob.
+                    TreeWalkError::NotBlob => TreeWalkResult::Ok,
+
+                    // But we want to keep the error and abort otherwise.
+                    TreeWalkError::Git(err) => {
+                        file_paths_or_error = Err(err);
+                        TreeWalkResult::Abort
+                    }
+                },
+            },
+        )?;
+
+        file_paths_or_error
+    }
+
+    fn update_file_map(
+        path: file_system::Path,
+        file: file_system::File,
+        files: &mut HashMap<file_system::Path, NonEmpty<file_system::File>>,
+    ) {
+        files
+            .entry(path)
+            .and_modify(|entries| entries.push(file.clone()))
+            .or_insert_with(|| NonEmpty::new(file));
+    }
+
+    fn tree_entry_to_file_and_path(
+        repo: &Repository,
+        tree_path: &str,
+        entry: &TreeEntry,
+    ) -> Result<(file_system::Path, file_system::File), TreeWalkError> {
+        // Account for the "root" of git being the empty string
+        let path = if tree_path.is_empty() {
+            Ok(file_system::Path::root())
+        } else {
+            file_system::Path::try_from(tree_path)
+        }?;
+
+        let object = entry.to_object(repo)?;
+        let blob = object.as_blob().ok_or(TreeWalkError::NotBlob)?;
+        let name = entry.name().ok_or(GitError::NameDecode)?;
+
+        let name = file_system::Label::try_from(name)
+            .map_err(file_error::Error::Label)
+            .map_err(GitError::FileSystem)?;
+
+        Ok((
+            path,
+            file_system::File {
+                name,
+                contents: blob.content().to_owned(),
+                size: blob.size(),
+            },
+        ))
     }
 
     /// Check that a given `Commit` touches the given `Path`.
