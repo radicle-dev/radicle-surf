@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt;
 use std::hash::{Hash, Hasher};
+use std::str::FromStr;
 
 pub mod error;
 pub use crate::file_system::error as file_error;
@@ -83,6 +84,14 @@ impl TryFrom<&str> for Label {
     }
 }
 
+impl FromStr for Label {
+    type Err = file_error::Label;
+
+    fn from_str(item: &str) -> Result<Self, Self::Err> {
+        Label::try_from(item)
+    }
+}
+
 /// A non-empty set of [`Label`](struct.Label.html)s to define a path
 /// in a directory or file search.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -112,6 +121,14 @@ impl TryFrom<&str> for Path {
         NonEmpty::from_slice(&path)
             .ok_or(file_error::Path::Empty)
             .map(Path)
+    }
+}
+
+impl FromStr for Path {
+    type Err = file_error::Path;
+
+    fn from_str(item: &str) -> Result<Self, Self::Err> {
+        Path::try_from(item)
     }
 }
 
