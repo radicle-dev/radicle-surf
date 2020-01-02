@@ -1,8 +1,14 @@
 use nonempty::NonEmpty;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::fmt;
 use std::hash::{Hash, Hasher};
+
+pub mod error;
+pub use crate::file_system::error as file_error;
+
+pub mod unsound;
 
 /// A label for [`Directory`](struct.Directory.html)
 /// and [`File`](struct.File.html) to allow for search.
@@ -12,11 +18,15 @@ use std::hash::{Hash, Hasher};
 /// # Examples
 ///
 /// ```
+/// use radicle_surf::file_system::error as file_error;
 /// use radicle_surf::file_system::{Label, Path};
+/// use std::convert::TryFrom;
 ///
-/// let lib_filename = "lib.rs".into();
-/// let src_directory_name = "src".into();
-/// let lib_filepath = Path::from_labels(src_directory_name, &[lib_filename]);
+/// fn build_lib_path() -> Result<Path, file_error::Label> {
+///     let lib_filename = Label::try_from("lib.rs")?;
+///     let src_directory_name = Label::try_from("src")?;
+///     Ok(Path::from_labels(src_directory_name, &[lib_filename]))
+/// }
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Label {
@@ -39,7 +49,10 @@ impl Label {
     /// assert_eq!(*root.split_first().0, Label::root());
     /// ```
     pub fn root() -> Self {
-        "~".into()
+        Label {
+            label: "~".into(),
+            hidden: false,
+        }
     }
 
     pub fn is_root(&self) -> bool {
@@ -53,20 +66,19 @@ impl fmt::Display for Label {
     }
 }
 
-impl From<&str> for Label {
-    fn from(item: &str) -> Self {
-        Label {
-            label: item.into(),
-            hidden: false,
-        }
-    }
-}
+impl TryFrom<&str> for Label {
+    type Error = file_error::Label;
 
-impl From<String> for Label {
-    fn from(label: String) -> Self {
-        Label {
-            label,
-            hidden: false,
+    fn try_from(item: &str) -> Result<Self, Self::Error> {
+        if item.is_empty() {
+            Err(file_error::Label::Empty)
+        } else if item.contains('/') {
+            Err(file_error::Label::ContainsSlash)
+        } else {
+            Ok(Label {
+                label: item.into(),
+                hidden: false,
+            })
         }
     }
 }
@@ -83,6 +95,23 @@ impl fmt::Display for Path {
             write!(f, "{}/", p)?;
         }
         write!(f, "{}", suffix)
+    }
+}
+
+impl TryFrom<&str> for Path {
+    type Error = file_error::Path;
+
+    fn try_from(item: &str) -> Result<Self, Self::Error> {
+        let mut path = Vec::new();
+
+        for label in item.trim_end_matches('/').split('/') {
+            let l = Label::try_from(label)?;
+            path.push(l);
+        }
+
+        NonEmpty::from_slice(&path)
+            .ok_or(file_error::Path::Empty)
+            .map(Path)
     }
 }
 
@@ -112,9 +141,11 @@ impl Path {
     ///
     /// ```
     /// use radicle_surf::file_system::{Label, Path};
+    /// use radicle_surf::file_system::unsound;
+    /// use std::convert::TryFrom;
     ///
     /// let root = Path::root();
-    /// let not_root = Path::with_root(&["src".into(), "lib.rs".into()]);
+    /// let not_root = unsound::path::new("src/lib.rs");
     ///
     /// assert!(root.is_root());
     /// assert!(!not_root.is_root());
@@ -129,10 +160,14 @@ impl Path {
     ///
     /// ```
     /// use radicle_surf::file_system::Path;
+    /// use radicle_surf::file_system::unsound;
+    /// use std::convert::TryFrom;
     ///
-    /// let mut path1 = Path::from_labels("foo".into(), &["bar".into()]);
-    /// path1.append(&mut Path::from_labels("baz".into(), &["quux".into()]));
-    /// assert_eq!(path1, Path::from_labels("foo".into(), &["bar".into(), "baz".into(), "quux".into()]));
+    /// let mut path1 = unsound::path::new("foo/bar");
+    /// let mut path2 = unsound::path::new("baz/quux");
+    /// path1.append(&mut path2);
+    /// let expected = unsound::path::new("foo/bar/baz/quux");
+    /// assert_eq!(path1, expected);
     /// ```
     pub fn append(&mut self, path: &mut Self) {
         let mut other = path.0.clone().into();
@@ -145,12 +180,13 @@ impl Path {
     ///
     /// ```
     /// use radicle_surf::file_system::{Label, Path};
+    /// use radicle_surf::file_system::unsound;
     ///
     /// let mut root = Path::root();
-    /// root.push("src".into());
-    /// root.push("lib.rs".into());
+    /// root.push(unsound::label::new("src"));
+    /// root.push(unsound::label::new("lib.rs"));
     ///
-    /// assert_eq!(root, Path::with_root(&["src".into(), "lib.rs".into()]));
+    /// assert_eq!(root, Path::with_root(&[unsound::label::new("src"), unsound::label::new("lib.rs")]));
     /// ```
     pub fn push(&mut self, label: Label) {
         self.0.push(label)
@@ -166,13 +202,14 @@ impl Path {
     ///
     /// ```
     /// use radicle_surf::file_system::{Label, Path};
+    /// use radicle_surf::file_system::unsound;
     ///
-    /// let path = Path::with_root(&["src".into(), "lib.rs".into()]);
+    /// let path = unsound::path::new("~/src/lib.rs");
     /// let mut path_iter = path.iter();
     ///
     /// assert_eq!(path_iter.next(), Some(&Label::root()));
-    /// assert_eq!(path_iter.next(), Some(&"src".into()));
-    /// assert_eq!(path_iter.next(), Some(&"lib.rs".into()));
+    /// assert_eq!(path_iter.next(), Some(&unsound::label::new("src")));
+    /// assert_eq!(path_iter.next(), Some(&unsound::label::new("lib.rs")));
     /// ```
     pub fn iter(&self) -> impl Iterator<Item = &Label> {
         self.0.iter()
@@ -185,10 +222,14 @@ impl Path {
     ///
     /// ```
     /// use radicle_surf::file_system::{Label, Path};
+    /// use radicle_surf::file_system::unsound;
     ///
-    /// let path = Path::with_root(&["src".into(), "lib.rs".into()]);
+    /// let path = unsound::path::new("~/src/lib.rs");
     ///
-    /// assert_eq!(path.split_first(), (&Label::root(), &["src".into(), "lib.rs".into()][..]));
+    /// assert_eq!(
+    ///     path.split_first(),
+    ///     (&Label::root(), &[unsound::label::new("src"), unsound::label::new("lib.rs")][..])
+    /// );
     /// ```
     pub fn split_first(&self) -> (&Label, &[Label]) {
         self.0.split_first()
@@ -203,32 +244,42 @@ impl Path {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::file_system::Path;
+    /// use radicle_surf::file_system::{Label, Path};
+    /// use radicle_surf::file_system::unsound;
     ///
-    /// let path = Path::from_labels("foo".into(), &[]);
-    /// assert_eq!(path.split_last(), (vec![], "foo".into()));
+    /// let path = unsound::path::new("foo");
+    /// assert_eq!(path.split_last(), (vec![], unsound::label::new("foo")));
     /// ```
     ///
     /// ```
     /// use radicle_surf::file_system::{Label, Path};
+    /// use radicle_surf::file_system::unsound;
     ///
-    /// let path = Path::with_root(&["src".into(), "lib.rs".into()]);
-    /// assert_eq!(path.split_last(), (vec![Label::root(), "src".into()], "lib.rs".into()));
+    /// let path = unsound::path::new("~/src/lib.rs");
+    /// assert_eq!(path.split_last(), (vec![Label::root(), unsound::label::new("src")], unsound::label::new("lib.rs")));
     /// ```
     ///
     /// ```
-    /// use radicle_surf::file_system::Path;
+    /// use radicle_surf::file_system::{Label, Path};
+    /// use radicle_surf::file_system::unsound;
     ///
-    /// let path = Path::from_labels("foo".into(), &["bar".into(), "baz".into()]);
-    /// assert_eq!(path.split_last(), (vec!["foo".into(), "bar".into()], "baz".into()));
+    /// let path = unsound::path::new("foo/bar/baz");
+    /// assert_eq!(
+    ///     path.split_last(),
+    ///     (vec![unsound::label::new("foo"), unsound::label::new("bar")], unsound::label::new("baz"))
+    /// );
     /// ```
     ///
     /// ```
-    /// use radicle_surf::file_system::Path;
+    /// use radicle_surf::file_system::{Label, Path};
+    /// use radicle_surf::file_system::unsound;
     ///
     /// // An interesting case for when first == last, but doesn't imply a singleton Path.
-    /// let path = Path::from_labels("foo".into(), &["bar".into(), "foo".into()]);
-    /// assert_eq!(path.split_last(), (vec!["foo".into(), "bar".into()], "foo".into()));
+    /// let path = unsound::path::new("foo/bar/foo");
+    /// assert_eq!(
+    ///     path.split_last(),
+    ///     (vec![unsound::label::new("foo"), unsound::label::new("bar")], unsound::label::new("foo"))
+    /// );
     /// ```
     pub fn split_last(&self) -> (Vec<Label>, Label) {
         let (first, middle, last) = self.0.split();
@@ -251,19 +302,24 @@ impl Path {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::file_system::{Path, Label};
     /// use nonempty::NonEmpty;
+    /// use radicle_surf::file_system::{Path, Label};
+    /// use radicle_surf::file_system::unsound;
     ///
-    /// let path = Path::with_root(&["foo".into(), "bar".into(), "baz.rs".into()]);
+    /// let path = unsound::path::new("~/foo/bar/baz.rs");
     ///
     /// let mut expected = Path::root();
-    /// expected.push("foo".into());
-    /// expected.push("bar".into());
-    /// expected.push("baz.rs".into());
+    /// expected.push(unsound::label::new("foo"));
+    /// expected.push(unsound::label::new("bar"));
+    /// expected.push(unsound::label::new("baz.rs"));
     ///
     /// assert_eq!(path, expected);
     /// let path_vec: Vec<Label> = path.0.into();
-    /// assert_eq!(path_vec, vec!["~".into(), "foo".into(), "bar".into(), "baz.rs".into()]);
+    /// assert_eq!(
+    ///     path_vec,
+    ///     vec![Label::root(), unsound::label::new("foo"), unsound::label::new("bar"),
+    ///     unsound::label::new("baz.rs")]
+    /// );
     /// ```
     pub fn from_labels(root: Label, labels: &[Label]) -> Path {
         Path((root, labels.to_vec()).into())
@@ -275,82 +331,27 @@ impl Path {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::file_system::{Path, Label};
     /// use nonempty::NonEmpty;
+    /// use radicle_surf::file_system::{Label, Path};
+    /// use radicle_surf::file_system::unsound;
     ///
-    /// let path = Path::with_root(&["foo".into(), "bar".into(), "baz.rs".into()]);
+    /// let path = unsound::path::new("~/foo/bar/baz.rs");
     ///
     /// let mut expected = Path::root();
-    /// expected.push("foo".into());
-    /// expected.push("bar".into());
-    /// expected.push("baz.rs".into());
+    /// expected.push(unsound::label::new("foo"));
+    /// expected.push(unsound::label::new("bar"));
+    /// expected.push(unsound::label::new("baz.rs"));
     ///
     /// assert_eq!(path, expected);
     /// let path_vec: Vec<Label> = path.0.into();
-    /// assert_eq!(path_vec, vec!["~".into(), "foo".into(), "bar".into(), "baz.rs".into()]);
+    /// assert_eq!(
+    ///     path_vec,
+    ///     vec![Label::root(), unsound::label::new("foo"), unsound::label::new("bar"),
+    ///     unsound::label::new("baz.rs")]
+    /// );
     /// ```
     pub fn with_root(labels: &[Label]) -> Path {
         Path::from_labels(Label::root(), labels)
-    }
-
-    /// Convert a raw string literal to a `Path`.
-    ///
-    /// This expects a '/' delimited `&str` splitting
-    /// the tokens between into separate labels.
-    ///
-    /// **Note**: it will return [`Path::root`](struct.Path.html#method.root)
-    /// if the provided input is empty.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use radicle_surf::file_system::Path;
-    ///
-    /// let path = Path::from_string("foo/bar/baz.rs");
-    ///
-    /// let expected = Path::from_labels("foo".into(), &["bar".into(), "baz.rs".into()]);
-    ///
-    /// assert_eq!(path, expected);
-    /// ```
-    ///
-    /// ```
-    /// use radicle_surf::file_system::Path;
-    ///
-    /// let path = Path::from_string("foo/bar/baz/");
-    ///
-    /// let expected = Path::from_labels("foo".into(), &["bar".into(), "baz".into()]);
-    ///
-    /// assert_eq!(path, expected);
-    /// ```
-    ///
-    /// ```
-    /// use radicle_surf::file_system::Path;
-    ///
-    /// let path = Path::from_string("");
-    ///
-    /// assert_eq!(path, Path::root());
-    /// ```
-    ///
-    /// ```
-    /// use radicle_surf::file_system::Path;
-    ///
-    /// let path = Path::from_string("/");
-    ///
-    /// assert_eq!(path, Path::root());
-    /// ```
-    pub fn from_string(path: &str) -> Self {
-        let path: Vec<&str> = path
-            .trim_matches('/')
-            .split('/')
-            .filter(|s| !s.is_empty())
-            .collect();
-
-        if path.is_empty() {
-            Path::root()
-        } else {
-            NonEmpty::from_slice(&path.into_iter().map(|l| l.into()).collect::<Vec<_>>())
-                .map_or(Path::root(), Path)
-        }
     }
 }
 
@@ -367,15 +368,16 @@ where
     ///
     /// For example:
     /// ```
-    /// use radicle_surf::file_system::{Label, Path, Directory, DirectoryContents};
     /// use nonempty::NonEmpty;
+    /// use radicle_surf::file_system::{Path, Directory, DirectoryContents, Label};
+    /// use radicle_surf::file_system::unsound;
     ///
     /// let repo = Directory {
     ///     name: Label::root(),
     ///     entries: NonEmpty::new(
     ///         DirectoryContents::SubDirectory(Box::new(
     ///             Directory {
-    ///                 name: ".git".into(),
+    ///                 name: unsound::label::new(".git"),
     ///                 entries: NonEmpty::new(DirectoryContents::Repo),
     ///             }
     ///         ))
@@ -404,12 +406,16 @@ impl DirectoryContents {
     ///
     /// ```
     /// use nonempty::NonEmpty;
-    /// use radicle_surf::file_system::{File, Directory, DirectoryContents};
+    /// use radicle_surf::file_system::{File, Directory, DirectoryContents, Label};
+    /// use radicle_surf::file_system::unsound;
+    ///
+    /// let src = unsound::label::new("src");
+    /// let lib_rs = unsound::label::new("lib.rs");
     ///
     /// let lib = Directory {
-    ///     name: "src".into(),
+    ///     name: src,
     ///     entries: NonEmpty::new(DirectoryContents::File(File::new(
-    ///         "lib.rs".into(),
+    ///         lib_rs,
     ///         b"pub mod file_system;",
     ///     )))
     /// };
@@ -428,11 +434,15 @@ impl DirectoryContents {
     ///
     /// ```
     /// use nonempty::NonEmpty;
-    /// use radicle_surf::file_system::{File, Directory, DirectoryContents};
+    /// use radicle_surf::file_system::{File, Directory, DirectoryContents, Label};
+    /// use radicle_surf::file_system::unsound;
+    ///
+    /// let src = unsound::label::new("src");
+    /// let lib_rs = unsound::label::new("lib.rs");
     ///
     /// let lib = Directory {
-    ///     name: "src".into(),
-    ///     entries: NonEmpty::new(DirectoryContents::file("lib.rs".into(), b"pub mod file_system;")),
+    ///     name: src,
+    ///     entries: NonEmpty::new(DirectoryContents::file(lib_rs, b"pub mod file_system;")),
     /// };
     ///
     /// let sub_dir = DirectoryContents::sub_directory(lib.clone());
@@ -487,10 +497,11 @@ impl File {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::file_system::File;
+    /// use radicle_surf::file_system::{File, Label};
+    /// use radicle_surf::file_system::unsound;
     ///
     /// let file = File::new(
-    ///     "lib.rs".into(),
+    ///     unsound::label::new("lib.rs"),
     ///     b"pub mod diff;\npub mod file_system;\npub mod vcs;\npub use crate::vcs::git;\n",
     /// );
     ///
@@ -554,10 +565,11 @@ impl Directory {
     ///
     /// ```
     /// use radicle_surf::file_system::{Directory, DirectoryContents, File, Label};
+    /// use radicle_surf::file_system::unsound;
     ///
     /// let files = (
-    ///     DirectoryContents::file("main.rs".into(), b"println!(\"Hello, world!\")"),
-    ///     vec![DirectoryContents::file("lib.rs".into(), b"struct Hello(String)")],
+    ///     DirectoryContents::file(unsound::label::new("main.rs"), b"println!(\"Hello, world!\")"),
+    ///     vec![DirectoryContents::file(unsound::label::new("lib.rs"), b"struct Hello(String)")],
     /// ).into();
     ///
     /// let directory = Directory {
@@ -571,16 +583,17 @@ impl Directory {
     /// ```
     /// use nonempty::NonEmpty;
     /// use radicle_surf::file_system::{Directory, DirectoryContents, File, Label};
+    /// use radicle_surf::file_system::unsound;
     ///
     /// let mut entries: NonEmpty<DirectoryContents> = (
-    ///     DirectoryContents::file("main.rs".into(), b"println!(\"Hello, world!\")"),
-    ///     vec![DirectoryContents::file("lib.rs".into(), b"struct Hello(String)")],
+    ///     DirectoryContents::file(unsound::label::new("main.rs"), b"println!(\"Hello, world!\")"),
+    ///     vec![DirectoryContents::file(unsound::label::new("lib.rs"), b"struct Hello(String)")],
     /// ).into();
     ///
     /// let subdir = DirectoryContents::sub_directory(Directory {
-    ///     name: "test".into(),
+    ///     name: unsound::label::new("test"),
     ///     entries: NonEmpty::new(DirectoryContents::file(
-    ///         "mod.rs".into(),
+    ///         unsound::label::new("mod.rs"),
     ///         b"assert_eq!(1 + 1, 2);",
     ///     )),
     /// });
@@ -787,10 +800,16 @@ impl Directory {
 
 #[cfg(test)]
 pub mod tests {
+    use crate::file_system::unsound;
     use crate::file_system::*;
     use pretty_assertions::assert_eq;
     use proptest::collection;
     use proptest::prelude::*;
+
+    // Safe labels to use in tests
+    fn bar() -> Label {
+        Label::try_from("bar").expect("bar could not be converted to Label")
+    }
 
     #[derive(Debug, Clone)]
     struct TestRepo {}
@@ -799,7 +818,7 @@ pub mod tests {
         fn repo_directory() -> Directory {
             Directory {
                 name: Label {
-                    label: ".test".into(),
+                    label: "test".into(),
                     hidden: true,
                 },
                 entries: NonEmpty::new(DirectoryContents::Repo),
@@ -809,9 +828,9 @@ pub mod tests {
 
     #[test]
     fn test_find_added_file() {
-        let file_path = Path::new("foo.hs".into());
+        let file_path = Path::new(unsound::label::new("foo.hs"));
 
-        let file = File::new("foo.hs".into(), b"module Banana ...");
+        let file = File::new(unsound::label::new("foo.hs"), b"module Banana ...");
 
         let directory: Directory = Directory {
             name: Label::root(),
@@ -824,16 +843,16 @@ pub mod tests {
 
     #[test]
     fn test_find_added_file_long_path() {
-        let file_path = Path::from_labels("foo".into(), &["bar".into(), "baz.hs".into()]);
+        let file_path = unsound::path::new("foo/bar/baz.hs");
 
-        let file = File::new("baz.hs".into(), b"module Banana ...");
+        let file = File::new(unsound::label::new("baz.hs"), b"module Banana ...");
 
         let directory: Directory = Directory::mkdir(
             Label::root(),
             Directory::mkdir(
-                "foo".into(),
+                unsound::label::new("foo"),
                 Directory {
-                    name: "bar".into(),
+                    name: bar(),
                     entries: NonEmpty::new(DirectoryContents::File(file.clone())),
                 },
             ),
@@ -845,12 +864,12 @@ pub mod tests {
 
     #[test]
     fn test_404_file_not_found() {
-        let file_path = Path::with_root(&["bar.hs".into()]);
+        let file_path = Path::with_root(&[unsound::label::new("bar.hs")]);
 
         let directory: Directory = Directory {
             name: Label::root(),
             entries: NonEmpty::new(DirectoryContents::file(
-                "foo.hs".into(),
+                unsound::label::new("foo.hs"),
                 "module Banana ...".as_bytes(),
             )),
         };
@@ -861,9 +880,18 @@ pub mod tests {
 
     #[test]
     fn test_list_directory() {
-        let foo = DirectoryContents::file("foo.hs".into(), "module Banana ...".as_bytes());
-        let bar = DirectoryContents::file("bar.hs".into(), "module Banana ...".as_bytes());
-        let baz = DirectoryContents::file("baz.hs".into(), "module Banana ...".as_bytes());
+        let foo = DirectoryContents::file(
+            unsound::label::new("foo.hs"),
+            "module Banana ...".as_bytes(),
+        );
+        let bar = DirectoryContents::file(
+            unsound::label::new("bar.hs"),
+            "module Banana ...".as_bytes(),
+        );
+        let baz = DirectoryContents::file(
+            unsound::label::new("baz.hs"),
+            "module Banana ...".as_bytes(),
+        );
 
         let directory: Directory = Directory {
             name: Label::root(),
@@ -873,9 +901,9 @@ pub mod tests {
         assert_eq!(
             directory.list_directory(),
             vec![
-                SystemType::file("foo.hs".into()),
-                SystemType::file("bar.hs".into()),
-                SystemType::file("baz.hs".into()),
+                SystemType::file(unsound::label::new("foo.hs")),
+                SystemType::file(unsound::label::new("bar.hs")),
+                SystemType::file(unsound::label::new("baz.hs")),
             ]
         );
     }
@@ -886,20 +914,29 @@ pub mod tests {
 
         // Root files set up
         let root_files = (
-            File::new("foo.rs".into(), b"use crate::bar"),
-            vec![File::new("bar.rs".into(), b"fn hello_world()")],
+            File::new(unsound::label::new("foo.rs"), b"use crate::bar"),
+            vec![File::new(
+                unsound::label::new("bar.rs"),
+                b"fn hello_world()",
+            )],
         )
             .into();
         directory_map.insert(Path::root(), root_files);
 
         // Haskell files set up
         let haskell_files = (
-            File::new("foo.hs".into(), b"module Foo where"),
-            vec![File::new("bar.hs".into(), b"module Bar where")],
+            File::new(unsound::label::new("foo.hs"), b"module Foo where"),
+            vec![File::new(
+                unsound::label::new("bar.hs"),
+                b"module Bar where",
+            )],
         )
             .into();
 
-        directory_map.insert(Path(NonEmpty::new("haskell".into())), haskell_files);
+        directory_map.insert(
+            Path(NonEmpty::new(unsound::label::new("haskell"))),
+            haskell_files,
+        );
 
         let directory = Directory::from::<TestRepo>(directory_map);
         let mut directory_contents = directory.list_directory();
@@ -908,14 +945,14 @@ pub mod tests {
         assert_eq!(
             directory_contents,
             vec![
-                SystemType::file("bar.rs".into()),
-                SystemType::file("foo.rs".into()),
-                SystemType::directory("haskell".into()),
+                SystemType::file(unsound::label::new("bar.rs")),
+                SystemType::file(unsound::label::new("foo.rs")),
+                SystemType::directory(unsound::label::new("haskell")),
             ]
         );
 
         let sub_directory = directory
-            .find_directory(&Path::new("haskell".into()))
+            .find_directory(&Path::new(unsound::label::new("haskell")))
             .expect("Could not find sub-directory");
         let mut sub_directory_contents = sub_directory.list_directory();
         sub_directory_contents.sort();
@@ -923,8 +960,8 @@ pub mod tests {
         assert_eq!(
             sub_directory_contents,
             vec![
-                SystemType::file("bar.hs".into()),
-                SystemType::file("foo.hs".into()),
+                SystemType::file(unsound::label::new("bar.hs")),
+                SystemType::file(unsound::label::new("foo.hs")),
             ]
         );
     }
@@ -933,13 +970,19 @@ pub mod tests {
     fn test_all_directories_and_files() {
         let mut directory_map = HashMap::new();
 
-        let path1 = Path::from_labels("foo".into(), &["bar".into(), "baz".into()]);
-        let file1 = File::new("monadic.rs".into(), &[]);
-        let file2 = File::new("oscoin.rs".into(), &[]);
+        let path1 = Path::from_labels(
+            unsound::label::new("foo"),
+            &[bar(), unsound::label::new("baz")],
+        );
+        let file1 = File::new(unsound::label::new("monadic.rs"), &[]);
+        let file2 = File::new(unsound::label::new("oscoin.rs"), &[]);
         directory_map.insert(path1, (file1, vec![file2]));
 
-        let path2 = Path::from_labels("foo".into(), &["bar".into(), "quux".into()]);
-        let file3 = File::new("radicle.rs".into(), &[]);
+        let path2 = Path::from_labels(
+            unsound::label::new("foo"),
+            &[bar(), unsound::label::new("quux")],
+        );
+        let file3 = File::new(unsound::label::new("radicle.rs"), &[]);
 
         directory_map.insert(path2, (file3, vec![]));
 
@@ -948,7 +991,7 @@ pub mod tests {
 
     fn label_strategy() -> impl Strategy<Value = Label> {
         // ASCII regex, excluding '/' because of posix file paths
-        "[ -.|0-~]+".prop_map(|label| label.into())
+        "[ -.|0-~]+".prop_map(|label| unsound::label::new(&label))
     }
 
     fn path_strategy(max_size: usize) -> impl Strategy<Value = Path> {
@@ -1016,7 +1059,7 @@ pub mod tests {
     fn test_file_name_is_same_as_root() {
         // This test ensures that if the name is the same the root of the
         // directory, that search_path.split_last() doesn't toss away the prefix.
-        let path = Path::from_labels("foo".into(), &["bar".into()]);
+        let path = Path::from_labels(unsound::label::new("foo"), &[bar()]);
         let files = (File::new(Label::root(), &[]), vec![]);
         let mut directory_map = HashMap::new();
         directory_map.insert(path, files);
@@ -1047,44 +1090,53 @@ pub mod tests {
     fn test_combine_dirs() {
         let mut root = Directory::empty_root::<TestRepo>();
         let quux = Directory::mkdir(
-            "foo".into(),
+            unsound::label::new("foo"),
             Directory::mkdir(
-                "bar".into(),
+                bar(),
                 Directory {
-                    name: "baz".into(),
-                    entries: NonEmpty::new(DirectoryContents::file("quux.rs".into(), b"")),
+                    name: unsound::label::new("baz"),
+                    entries: NonEmpty::new(DirectoryContents::file(
+                        unsound::label::new("quux.rs"),
+                        b"",
+                    )),
                 },
             ),
         );
         root.entries.push(DirectoryContents::sub_directory(quux));
 
         let hallo = Directory::mkdir(
-            "foo".into(),
+            unsound::label::new("foo"),
             Directory::mkdir(
-                "bar".into(),
+                bar(),
                 Directory {
-                    name: "quux".into(),
-                    entries: NonEmpty::new(DirectoryContents::file("hallo.rs".into(), b"")),
+                    name: unsound::label::new("quux"),
+                    entries: NonEmpty::new(DirectoryContents::file(
+                        unsound::label::new("hallo.rs"),
+                        b"",
+                    )),
                 },
             ),
         );
 
         let mut expected_root = Directory::empty_root::<TestRepo>();
         let expected_quux = DirectoryContents::sub_directory(Directory {
-            name: "baz".into(),
-            entries: NonEmpty::new(DirectoryContents::file("quux.rs".into(), b"")),
+            name: unsound::label::new("baz"),
+            entries: NonEmpty::new(DirectoryContents::file(unsound::label::new("quux.rs"), b"")),
         });
         let expected_hallo = DirectoryContents::sub_directory(Directory {
-            name: "quux".into(),
-            entries: NonEmpty::new(DirectoryContents::file("hallo.rs".into(), b"")),
+            name: unsound::label::new("quux"),
+            entries: NonEmpty::new(DirectoryContents::file(
+                unsound::label::new("hallo.rs"),
+                b"",
+            )),
         });
 
         let subdirs = (expected_quux, vec![expected_hallo]).into();
 
         let expected = Directory::mkdir(
-            "foo".into(),
+            unsound::label::new("foo"),
             Directory {
-                name: "bar".into(),
+                name: bar(),
                 entries: subdirs,
             },
         );
@@ -1115,32 +1167,35 @@ pub mod tests {
     fn test_combine_files() {
         let mut root = Directory::empty_root::<TestRepo>();
         let baz = Directory::mkdir(
-            "foo".into(),
+            unsound::label::new("foo"),
             Directory {
-                name: "bar".into(),
-                entries: NonEmpty::new(DirectoryContents::file("baz.rs".into(), b"")),
+                name: bar(),
+                entries: NonEmpty::new(DirectoryContents::file(unsound::label::new("baz.rs"), b"")),
             },
         );
         root.entries.push(DirectoryContents::sub_directory(baz));
 
         let quux = Directory::mkdir(
-            "foo".into(),
+            unsound::label::new("foo"),
             Directory {
-                name: "bar".into(),
-                entries: NonEmpty::new(DirectoryContents::file("quux.rs".into(), b"")),
+                name: bar(),
+                entries: NonEmpty::new(DirectoryContents::file(
+                    unsound::label::new("quux.rs"),
+                    b"",
+                )),
             },
         );
 
         let mut expected_root = Directory::empty_root::<TestRepo>();
         let files = (
-            DirectoryContents::file("baz.rs".into(), b""),
-            vec![DirectoryContents::file("quux.rs".into(), b"")],
+            DirectoryContents::file(unsound::label::new("baz.rs"), b""),
+            vec![DirectoryContents::file(unsound::label::new("quux.rs"), b"")],
         )
             .into();
         let expected = Directory::mkdir(
-            "foo".into(),
+            unsound::label::new("foo"),
             Directory {
-                name: "bar".into(),
+                name: bar(),
                 entries: files,
             },
         );
