@@ -10,6 +10,7 @@
 //! ```
 //! use radicle_surf::vcs::git::{GitBrowser, GitRepository, Sha1};
 //! use radicle_surf::file_system::{Label, Path, SystemType};
+//! use radicle_surf::file_system::unsound;
 //! use pretty_assertions::assert_eq;
 //!
 //! // We're going to point to this repo.
@@ -27,7 +28,7 @@
 //! let directory = browser.get_directory().expect("Failed to get directory");
 //!
 //! // Let's get a Path to this file
-//! let this_file = Path::from_labels(Label::unsafe_label("src"), &[Label::unsafe_label("memory.rs")]);
+//! let this_file = Path::from_labels(unsound::label::new("src"), &[unsound::label::new("memory.rs")]);
 //!
 //! // And assert that we can find it!
 //! assert!(directory.find_file(&this_file).is_some());
@@ -36,26 +37,26 @@
 //! root_contents.sort();
 //!
 //! assert_eq!(root_contents, vec![
-//!     SystemType::file(Label::unsafe_label(".i-am-well-hidden")),
-//!     SystemType::file(Label::unsafe_label(".i-too-am-hidden")),
-//!     SystemType::file(Label::unsafe_label("README.md")),
-//!     SystemType::directory(Label::unsafe_label("bin")),
-//!     SystemType::directory(Label::unsafe_label("src")),
-//!     SystemType::directory(Label::unsafe_label("text")),
-//!     SystemType::directory(Label::unsafe_label("this")),
+//!     SystemType::file(unsound::label::new(".i-am-well-hidden")),
+//!     SystemType::file(unsound::label::new(".i-too-am-hidden")),
+//!     SystemType::file(unsound::label::new("README.md")),
+//!     SystemType::directory(unsound::label::new("bin")),
+//!     SystemType::directory(unsound::label::new("src")),
+//!     SystemType::directory(unsound::label::new("text")),
+//!     SystemType::directory(unsound::label::new("this")),
 //! ]);
 //!
 //! let src = directory.find_directory(
-//!     &Path::new(Label::unsafe_label("src"))
+//!     &Path::new(unsound::label::new("src"))
 //! ).expect("Failed to find src");
 //!
 //! let mut src_contents = src.list_directory();
 //! src_contents.sort();
 //!
 //! assert_eq!(src_contents, vec![
-//!     SystemType::file(Label::unsafe_label("Eval.hs")),
-//!     SystemType::file(Label::unsafe_label("Folder.svelte")),
-//!     SystemType::file(Label::unsafe_label("memory.rs")),
+//!     SystemType::file(unsound::label::new("Eval.hs")),
+//!     SystemType::file(unsound::label::new("Folder.svelte")),
+//!     SystemType::file(unsound::label::new("memory.rs")),
 //! ]);
 //! ```
 pub mod diff;
