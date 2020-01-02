@@ -1,6 +1,7 @@
 //! ```
 //! use nonempty::NonEmpty;
-//! use radicle_surf::file_system::{Directory, File, Path, SystemType};
+//! use radicle_surf::file_system::{Directory, File, Label, Path, SystemType};
+//! use radicle_surf::file_system::unsound;
 //! use radicle_surf::vcs::git::*;
 //! use std::collections::HashMap;
 //!
@@ -12,26 +13,26 @@
 //! directory_contents.sort();
 //!
 //! assert_eq!(directory_contents, vec![
-//!     SystemType::file(".i-am-well-hidden".into()),
-//!     SystemType::file(".i-too-am-hidden".into()),
-//!     SystemType::file("README.md".into()),
-//!     SystemType::directory("bin".into()),
-//!     SystemType::directory("src".into()),
-//!     SystemType::directory("text".into()),
-//!     SystemType::directory("this".into()),
+//!     SystemType::file(unsound::label::new(".i-am-well-hidden")),
+//!     SystemType::file(unsound::label::new(".i-too-am-hidden")),
+//!     SystemType::file(unsound::label::new("README.md")),
+//!     SystemType::directory(unsound::label::new("bin")),
+//!     SystemType::directory(unsound::label::new("src")),
+//!     SystemType::directory(unsound::label::new("text")),
+//!     SystemType::directory(unsound::label::new("this")),
 //! ]);
 //!
 //! // find src directory in the Git directory and the in-memory directory
 //! let src_directory = directory
-//!     .find_directory(&Path::new("src".into()))
+//!     .find_directory(&Path::new(unsound::label::new("src")))
 //!     .unwrap();
 //! let mut src_directory_contents = src_directory.list_directory();
 //! src_directory_contents.sort();
 //!
 //! assert_eq!(src_directory_contents, vec![
-//!     SystemType::file("Eval.hs".into()),
-//!     SystemType::file("Folder.svelte".into()),
-//!     SystemType::file("memory.rs".into()),
+//!     SystemType::file(unsound::label::new("Eval.hs")),
+//!     SystemType::file(unsound::label::new("Folder.svelte")),
+//!     SystemType::file(unsound::label::new("memory.rs")),
 //! ]);
 //! ```
 
@@ -395,6 +396,7 @@ impl<'repo> GitBrowser<'repo> {
     /// ```
     /// use radicle_surf::vcs::git::{BranchName, GitBrowser, GitRepository};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
+    /// use radicle_surf::file_system::unsound;
     ///
     /// let repo = GitRepository::new("./data/git-platinum").unwrap();
     /// let mut browser = GitBrowser::new(&repo).unwrap();
@@ -409,19 +411,19 @@ impl<'repo> GitBrowser<'repo> {
     /// assert_eq!(
     ///     directory_contents,
     ///     vec![
-    ///         SystemType::file(".i-am-well-hidden".into()),
-    ///         SystemType::file(".i-too-am-hidden".into()),
-    ///         SystemType::file("README.md".into()),
-    ///         SystemType::directory("bin".into()),
-    ///         SystemType::file("here-we-are-on-a-dev-branch.lol".into()),
-    ///         SystemType::directory("src".into()),
-    ///         SystemType::directory("text".into()),
-    ///         SystemType::directory("this".into()),
+    ///         SystemType::file(unsound::label::new(".i-am-well-hidden")),
+    ///         SystemType::file(unsound::label::new(".i-too-am-hidden")),
+    ///         SystemType::file(unsound::label::new("README.md")),
+    ///         SystemType::directory(unsound::label::new("bin")),
+    ///         SystemType::file(unsound::label::new("here-we-are-on-a-dev-branch.lol")),
+    ///         SystemType::directory(unsound::label::new("src")),
+    ///         SystemType::directory(unsound::label::new("text")),
+    ///         SystemType::directory(unsound::label::new("this")),
     ///     ]
     /// );
     ///
     /// let tests = directory
-    ///     .find_directory(&Path::new("bin".into()))
+    ///     .find_directory(&Path::new(unsound::label::new("bin")))
     ///     .expect("bin not found");
     /// let mut tests_contents = tests.list_directory();
     /// tests_contents.sort();
@@ -429,9 +431,9 @@ impl<'repo> GitBrowser<'repo> {
     /// assert_eq!(
     ///     tests_contents,
     ///     vec![
-    ///         SystemType::file("cat".into()),
-    ///         SystemType::file("ls".into()),
-    ///         SystemType::file("test".into()),
+    ///         SystemType::file(unsound::label::new("cat")),
+    ///         SystemType::file(unsound::label::new("ls")),
+    ///         SystemType::file(unsound::label::new("test")),
     ///     ]
     /// );
     /// ```
@@ -485,8 +487,9 @@ impl<'repo> GitBrowser<'repo> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::file_system::SystemType;
+    /// use radicle_surf::file_system::{Label, SystemType};
     /// use radicle_surf::vcs::git::{GitBrowser, GitRepository, Sha1};
+    /// use radicle_surf::file_system::unsound;
     ///
     /// let repo = GitRepository::new("./data/git-platinum")
     ///     .expect("Could not retrieve ./data/git-platinum as git repository");
@@ -505,10 +508,10 @@ impl<'repo> GitBrowser<'repo> {
     /// assert_eq!(
     ///     directory_contents,
     ///     vec![
-    ///         SystemType::file("README.md".into()),
-    ///         SystemType::directory("bin".into()),
-    ///         SystemType::directory("src".into()),
-    ///         SystemType::directory("this".into()),
+    ///         SystemType::file(unsound::label::new("README.md")),
+    ///         SystemType::directory(unsound::label::new("bin")),
+    ///         SystemType::directory(unsound::label::new("src")),
+    ///         SystemType::directory(unsound::label::new("this")),
     ///     ]
     /// );
     ///
@@ -612,6 +615,7 @@ impl<'repo> GitBrowser<'repo> {
     /// ```
     /// use radicle_surf::vcs::git::{GitBrowser, GitRepository, Sha1};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
+    /// use radicle_surf::file_system::unsound;
     ///
     /// let repo = GitRepository::new("./data/git-platinum")
     ///     .expect("Could not retrieve ./data/git-test as git repository");
@@ -620,13 +624,13 @@ impl<'repo> GitBrowser<'repo> {
     /// let head_commit = browser.get_history().0.first().clone();
     ///
     /// let readme_last_commit = browser
-    ///     .last_commit(&Path::with_root(&["README.md".into()]))
+    ///     .last_commit(&Path::with_root(&[unsound::label::new("README.md")]))
     ///     .map(|commit| commit.id());
     ///
     /// assert_eq!(readme_last_commit, Some(head_commit.id()));
     ///
     /// let memory_last_commit = browser
-    ///     .last_commit(&Path::with_root(&["src".into(), "memory.rs".into()]))
+    ///     .last_commit(&Path::with_root(&[unsound::label::new("src"), unsound::label::new("memory.rs")]))
     ///     .map(|commit| commit.id());
     ///
     /// assert_eq!(memory_last_commit, Some(head_commit.id()));
@@ -635,6 +639,7 @@ impl<'repo> GitBrowser<'repo> {
     /// ```
     /// use radicle_surf::vcs::git::{GitBrowser, GitRepository, Sha1};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
+    /// use radicle_surf::file_system::unsound;
     ///
     /// let repo = GitRepository::new("./data/git-platinum")
     ///     .expect("Could not retrieve ./data/git-platinum as git repository");
@@ -647,14 +652,14 @@ impl<'repo> GitBrowser<'repo> {
     ///
     /// // memory.rs is commited later so it should not exist here.
     /// let memory_last_commit = browser
-    ///     .last_commit(&Path::with_root(&["src".into(), "memory.rs".into()]))
+    ///     .last_commit(&Path::with_root(&[unsound::label::new("src"), unsound::label::new("memory.rs")]))
     ///     .map(|commit| commit.id());
     ///
     /// assert_eq!(memory_last_commit, None);
     ///
     /// // README.md exists in this commit.
     /// let readme_last_commit = browser
-    ///     .last_commit(&Path::with_root(&["README.md".into()]))
+    ///     .last_commit(&Path::with_root(&[unsound::label::new("README.md")]))
     ///     .map(|commit| commit.id());
     ///
     /// assert_eq!(readme_last_commit, Some(head_commit.id()));
