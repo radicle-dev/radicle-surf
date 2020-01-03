@@ -1,6 +1,7 @@
 //! ```
 //! use nonempty::NonEmpty;
-//! use radicle_surf::file_system::{Directory, File, Path, SystemType};
+//! use radicle_surf::file_system::{Directory, File, Label, Path, SystemType};
+//! use radicle_surf::file_system::unsound;
 //! use radicle_surf::vcs::git::*;
 //! use std::collections::HashMap;
 //!
@@ -12,26 +13,26 @@
 //! directory_contents.sort();
 //!
 //! assert_eq!(directory_contents, vec![
-//!     SystemType::file(".i-am-well-hidden".into()),
-//!     SystemType::file(".i-too-am-hidden".into()),
-//!     SystemType::file("README.md".into()),
-//!     SystemType::directory("bin".into()),
-//!     SystemType::directory("src".into()),
-//!     SystemType::directory("text".into()),
-//!     SystemType::directory("this".into()),
+//!     SystemType::file(unsound::label::new(".i-am-well-hidden")),
+//!     SystemType::file(unsound::label::new(".i-too-am-hidden")),
+//!     SystemType::file(unsound::label::new("README.md")),
+//!     SystemType::directory(unsound::label::new("bin")),
+//!     SystemType::directory(unsound::label::new("src")),
+//!     SystemType::directory(unsound::label::new("text")),
+//!     SystemType::directory(unsound::label::new("this")),
 //! ]);
 //!
 //! // find src directory in the Git directory and the in-memory directory
 //! let src_directory = directory
-//!     .find_directory(&Path::new("src".into()))
+//!     .find_directory(&Path::new(unsound::label::new("src")))
 //!     .unwrap();
 //! let mut src_directory_contents = src_directory.list_directory();
 //! src_directory_contents.sort();
 //!
 //! assert_eq!(src_directory_contents, vec![
-//!     SystemType::file("Eval.hs".into()),
-//!     SystemType::file("Folder.svelte".into()),
-//!     SystemType::file("memory.rs".into()),
+//!     SystemType::file(unsound::label::new("Eval.hs")),
+//!     SystemType::file(unsound::label::new("Folder.svelte")),
+//!     SystemType::file(unsound::label::new("memory.rs")),
 //! ]);
 //! ```
 
@@ -39,12 +40,16 @@
 pub use git2;
 
 use crate::file_system;
+use crate::file_system::error as file_error;
 use crate::vcs;
 use crate::vcs::VCS;
-use git2::{BranchType, Commit, Error, Oid, Reference, Repository, TreeWalkMode, TreeWalkResult};
+use git2::{
+    BranchType, Commit, Error, Oid, Reference, Repository, TreeEntry, TreeWalkMode, TreeWalkResult,
+};
 use nonempty::NonEmpty;
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::convert::TryFrom;
 
 #[derive(Debug, PartialEq)]
 pub enum GitError {
@@ -52,7 +57,15 @@ pub enum GitError {
     BranchDecode,
     NotBranch,
     NotTag,
+    NameDecode,
+    FileSystem(file_error::Error),
     Internal(Error),
+}
+
+impl From<file_error::Error> for GitError {
+    fn from(err: file_error::Error) -> Self {
+        GitError::FileSystem(err)
+    }
 }
 
 impl From<Error> for GitError {
@@ -324,6 +337,37 @@ impl std::fmt::Debug for GitRepository {
 /// `git2::Commit` as the artifact, and [`GitError`](enum.GitError.html) for error reporting.
 pub type GitBrowser<'repo> = vcs::Browser<'repo, GitRepository, Commit<'repo>, GitError>;
 
+/// A private enum that captures a recoverable and
+/// non-recoverable error when walking the git tree.
+///
+/// In the case of `NotBlob` we abort the the computation but do
+/// a check for it and recover.
+///
+/// In the of `Git` we abort both computations.
+#[derive(Debug)]
+enum TreeWalkError {
+    NotBlob,
+    Git(GitError),
+}
+
+impl From<Error> for TreeWalkError {
+    fn from(err: Error) -> Self {
+        TreeWalkError::Git(err.into())
+    }
+}
+
+impl From<file_error::Error> for TreeWalkError {
+    fn from(err: file_error::Error) -> Self {
+        err.into()
+    }
+}
+
+impl From<GitError> for TreeWalkError {
+    fn from(err: GitError) -> Self {
+        err.into()
+    }
+}
+
 impl<'repo> GitBrowser<'repo> {
     /// Create a new browser to interact with.
     ///
@@ -395,6 +439,7 @@ impl<'repo> GitBrowser<'repo> {
     /// ```
     /// use radicle_surf::vcs::git::{BranchName, GitBrowser, GitRepository};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
+    /// use radicle_surf::file_system::unsound;
     ///
     /// let repo = GitRepository::new("./data/git-platinum").unwrap();
     /// let mut browser = GitBrowser::new(&repo).unwrap();
@@ -409,19 +454,19 @@ impl<'repo> GitBrowser<'repo> {
     /// assert_eq!(
     ///     directory_contents,
     ///     vec![
-    ///         SystemType::file(".i-am-well-hidden".into()),
-    ///         SystemType::file(".i-too-am-hidden".into()),
-    ///         SystemType::file("README.md".into()),
-    ///         SystemType::directory("bin".into()),
-    ///         SystemType::file("here-we-are-on-a-dev-branch.lol".into()),
-    ///         SystemType::directory("src".into()),
-    ///         SystemType::directory("text".into()),
-    ///         SystemType::directory("this".into()),
+    ///         SystemType::file(unsound::label::new(".i-am-well-hidden")),
+    ///         SystemType::file(unsound::label::new(".i-too-am-hidden")),
+    ///         SystemType::file(unsound::label::new("README.md")),
+    ///         SystemType::directory(unsound::label::new("bin")),
+    ///         SystemType::file(unsound::label::new("here-we-are-on-a-dev-branch.lol")),
+    ///         SystemType::directory(unsound::label::new("src")),
+    ///         SystemType::directory(unsound::label::new("text")),
+    ///         SystemType::directory(unsound::label::new("this")),
     ///     ]
     /// );
     ///
     /// let tests = directory
-    ///     .find_directory(&Path::new("bin".into()))
+    ///     .find_directory(&Path::new(unsound::label::new("bin")))
     ///     .expect("bin not found");
     /// let mut tests_contents = tests.list_directory();
     /// tests_contents.sort();
@@ -429,9 +474,9 @@ impl<'repo> GitBrowser<'repo> {
     /// assert_eq!(
     ///     tests_contents,
     ///     vec![
-    ///         SystemType::file("cat".into()),
-    ///         SystemType::file("ls".into()),
-    ///         SystemType::file("test".into()),
+    ///         SystemType::file(unsound::label::new("cat")),
+    ///         SystemType::file(unsound::label::new("ls")),
+    ///         SystemType::file(unsound::label::new("test")),
     ///     ]
     /// );
     /// ```
@@ -485,8 +530,9 @@ impl<'repo> GitBrowser<'repo> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::file_system::SystemType;
+    /// use radicle_surf::file_system::{Label, SystemType};
     /// use radicle_surf::vcs::git::{GitBrowser, GitRepository, Sha1};
+    /// use radicle_surf::file_system::unsound;
     ///
     /// let repo = GitRepository::new("./data/git-platinum")
     ///     .expect("Could not retrieve ./data/git-platinum as git repository");
@@ -505,10 +551,10 @@ impl<'repo> GitBrowser<'repo> {
     /// assert_eq!(
     ///     directory_contents,
     ///     vec![
-    ///         SystemType::file("README.md".into()),
-    ///         SystemType::directory("bin".into()),
-    ///         SystemType::directory("src".into()),
-    ///         SystemType::directory("this".into()),
+    ///         SystemType::file(unsound::label::new("README.md")),
+    ///         SystemType::directory(unsound::label::new("bin")),
+    ///         SystemType::directory(unsound::label::new("src")),
+    ///         SystemType::directory(unsound::label::new("this")),
     ///     ]
     /// );
     ///
@@ -612,6 +658,7 @@ impl<'repo> GitBrowser<'repo> {
     /// ```
     /// use radicle_surf::vcs::git::{GitBrowser, GitRepository, Sha1};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
+    /// use radicle_surf::file_system::unsound;
     ///
     /// let repo = GitRepository::new("./data/git-platinum")
     ///     .expect("Could not retrieve ./data/git-test as git repository");
@@ -620,13 +667,13 @@ impl<'repo> GitBrowser<'repo> {
     /// let head_commit = browser.get_history().0.first().clone();
     ///
     /// let readme_last_commit = browser
-    ///     .last_commit(&Path::with_root(&["README.md".into()]))
+    ///     .last_commit(&Path::with_root(&[unsound::label::new("README.md")]))
     ///     .map(|commit| commit.id());
     ///
     /// assert_eq!(readme_last_commit, Some(head_commit.id()));
     ///
     /// let memory_last_commit = browser
-    ///     .last_commit(&Path::with_root(&["src".into(), "memory.rs".into()]))
+    ///     .last_commit(&Path::with_root(&[unsound::label::new("src"), unsound::label::new("memory.rs")]))
     ///     .map(|commit| commit.id());
     ///
     /// assert_eq!(memory_last_commit, Some(head_commit.id()));
@@ -635,6 +682,7 @@ impl<'repo> GitBrowser<'repo> {
     /// ```
     /// use radicle_surf::vcs::git::{GitBrowser, GitRepository, Sha1};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
+    /// use radicle_surf::file_system::unsound;
     ///
     /// let repo = GitRepository::new("./data/git-platinum")
     ///     .expect("Could not retrieve ./data/git-platinum as git repository");
@@ -647,14 +695,14 @@ impl<'repo> GitBrowser<'repo> {
     ///
     /// // memory.rs is commited later so it should not exist here.
     /// let memory_last_commit = browser
-    ///     .last_commit(&Path::with_root(&["src".into(), "memory.rs".into()]))
+    ///     .last_commit(&Path::with_root(&[unsound::label::new("src"), unsound::label::new("memory.rs")]))
     ///     .map(|commit| commit.id());
     ///
     /// assert_eq!(memory_last_commit, None);
     ///
     /// // README.md exists in this commit.
     /// let readme_last_commit = browser
-    ///     .last_commit(&Path::with_root(&["README.md".into()]))
+    ///     .last_commit(&Path::with_root(&[unsound::label::new("README.md")]))
     ///     .map(|commit| commit.id());
     ///
     /// assert_eq!(readme_last_commit, Some(head_commit.id()));
@@ -671,32 +719,78 @@ impl<'repo> GitBrowser<'repo> {
         repo: &Repository,
         commit: &Commit,
     ) -> Result<HashMap<file_system::Path, NonEmpty<file_system::File>>, GitError> {
-        let mut dir: HashMap<file_system::Path, NonEmpty<file_system::File>> = HashMap::new();
-        let tree = commit.as_object().peel_to_tree()?;
-        tree.walk(TreeWalkMode::PreOrder, |s, entry| {
-            let path = file_system::Path::from_string(s);
+        let mut file_paths_or_error: Result<
+            HashMap<file_system::Path, NonEmpty<file_system::File>>,
+            GitError,
+        > = Ok(HashMap::new());
 
-            entry
-                .to_object(repo)
-                .map(|object| {
-                    object.as_blob().and_then(|blob| {
-                        entry.name().and_then(|name| {
-                            let file = file_system::File {
-                                name: name.into(),
-                                contents: blob.content().to_owned(),
-                                size: blob.size(),
-                            };
-                            dir.entry(path)
-                                .and_modify(|entries| entries.push(file.clone()))
-                                .or_insert_with(|| NonEmpty::new(file));
-                            Some(TreeWalkResult::Ok)
-                        })
-                    });
+        let tree = commit.as_object().peel_to_tree()?;
+
+        tree.walk(
+            TreeWalkMode::PreOrder,
+            |s, entry| match Self::tree_entry_to_file_and_path(repo, s, entry) {
+                Ok((path, file)) => {
+                    match file_paths_or_error.as_mut() {
+                        Ok(mut files) => Self::update_file_map(path, file, &mut files),
+
+                        // We don't need to update, we want to keep the error.
+                        Err(_err) => {}
+                    }
                     TreeWalkResult::Ok
-                })
-                .unwrap_or(TreeWalkResult::Skip)
-        })?;
-        Ok(dir)
+                }
+                Err(err) => match err {
+                    // We want to continue if the entry was not a Blob.
+                    TreeWalkError::NotBlob => TreeWalkResult::Ok,
+
+                    // But we want to keep the error and abort otherwise.
+                    TreeWalkError::Git(err) => {
+                        file_paths_or_error = Err(err);
+                        TreeWalkResult::Abort
+                    }
+                },
+            },
+        )?;
+
+        file_paths_or_error
+    }
+
+    fn update_file_map(
+        path: file_system::Path,
+        file: file_system::File,
+        files: &mut HashMap<file_system::Path, NonEmpty<file_system::File>>,
+    ) {
+        files
+            .entry(path)
+            .and_modify(|entries| entries.push(file.clone()))
+            .or_insert_with(|| NonEmpty::new(file));
+    }
+
+    fn tree_entry_to_file_and_path(
+        repo: &Repository,
+        tree_path: &str,
+        entry: &TreeEntry,
+    ) -> Result<(file_system::Path, file_system::File), TreeWalkError> {
+        // Account for the "root" of git being the empty string
+        let path = if tree_path.is_empty() {
+            Ok(file_system::Path::root())
+        } else {
+            file_system::Path::try_from(tree_path)
+        }?;
+
+        let object = entry.to_object(repo)?;
+        let blob = object.as_blob().ok_or(TreeWalkError::NotBlob)?;
+        let name = entry.name().ok_or(GitError::NameDecode)?;
+
+        let name = file_system::Label::try_from(name).map_err(GitError::FileSystem)?;
+
+        Ok((
+            path,
+            file_system::File {
+                name,
+                contents: blob.content().to_owned(),
+                size: blob.size(),
+            },
+        ))
     }
 
     /// Check that a given `Commit` touches the given `Path`.

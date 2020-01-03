@@ -309,7 +309,7 @@ mod tests {
     impl RepoBackend for TestRepo {
         fn repo_directory() -> Directory {
             Directory {
-                name: ".test".into(),
+                name: unsound::label::new(".test"),
                 entries: NonEmpty::new(DirectoryContents::Repo),
             }
         }
@@ -326,14 +326,19 @@ mod tests {
             name: Label::root(),
             entries: (
                 DirectoryContents::Repo,
-                vec![DirectoryContents::file("banana.rs".into(), b"use banana")],
+                vec![DirectoryContents::file(
+                    unsound::label::new("banana.rs"),
+                    b"use banana",
+                )],
             )
                 .into(),
         };
 
         let diff = Diff::diff(directory, new_directory).expect("diff failed");
         let expected_diff = Diff {
-            created: vec![CreateFile(Path::with_root(&["banana.rs".into()]))],
+            created: vec![CreateFile(Path::with_root(&[unsound::label::new(
+                "banana.rs",
+            )]))],
             deleted: vec![],
             moved: vec![],
             modified: vec![],
@@ -348,7 +353,10 @@ mod tests {
             name: Label::root(),
             entries: (
                 DirectoryContents::Repo,
-                vec![DirectoryContents::file("banana.rs".into(), b"use banana")],
+                vec![DirectoryContents::file(
+                    unsound::label::new("banana.rs"),
+                    b"use banana",
+                )],
             )
                 .into(),
         };
@@ -361,7 +369,9 @@ mod tests {
         let diff = Diff::diff(directory, new_directory).expect("diff failed");
         let expected_diff = Diff {
             created: vec![],
-            deleted: vec![DeleteFile(Path::with_root(&["banana.rs".into()]))],
+            deleted: vec![DeleteFile(Path::with_root(&[unsound::label::new(
+                "banana.rs",
+            )]))],
             moved: vec![],
             modified: vec![],
         };
@@ -373,12 +383,18 @@ mod tests {
     fn test_moved_file() {
         let directory: Directory = Directory {
             name: Label::root(),
-            entries: NonEmpty::new(DirectoryContents::file("mod.rs".into(), b"use banana")),
+            entries: NonEmpty::new(DirectoryContents::file(
+                unsound::label::new("mod.rs"),
+                b"use banana",
+            )),
         };
 
         let new_directory: Directory = Directory {
             name: Label::root(),
-            entries: NonEmpty::new(DirectoryContents::file("banana.rs".into(), b"use banana")),
+            entries: NonEmpty::new(DirectoryContents::file(
+                unsound::label::new("banana.rs"),
+                b"use banana",
+            )),
         };
 
         let diff = Diff::diff(directory, new_directory).expect("diff failed");
@@ -394,7 +410,10 @@ mod tests {
             name: Label::root(),
             entries: (
                 DirectoryContents::Repo,
-                vec![DirectoryContents::file("banana.rs".into(), b"use banana")],
+                vec![DirectoryContents::file(
+                    unsound::label::new("banana.rs"),
+                    b"use banana",
+                )],
             )
                 .into(),
         };
@@ -403,7 +422,10 @@ mod tests {
             name: Label::root(),
             entries: (
                 DirectoryContents::Repo,
-                vec![DirectoryContents::file("banana.rs".into(), b"use banana;")],
+                vec![DirectoryContents::file(
+                    unsound::label::new("banana.rs"),
+                    b"use banana;",
+                )],
             )
                 .into(),
         };
@@ -414,7 +436,7 @@ mod tests {
             deleted: vec![],
             moved: vec![],
             modified: vec![ModifiedFile {
-                path: Path::with_root(&["banana.rs".into()]),
+                path: Path::with_root(&[unsound::label::new("banana.rs")]),
                 diff: FileDiff {},
             }],
         };
@@ -434,9 +456,9 @@ mod tests {
             entries: (
                 DirectoryContents::Repo,
                 vec![DirectoryContents::sub_directory(Directory {
-                    name: "src".into(),
+                    name: unsound::label::new("src"),
                     entries: NonEmpty::new(DirectoryContents::file(
-                        "banana.rs".into(),
+                        unsound::label::new("banana.rs"),
                         b"use banana",
                     )),
                 })],
@@ -447,8 +469,8 @@ mod tests {
         let diff = Diff::diff(directory, new_directory).expect("diff failed");
         let expected_diff = Diff {
             created: vec![CreateFile(Path::with_root(&[
-                "src".into(),
-                "banana.rs".into(),
+                unsound::label::new("src"),
+                unsound::label::new("banana.rs"),
             ]))],
             deleted: vec![],
             moved: vec![],
@@ -465,9 +487,9 @@ mod tests {
             entries: (
                 DirectoryContents::Repo,
                 vec![DirectoryContents::sub_directory(Directory {
-                    name: "src".into(),
+                    name: unsound::label::new("src"),
                     entries: NonEmpty::new(DirectoryContents::file(
-                        "banana.rs".into(),
+                        unsound::label::new("banana.rs"),
                         b"use banana",
                     )),
                 })],
@@ -484,8 +506,8 @@ mod tests {
         let expected_diff = Diff {
             created: vec![],
             deleted: vec![DeleteFile(Path::with_root(&[
-                "src".into(),
-                "banana.rs".into(),
+                unsound::label::new("src"),
+                unsound::label::new("banana.rs"),
             ]))],
             moved: vec![],
             modified: vec![],
@@ -501,9 +523,9 @@ mod tests {
             entries: (
                 DirectoryContents::Repo,
                 vec![DirectoryContents::sub_directory(Directory {
-                    name: "src".into(),
+                    name: unsound::label::new("src"),
                     entries: NonEmpty::new(DirectoryContents::file(
-                        "banana.rs".into(),
+                        unsound::label::new("banana.rs"),
                         b"use banana",
                     )),
                 })],
@@ -516,9 +538,9 @@ mod tests {
             entries: (
                 DirectoryContents::Repo,
                 vec![DirectoryContents::sub_directory(Directory {
-                    name: "src".into(),
+                    name: unsound::label::new("src"),
                     entries: NonEmpty::new(DirectoryContents::file(
-                        "banana.rs".into(),
+                        unsound::label::new("banana.rs"),
                         b"use banana;",
                     )),
                 })],
@@ -532,7 +554,10 @@ mod tests {
             deleted: vec![],
             moved: vec![],
             modified: vec![ModifiedFile {
-                path: Path::with_root(&["src".into(), "banana.rs".into()]),
+                path: Path::with_root(&[
+                    unsound::label::new("src"),
+                    unsound::label::new("banana.rs"),
+                ]),
                 diff: FileDiff {},
             }],
         };
@@ -543,19 +568,22 @@ mod tests {
     #[test]
     fn test_disjoint_directories() {
         let directory: Directory = Directory {
-            name: "foo".into(),
+            name: unsound::label::new("foo"),
             entries: NonEmpty::new(DirectoryContents::sub_directory(Directory {
-                name: "src".into(),
-                entries: NonEmpty::new(DirectoryContents::file("banana.rs".into(), b"use banana")),
+                name: unsound::label::new("src"),
+                entries: NonEmpty::new(DirectoryContents::file(
+                    unsound::label::new("banana.rs"),
+                    b"use banana",
+                )),
             })),
         };
 
         let other_directory: Directory = Directory {
-            name: "bar".into(),
+            name: unsound::label::new("bar"),
             entries: NonEmpty::new(DirectoryContents::sub_directory(Directory {
-                name: "src".into(),
+                name: unsound::label::new("src"),
                 entries: NonEmpty::new(DirectoryContents::file(
-                    "pineapple.rs".into(),
+                    unsound::label::new("pineapple.rs"),
                     b"use pineapple",
                 )),
             })),
@@ -564,12 +592,15 @@ mod tests {
         let diff = Diff::diff(directory, other_directory).expect("diff failed");
         let expected_diff = Diff {
             created: vec![CreateFile(Path::from_labels(
-                "bar".into(),
-                &["src".into(), "pineapple.rs".into()],
+                unsound::label::new("bar"),
+                &[
+                    unsound::label::new("src"),
+                    unsound::label::new("pineapple.rs"),
+                ],
             ))],
             deleted: vec![DeleteFile(Path::from_labels(
-                "foo".into(),
-                &["src".into(), "banana.rs".into()],
+                unsound::label::new("foo"),
+                &[unsound::label::new("src"), unsound::label::new("banana.rs")],
             ))],
             moved: vec![],
             modified: vec![],
