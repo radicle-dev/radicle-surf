@@ -23,7 +23,7 @@ pub mod unsound;
 /// use radicle_surf::file_system::{Label, Path};
 /// use std::convert::TryFrom;
 ///
-/// fn build_lib_path() -> Result<Path, file_error::Label> {
+/// fn build_lib_path() -> Result<Path, file_error::Error> {
 ///     let lib_filename = Label::try_from("lib.rs")?;
 ///     let src_directory_name = Label::try_from("src")?;
 ///     Ok(Path::from_labels(src_directory_name, &[lib_filename]))
