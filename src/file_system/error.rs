@@ -1,3 +1,7 @@
+pub(crate) const EMPTY_PATH: Error = Error::Path(Path::Empty);
+pub(crate) const EMPTY_LABEL: Error = Error::Label(Label::Empty);
+pub(crate) const CONTAINS_SLASH: Error = Error::Label(Label::ContainsSlash);
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
     Label(Label),
@@ -19,13 +23,6 @@ impl From<Path> for Error {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Path {
     Empty,
-    Label(Label),
-}
-
-impl From<Label> for Path {
-    fn from(err: Label) -> Self {
-        Path::Label(err)
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -68,13 +68,13 @@ impl fmt::Display for Label {
 }
 
 impl TryFrom<&str> for Label {
-    type Error = file_error::Label;
+    type Error = file_error::Error;
 
     fn try_from(item: &str) -> Result<Self, Self::Error> {
         if item.is_empty() {
-            Err(file_error::Label::Empty)
+            Err(file_error::EMPTY_LABEL)
         } else if item.contains('/') {
-            Err(file_error::Label::ContainsSlash)
+            Err(file_error::CONTAINS_SLASH)
         } else {
             Ok(Label {
                 label: item.into(),
@@ -85,7 +85,7 @@ impl TryFrom<&str> for Label {
 }
 
 impl FromStr for Label {
-    type Err = file_error::Label;
+    type Err = file_error::Error;
 
     fn from_str(item: &str) -> Result<Self, Self::Err> {
         Label::try_from(item)
@@ -108,7 +108,7 @@ impl fmt::Display for Path {
 }
 
 impl TryFrom<&str> for Path {
-    type Error = file_error::Path;
+    type Error = file_error::Error;
 
     fn try_from(item: &str) -> Result<Self, Self::Error> {
         let mut path = Vec::new();
@@ -119,13 +119,13 @@ impl TryFrom<&str> for Path {
         }
 
         NonEmpty::from_slice(&path)
-            .ok_or(file_error::Path::Empty)
+            .ok_or(file_error::EMPTY_PATH)
             .map(Path)
     }
 }
 
 impl FromStr for Path {
-    type Err = file_error::Path;
+    type Err = file_error::Error;
 
     fn from_str(item: &str) -> Result<Self, Self::Err> {
         Path::try_from(item)

@@ -356,8 +356,8 @@ impl From<Error> for TreeWalkError {
     }
 }
 
-impl From<file_error::Path> for TreeWalkError {
-    fn from(err: file_error::Path) -> Self {
+impl From<file_error::Error> for TreeWalkError {
+    fn from(err: file_error::Error) -> Self {
         err.into()
     }
 }
@@ -781,9 +781,7 @@ impl<'repo> GitBrowser<'repo> {
         let blob = object.as_blob().ok_or(TreeWalkError::NotBlob)?;
         let name = entry.name().ok_or(GitError::NameDecode)?;
 
-        let name = file_system::Label::try_from(name)
-            .map_err(file_error::Error::Label)
-            .map_err(GitError::FileSystem)?;
+        let name = file_system::Label::try_from(name).map_err(GitError::FileSystem)?;
 
         Ok((
             path,
