@@ -354,6 +354,23 @@ impl Path {
     }
 }
 
+impl From<Vec<Label>> for Path {
+    fn from(labels: Vec<Label>) -> Self {
+        if labels.len() > 0 {
+            Self::from_labels(labels[0].clone(), &labels[1..])
+        } else {
+            panic!("Cannot convert empty vector to Path")
+        }
+    }
+}
+
+impl From<NonEmpty<Label>> for Path {
+    fn from(labels: NonEmpty<Label>) -> Self {
+        let (first, rest) = labels.split_first();
+        Self::from_labels(first.clone(), rest)
+    }
+}
+
 /// A trait to say how to intitialise a Repository `Directory`.
 /// For example, Git would initialise with the `.git` folder and
 /// the files contained in it.
@@ -1151,5 +1168,44 @@ pub mod tests {
         root.combine(&quux);
 
         assert_eq!(root, expected_root)
+    }
+
+    fn path_from_string_vector(names: &Vec<&str>) -> Path {
+        let labels: Vec<Label> = names.iter().map(|n| Label::from(*n)).collect();
+        Path::from(labels)
+    }
+    
+    #[test]
+    fn build_path_from_vector() {
+        let names = vec!["a", "b", "c"];
+        let path = path_from_string_vector(&names);
+        let label_names: Vec<String> = path.iter().map(|l| l.label.clone()).collect();
+        assert_eq!(names, label_names);
+    }
+
+    #[test]
+    fn build_path_from_single_label_vector() {
+        let names = vec!["a"];
+        let path = path_from_string_vector(&names);
+        let label_names: Vec<String> = path.iter().map(|l| l.label.clone()).collect();
+        assert_eq!(names, label_names);
+    }
+
+    #[test]
+    #[should_panic]
+    fn build_path_from_empty_label_vector() {
+        let names: Vec<&str> = vec![];
+        let path = path_from_string_vector(&names);
+        let label_names: Vec<String> = path.iter().map(|l| l.label.clone()).collect();
+        assert_eq!(names, label_names);
+    }
+
+    #[test]
+    fn build_path_from_nonempty() {
+        use nonempty::NonEmpty;
+        let labels = NonEmpty::from((Label::from("a"), vec![Label::from("b"), Label::from("c")]));
+        let path = Path::from(labels);
+        let label_names: Vec<String> = path.iter().map(|l| l.label.clone()).collect();
+        assert_eq!(vec!["a", "b", "c"], label_names);
     }
 }
