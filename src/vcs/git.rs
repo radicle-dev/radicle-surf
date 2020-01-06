@@ -60,6 +60,7 @@ pub enum GitError {
     NotTag,
     NameDecode,
     FileSystem(file_error::Error),
+    FileDiffException,
     Internal(Error),
 }
 
@@ -154,7 +155,7 @@ impl<'repo> GitRepository {
     fn last_commit(
         &'repo self,
         commit: Commit<'repo>,
-    ) -> Result<HashMap<std::path::PathBuf, GitHistory<'repo>>, GitError> {
+    ) -> Result<HashMap<file_system::Path, GitHistory<'repo>>, GitError> {
         let mut file_histories = HashMap::new();
         self.collect_file_history(commit, &mut file_histories)?;
         Ok(file_histories)
@@ -163,52 +164,78 @@ impl<'repo> GitRepository {
     fn collect_file_history(
         &'repo self,
         commit: Commit<'repo>,
-        file_histories: &mut HashMap<std::path::PathBuf, GitHistory<'repo>>,
+        file_histories: &mut HashMap<file_system::Path, GitHistory<'repo>>,
     ) -> Result<(), GitError> {
         let mut revwalk = self.0.revwalk()?;
 
         // Set the revwalk to the head commit
         revwalk.push(commit.id())?;
 
-        let current = commit.clone();
-
         for commit_result in revwalk {
             let parent_id = commit_result?;
 
-            if parent_id == commit.id() {
-                continue;
-            }
-
             let parent = self.0.find_commit(parent_id)?;
-            let diff = self.diff_commits(&current, &parent)?;
-
-            let deltas = diff.deltas();
-            for delta in deltas {
-                let path = delta
-                    .new_file()
-                    .path()
-                    .expect("TODO(finto): handle")
-                    .to_path_buf();
+            let paths = self.diff_commit_and_parents(&parent)?;
+            for path in paths {
                 file_histories
                     .entry(path)
                     .and_modify(|commits: &mut GitHistory| commits.push(parent.clone()))
-                    .or_insert_with(|| vcs::History::new(commit.clone()));
+                    .or_insert_with(|| vcs::History::new(parent.clone()));
             }
         }
         Ok(())
     }
 
+    fn diff_commit_and_parents(
+        &'repo self,
+        commit: &'repo Commit,
+    ) -> Result<Vec<file_system::Path>, GitError> {
+        let mut parents = commit.parents();
+        let head = parents.next();
+        let mut touched_files = vec![];
+
+        let mut add_deltas = |diff: Diff| -> Result<(), GitError> {
+            let deltas = diff.deltas();
+
+            for delta in deltas {
+                let new = delta.new_file().path().ok_or(GitError::FileDiffException)?;
+                let path = file_system::Path::try_from(new.to_path_buf())?;
+                touched_files.push(path);
+            }
+
+            Ok(())
+        };
+
+        match head {
+            None => {
+                let diff = self.diff_commits(&commit, None)?;
+                add_deltas(diff)?;
+            }
+            Some(parent) => {
+                let diff = self.diff_commits(&commit, Some(&parent))?;
+                add_deltas(diff)?;
+
+                for parent in parents {
+                    let diff = self.diff_commits(&commit, Some(&parent))?;
+                    add_deltas(diff)?;
+                }
+            }
+        }
+
+        Ok(touched_files)
+    }
+
     fn diff_commits(
         &'repo self,
         left: &'repo Commit,
-        right: &'repo Commit,
+        right: Option<&'repo Commit>,
     ) -> Result<Diff, GitError> {
         let left_tree = left.tree()?;
-        let right_tree = right.tree()?;
+        let right_tree = right.map_or(Ok(None), |commit| commit.tree().map(Some))?;
 
         let diff = self
             .0
-            .diff_tree_to_tree(Some(&left_tree), Some(&right_tree), None)?;
+            .diff_tree_to_tree(Some(&left_tree), right_tree.as_ref(), None)?;
 
         Ok(diff)
     }
@@ -723,23 +750,36 @@ impl<'repo> GitBrowser<'repo> {
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     /// use radicle_surf::file_system::unsound;
     ///
+    /// use git2;
+    ///
     /// let repo = GitRepository::new("./data/git-platinum")
     ///     .expect("Could not retrieve ./data/git-test as git repository");
-    /// let browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
+    /// let mut browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
+    ///
+    /// // Clamp the Browser to a particular commit
+    /// browser.commit(Sha1::new("d6880352fc7fda8f521ae9b7357668b17bb5bad5")).expect("Failed to set
+    /// commit");
     ///
     /// let head_commit = browser.get_history().0.first().clone();
+    /// let expected_commit = git2::Oid::from_str("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3")
+    ///     .expect("Failed to create Oid");
     ///
     /// let readme_last_commit = browser
     ///     .last_commit(&Path::with_root(&[unsound::label::new("README.md")]))
+    ///     .expect("Failed to get last commit")
     ///     .map(|commit| commit.id());
     ///
-    /// assert_eq!(readme_last_commit, Some(head_commit.id()));
+    /// assert_eq!(readme_last_commit, Some(expected_commit));
+    ///
+    /// let expected_commit = git2::Oid::from_str("e24124b7538658220b5aaf3b6ef53758f0a106dc")
+    ///     .expect("Failed to create Oid");
     ///
     /// let memory_last_commit = browser
     ///     .last_commit(&Path::with_root(&[unsound::label::new("src"), unsound::label::new("memory.rs")]))
+    ///     .expect("Failed to get last commit")
     ///     .map(|commit| commit.id());
     ///
-    /// assert_eq!(memory_last_commit, Some(head_commit.id()));
+    /// assert_eq!(memory_last_commit, Some(expected_commit));
     /// ```
     ///
     /// ```
@@ -759,6 +799,7 @@ impl<'repo> GitBrowser<'repo> {
     /// // memory.rs is commited later so it should not exist here.
     /// let memory_last_commit = browser
     ///     .last_commit(&Path::with_root(&[unsound::label::new("src"), unsound::label::new("memory.rs")]))
+    ///     .expect("Failed to get last commit")
     ///     .map(|commit| commit.id());
     ///
     /// assert_eq!(memory_last_commit, None);
@@ -766,13 +807,67 @@ impl<'repo> GitBrowser<'repo> {
     /// // README.md exists in this commit.
     /// let readme_last_commit = browser
     ///     .last_commit(&Path::with_root(&[unsound::label::new("README.md")]))
+    ///     .expect("Failed to get last commit")
     ///     .map(|commit| commit.id());
     ///
     /// assert_eq!(readme_last_commit, Some(head_commit.id()));
     /// ```
-    pub fn last_commit(&self, path: &file_system::Path) -> Option<Commit> {
-        self.get_history()
-            .find(|commit| self.commit_contains_path(commit.clone(), path))
+    ///
+    /// ```
+    /// use radicle_surf::vcs::git::{BranchName, GitBrowser, GitRepository, Sha1};
+    /// use radicle_surf::vcs::git::git2::{Oid};
+    /// use radicle_surf::file_system::{Label, Path, SystemType};
+    /// use radicle_surf::file_system::unsound;
+    ///
+    /// let repo = GitRepository::new("./data/git-platinum")
+    ///     .expect("Could not retrieve ./data/git-platinum as git repository");
+    /// let mut browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
+    ///
+    /// // Check that last commit is the actual last commit even if head commit differs.
+    /// browser.commit(Sha1::new("19bec071db6474af89c866a1bd0e4b1ff76e2b97")).unwrap();
+    ///
+    /// let expected_commit_id =
+    ///     Oid::from_str("f3a089488f4cfd1a240a9c01b3fcc4c34a4e97b2").unwrap();
+    ///
+    /// let gitignore_last_commit_id = browser
+    ///     .last_commit(&unsound::path::new("~/examples/Folder.svelte"))
+    ///     .expect("Failed to get last commit")
+    ///     .map(|commit| commit.id());
+    ///
+    /// assert_eq!(gitignore_last_commit_id, Some(expected_commit_id));
+    /// ```
+    ///
+    /// ```
+    /// use radicle_surf::vcs::git::{BranchName, GitBrowser, GitRepository, Sha1};
+    /// use radicle_surf::vcs::git::git2::{Oid};
+    /// use radicle_surf::file_system::{Label, Path, SystemType};
+    /// use radicle_surf::file_system::unsound;
+    ///
+    /// let repo = GitRepository::new("./data/git-platinum")
+    ///     .expect("Could not retrieve ./data/git-platinum as git repository");
+    /// let mut browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
+    ///
+    /// // Check that last commit is the actual last commit even if head commit differs.
+    /// browser.commit(Sha1::new("19bec071db6474af89c866a1bd0e4b1ff76e2b97")).unwrap();
+    ///
+    /// let expected_commit_id =
+    ///     Oid::from_str("2429f097664f9af0c5b7b389ab998b2199ffa977").unwrap();
+    ///
+    /// let gitignore_last_commit_id = browser
+    ///     .last_commit(&unsound::path::new("~/this/is/a/really/deeply/nested/directory/tree"))
+    ///     .expect("Failed to get last commit")
+    ///     .map(|commit| commit.id());
+    ///
+    /// assert_eq!(gitignore_last_commit_id, Some(expected_commit_id));
+    /// ```
+    pub fn last_commit(&self, path: &file_system::Path) -> Result<Option<Commit>, GitError> {
+        let file_histories = self
+            .repository
+            .last_commit(self.get_history().first().clone())?;
+
+        Ok(file_histories
+            .get(path)
+            .map(|commits| commits.first().clone()))
     }
 
     /// Do a pre-order TreeWalk of the given commit. This turns a Tree
@@ -854,53 +949,5 @@ impl<'repo> GitBrowser<'repo> {
                 size: blob.size(),
             },
         ))
-    }
-
-    /// Check that a given `Commit` touches the given `Path`.
-    fn commit_contains_path(
-        &self,
-        commit: Commit<'repo>,
-        path: &file_system::Path,
-    ) -> Option<Commit<'repo>> {
-        let (directory, name) = path.split_last();
-        let commit_tree = commit.tree().ok()?;
-
-        if directory == vec![file_system::Label::root()] {
-            commit_tree.get_name(&name.label).map(|_| commit)
-        } else {
-            let mut directory_path = std::path::PathBuf::new();
-            for dir in directory {
-                if dir == file_system::Label::root() {
-                    continue;
-                }
-
-                directory_path.push(dir.label);
-            }
-
-            let tree_entry = commit_tree.get_path(directory_path.as_path()).ok()?;
-            let object = tree_entry.to_object(&self.repository.0).ok()?;
-            let tree = object.as_tree().map(|t| t.get_name(&name.label));
-            tree.map(|_| commit)
-        }
-    }
-}
-
-#[cfg(test)]
-mod playground {
-    use super::*;
-    use git2::Oid;
-    #[test]
-    fn play_last_commit() {
-        let repo = GitRepository::new("./data/git-golden")
-            .expect("Could not retrieve ./data/git-golden as git repository");
-        let commit = repo
-            .0
-            .find_commit(Oid::from_str("74ba370ee5643f310873fb288af1c99d639da8ca").unwrap())
-            .expect("No Commit");
-        let histories = repo.last_commit(commit).expect("Failed to get history");
-        for (path, history) in histories {
-            println!("{:?}: {:?}", path, history.map(|c| c.id()))
-        }
-        assert!(false)
     }
 }

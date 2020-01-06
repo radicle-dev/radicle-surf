@@ -1,4 +1,6 @@
 pub(crate) const EMPTY_PATH: Error = Error::Path(Path::Empty);
+
+pub(crate) const INVALID_UTF8: Error = Error::Label(Label::InvalidUTF8);
 pub(crate) const EMPTY_LABEL: Error = Error::Label(Label::Empty);
 pub(crate) const CONTAINS_SLASH: Error = Error::Label(Label::ContainsSlash);
 
@@ -27,6 +29,7 @@ pub enum Path {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Label {
+    InvalidUTF8,
     ContainsSlash,
     Empty,
 }

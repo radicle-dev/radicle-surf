@@ -23,6 +23,10 @@ impl<A> History<A> {
         self.0.iter()
     }
 
+    pub fn first(&self) -> &A {
+        self.0.first()
+    }
+
     /// Given that the `History` is topological order from most
     /// recent artifact to least recent, `find_suffix` gets returns
     /// the history up until the point of the given artifact.

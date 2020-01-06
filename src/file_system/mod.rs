@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt;
 use std::hash::{Hash, Hasher};
+use std::path;
 use std::str::FromStr;
 
 pub mod error;
@@ -369,6 +370,21 @@ impl Path {
     /// ```
     pub fn with_root(labels: &[Label]) -> Path {
         Path::from_labels(Label::root(), labels)
+    }
+}
+
+impl TryFrom<path::PathBuf> for Path {
+    type Error = file_error::Error;
+
+    fn try_from(path_buf: path::PathBuf) -> Result<Self, Self::Error> {
+        let mut path = Path::root();
+        for p in path_buf.iter() {
+            let p = p.to_str().ok_or(file_error::INVALID_UTF8)?;
+            let l = Label::try_from(p)?;
+            path.push(l);
+        }
+
+        Ok(path)
     }
 }
 
