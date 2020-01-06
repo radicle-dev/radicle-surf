@@ -675,7 +675,8 @@ impl<'repo> GitBrowser<'repo> {
     /// assert!(branches.contains(&Branch::local(BranchName::new("master"))));
     ///
     /// // Filter the branches by `Remote`.
-    /// let branches = browser.list_branches(Some(BranchType::Remote)).unwrap();
+    /// let mut branches = browser.list_branches(Some(BranchType::Remote)).unwrap();
+    /// branches.sort();
     ///
     /// assert_eq!(branches, vec![
     ///     Branch::remote(BranchName::new("origin/HEAD")),
