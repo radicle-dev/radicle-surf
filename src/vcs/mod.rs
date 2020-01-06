@@ -10,11 +10,11 @@ pub mod git;
 pub struct History<A>(pub NonEmpty<A>);
 
 impl<A> History<A> {
-    pub(crate) fn new(a: A) -> Self {
+    pub fn new(a: A) -> Self {
         History(NonEmpty::new(a))
     }
 
-    pub(crate) fn push(&mut self, a: A) {
+    pub fn push(&mut self, a: A) {
         self.0.push(a)
     }
 
@@ -95,12 +95,6 @@ impl<A> History<A> {
             .filter(|history| history.find_in_history(identifier, id_of).is_some())
             .collect()
     }
-}
-
-/// TODO(finto): Turn path::Path to file_system::Path
-pub struct FileHistory<'path, A> {
-    pub file: &'path std::path::Path,
-    pub history: History<A>,
 }
 
 /// A Snapshot is a function that renders a `Directory` given
