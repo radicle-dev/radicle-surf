@@ -10,9 +10,21 @@ pub mod git;
 pub struct History<A>(pub NonEmpty<A>);
 
 impl<A> History<A> {
+    pub fn new(a: A) -> Self {
+        History(NonEmpty::new(a))
+    }
+
+    pub fn push(&mut self, a: A) {
+        self.0.push(a)
+    }
+
     /// Iterator over the artifacts.
     pub fn iter<'a>(&'a self) -> impl Iterator<Item = &A> + 'a {
         self.0.iter()
+    }
+
+    pub fn first(&self) -> &A {
+        self.0.first()
     }
 
     /// Given that the `History` is topological order from most
