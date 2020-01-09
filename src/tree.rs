@@ -1,152 +1,154 @@
-use crate::file_system::Label;
 use nonempty::NonEmpty;
 
-pub trait HasLabel {
-    fn label(&self) -> &Label;
+pub trait HasKey<K> {
+    fn key(&self) -> &K;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-enum SubTree<A> {
+enum SubTree<K, A> {
     Node(A),
-    Branch(Box<Forest<A>>),
+    Branch { key: K, forest: Box<Forest<K, A>> },
 }
 
-impl<A> SubTree<A> {
-    fn branch(tree: Forest<A>) -> Self {
-        SubTree::Branch(Box::new(tree))
+impl<K, A> SubTree<K, A> {
+    fn branch(key: K, tree: Forest<K, A>) -> Self {
+        SubTree::Branch {
+            key,
+            forest: Box::new(tree),
+        }
     }
+}
 
-    fn label(&self) -> &Label
-    where
-        A: HasLabel,
-    {
+impl<K, A: HasKey<K>> HasKey<K> for SubTree<K, A> {
+    fn key(&self) -> &K {
         match self {
-            SubTree::Node(node) => &node.label(),
-            SubTree::Branch(ref forest) => &forest.label,
+            SubTree::Node(node) => &node.key(),
+            SubTree::Branch { key, .. } => &key,
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct Forest<A> {
-    label: Label,
-    forest: NonEmpty<SubTree<A>>,
-}
+struct Forest<K, A>(NonEmpty<SubTree<K, A>>);
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Tree<A>(Vec<Forest<A>>);
+pub struct Tree<K, A>(Option<Forest<K, A>>);
 
-impl<A> Forest<A> {
-    fn new(labels: NonEmpty<Label>, node: A) -> Self {
-        let (start, middle, last) = labels.split();
-        let node = SubTree::Node(node);
+impl<K, A> Forest<K, A> {
+    fn branch(key: K, forest: Self) -> Self {
+        Forest(NonEmpty::new(SubTree::branch(key, forest)))
+    }
+
+    fn node(node: A) -> Self {
+        Forest(NonEmpty::new(SubTree::Node(node)))
+    }
+
+    fn new(keys: NonEmpty<K>, node: A) -> Self
+    where
+        K: Ord + Clone,
+    {
+        let (start, middle, last) = keys.split();
 
         if start == last && middle.is_empty() {
-            Forest {
-                label: start.clone(),
-                forest: NonEmpty::new(node),
-            }
+            Forest::branch(start.clone(), Forest::node(node))
         } else {
-            let mut branch = Forest {
-                label: last.clone(),
-                forest: NonEmpty::new(node),
-            };
+            let mut branch = SubTree::branch(last.clone(), Forest::node(node));
 
-            for label in middle.iter().rev() {
-                branch = Forest {
-                    label: label.clone(),
-                    forest: NonEmpty::new(SubTree::branch(branch)),
-                }
+            for key in middle.iter().rev() {
+                branch = SubTree::branch(key.clone(), Forest(NonEmpty::new(branch)))
             }
 
-            Forest {
-                label: start.clone(),
-                forest: NonEmpty::new(SubTree::branch(branch)),
-            }
+            Forest::branch(start.clone(), Forest(NonEmpty::new(branch)))
         }
+    }
+
+    fn search(&self, key: &K) -> Result<usize, usize>
+    where
+        A: HasKey<K>,
+        K: Ord,
+    {
+        self.0.binary_search_by(|tree| tree.key().cmp(key))
     }
 
     fn insert_node(&mut self, node: A)
     where
-        A: HasLabel,
+        A: HasKey<K>,
+        K: Ord,
     {
-        let result = self
-            .forest
-            .binary_search_by(|sub_tree| sub_tree.label().cmp(&node.label()));
+        let result = self.search(&node.key());
 
         let node = SubTree::Node(node);
 
         match result {
-            Ok(index) => self.forest.insert(index, node),
-            Err(index) => self.forest.insert(index, node),
+            Ok(index) => self.0.insert(index, node),
+            Err(index) => self.0.insert(index, node),
         }
     }
 
-    fn insert(&mut self, labels: NonEmpty<Label>, node: A)
+    fn insert(&mut self, keys: NonEmpty<K>, node: A)
     where
-        A: HasLabel,
+        A: HasKey<K>,
+        K: Ord + Clone,
     {
-        let (head, tail) = labels.split_first();
+        let (head, tail) = keys.split_first();
         let tail = NonEmpty::from_slice(tail);
-        match self
-            .forest
-            .binary_search_by(|sub_tree| sub_tree.label().cmp(head))
-        {
+        match self.search(head) {
             Ok(index) => match tail {
                 None => {
-                    let sub_tree = self.forest.get_mut(index).unwrap();
+                    let sub_tree = self.0.get_mut(index).unwrap();
                     match sub_tree {
                         SubTree::Node(_) => *sub_tree = SubTree::Node(node),
-                        SubTree::Branch(tree) => tree.insert_node(node),
+                        SubTree::Branch { forest, .. } => forest.insert_node(node),
                     }
                 }
-                Some(labels) => {
-                    let sub_tree = self.forest.get_mut(index).unwrap();
+                Some(keys) => {
+                    let sub_tree = self.0.get_mut(index).unwrap();
                     match sub_tree {
                         SubTree::Node(_) => *sub_tree = SubTree::Node(node),
-                        SubTree::Branch(tree) => tree.insert(labels, node),
+                        SubTree::Branch { forest, .. } => forest.insert(keys, node),
                     }
                 }
             },
-            Err(index) => {
-                let branch = SubTree::branch(Forest::new(labels, node));
-                self.forest.insert(index, branch)
-            }
+            Err(index) => match tail {
+                None => self
+                    .0
+                    .insert(index, SubTree::branch(head.clone(), Forest::node(node))),
+                Some(tail) => {
+                    let branch = Forest::new(tail, node);
+                    self.0.insert(index, SubTree::branch(head.clone(), branch))
+                }
+            },
         }
     }
 }
 
-impl<A> Tree<A> {
+impl<K, A> Tree<K, A> {
     pub fn root() -> Self {
-        Tree(vec![])
+        Tree(None)
     }
 
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.0.is_none()
     }
 
-    fn insert_forest(&mut self, index: usize, forest: Forest<A>) {
-        self.0.insert(index, forest)
+    fn insert_forest(&mut self, forest: Forest<K, A>) {
+        self.0 = Some(forest)
     }
 
-    fn search(&self, label: &Label) -> Result<usize, usize> {
-        self.0.binary_search_by(|forest| forest.label.cmp(label))
-    }
-
-    pub fn insert(&mut self, labels: NonEmpty<Label>, node: A)
+    pub fn insert(&mut self, keys: Vec<K>, node: A)
     where
-        A: HasLabel,
+        A: HasKey<K>,
+        K: Ord + Clone,
     {
-        let (l, ls) = labels.split_first();
-        match self.search(l) {
-            Ok(index) => {
-                let forest = &mut self.0[index];
-                match NonEmpty::from_slice(ls) {
-                    None => forest.insert_node(node),
-                    Some(labels) => forest.insert(labels, node),
-                }
-            }
-            Err(index) => self.insert_forest(index, Forest::new(labels, node)),
+        match self.0.as_mut() {
+            Some(forest) => match NonEmpty::from_slice(&keys) {
+                None => forest.insert_node(node),
+                Some(keys) => forest.insert(keys, node),
+            },
+            None => match NonEmpty::from_slice(&keys) {
+                None => self.insert_forest(Forest::node(node)),
+                Some(keys) => self.insert_forest(Forest::new(keys, node)),
+            },
         }
     }
 }
@@ -154,150 +156,165 @@ impl<A> Tree<A> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::file_system::unsound;
     use pretty_assertions::assert_eq;
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     struct TestNode {
-        label: Label,
+        key: String,
         id: u32,
     }
 
-    impl HasLabel for TestNode {
-        fn label(&self) -> &Label {
-            &self.label
+    impl HasKey<String> for TestNode {
+        fn key(&self) -> &String {
+            &self.key
         }
     }
 
     #[test]
+    fn test_insert_root_node() {
+        let a_label = String::from("a");
+
+        let mut tree = Tree::root();
+
+        let a_node = TestNode {
+            key: a_label,
+            id: 1,
+        };
+
+        tree.insert(vec![], a_node.clone());
+
+        assert_eq!(tree, Tree(Some(Forest::node(a_node))));
+    }
+
+    #[test]
     fn test_insert_single_node() {
-        let a_label = unsound::label::new("a");
-        let b_label = unsound::label::new("b");
-        let c_label = unsound::label::new("c");
+        let a_label = String::from("a");
+        let b_label = String::from("b");
+        let c_label = String::from("c");
+        let path = vec![a_label, b_label];
 
         let mut tree = Tree::root();
 
         let c_node = TestNode {
-            label: c_label,
+            key: c_label,
             id: 1,
         };
 
-        tree.insert((a_label, vec![b_label]).into(), c_node.clone());
+        tree.insert(path, c_node.clone());
 
         assert_eq!(
             tree,
-            Tree(vec![Forest {
-                label: unsound::label::new("a"),
-                forest: NonEmpty::new(SubTree::Branch(Box::new(Forest {
-                    label: unsound::label::new("b"),
-                    forest: NonEmpty::new(SubTree::Node(c_node))
-                })))
-            }])
+            Tree(Some(Forest::branch(
+                String::from("a"),
+                Forest::branch(String::from("b"), Forest::node(c_node))
+            )))
         );
     }
 
     #[test]
     fn test_insert_two_nodes() {
-        let a_label = unsound::label::new("a");
-        let b_label = unsound::label::new("b");
-        let c_label = unsound::label::new("c");
-        let d_label = unsound::label::new("d");
+        let a_label = String::from("a");
+        let b_label = String::from("b");
+        let c_label = String::from("c");
+        let d_label = String::from("d");
+        let b_path = vec![a_label, b_label];
 
         let mut tree = Tree::root();
 
         let c_node = TestNode {
-            label: c_label,
+            key: c_label,
             id: 1,
         };
 
-        tree.insert(
-            (a_label.clone(), vec![b_label.clone()]).into(),
-            c_node.clone(),
-        );
+        tree.insert(b_path.clone(), c_node.clone());
 
         let d_node = TestNode {
-            label: d_label,
+            key: d_label,
             id: 3,
         };
 
-        tree.insert((a_label, vec![b_label]).into(), d_node.clone());
+        tree.insert(b_path, d_node.clone());
 
         assert_eq!(
             tree,
-            Tree(vec![Forest {
-                label: unsound::label::new("a"),
-                forest: NonEmpty::new(SubTree::Branch(Box::new(Forest {
-                    label: unsound::label::new("b"),
-                    forest: (SubTree::Node(c_node), vec![SubTree::Node(d_node)]).into()
-                })))
-            }])
+            Tree(Some(Forest::branch(
+                String::from("a"),
+                Forest::branch(
+                    String::from("b"),
+                    Forest(NonEmpty::from((
+                        SubTree::Node(c_node),
+                        vec![SubTree::Node(d_node)]
+                    )))
+                )
+            )))
         );
     }
 
     #[test]
     fn test_insert_two_nodes_out_of_order() {
-        let a_label = unsound::label::new("a");
-        let b_label = unsound::label::new("b");
-        let c_label = unsound::label::new("c");
-        let d_label = unsound::label::new("d");
+        let a_label = String::from("a");
+        let b_label = String::from("b");
+        let c_label = String::from("c");
+        let d_label = String::from("d");
+        let b_path = vec![a_label, b_label];
 
         let mut tree = Tree::root();
 
         let d_node = TestNode {
-            label: d_label,
+            key: d_label,
             id: 3,
         };
 
-        tree.insert(
-            (a_label.clone(), vec![b_label.clone()]).into(),
-            d_node.clone(),
-        );
+        tree.insert(b_path.clone(), d_node.clone());
 
         let c_node = TestNode {
-            label: c_label,
+            key: c_label,
             id: 1,
         };
 
-        tree.insert((a_label, vec![b_label]).into(), c_node.clone());
+        tree.insert(b_path, c_node.clone());
 
         assert_eq!(
             tree,
-            Tree(vec![Forest {
-                label: unsound::label::new("a"),
-                forest: NonEmpty::new(SubTree::Branch(Box::new(Forest {
-                    label: unsound::label::new("b"),
-                    forest: (SubTree::Node(c_node), vec![SubTree::Node(d_node)]).into()
-                })))
-            }])
+            Tree(Some(Forest::branch(
+                String::from("a"),
+                Forest::branch(
+                    String::from("b"),
+                    Forest(NonEmpty::from((
+                        SubTree::Node(c_node),
+                        vec![SubTree::Node(d_node)]
+                    )))
+                )
+            )))
         );
     }
 
     #[test]
     fn test_insert_branch() {
-        let a_label = unsound::label::new("a");
-        let b_label = unsound::label::new("b");
-        let c_label = unsound::label::new("c");
-        let d_label = unsound::label::new("d");
-        let e_label = unsound::label::new("e");
-        let f_label = unsound::label::new("f");
+        let a_label = String::from("a");
+        let b_label = String::from("b");
+        let c_label = String::from("c");
+        let d_label = String::from("d");
+        let e_label = String::from("e");
+        let f_label = String::from("f");
 
-        let b_path = NonEmpty::from((a_label.clone(), vec![b_label]));
-        let e_path = NonEmpty::from((a_label, vec![e_label]));
+        let b_path = vec![a_label.clone(), b_label];
+        let e_path = vec![a_label, e_label];
 
         let mut tree = Tree::root();
 
         let c_node = TestNode {
-            label: c_label,
+            key: c_label,
             id: 1,
         };
 
         let d_node = TestNode {
-            label: d_label,
+            key: d_label,
             id: 3,
         };
 
         let f_node = TestNode {
-            label: f_label,
+            key: f_label,
             id: 2,
         };
 
@@ -307,86 +324,86 @@ mod tests {
 
         assert_eq!(
             tree,
-            Tree(vec![Forest {
-                label: unsound::label::new("a"),
-                forest: NonEmpty::from((
-                    SubTree::Branch(Box::new(Forest {
-                        label: unsound::label::new("b"),
-                        forest: NonEmpty::from((
+            Tree(Some(Forest::branch(
+                String::from("a"),
+                Forest(NonEmpty::from((
+                    SubTree::Branch {
+                        key: String::from("b"),
+                        forest: Box::new(Forest(NonEmpty::from((
                             SubTree::Node(c_node),
                             vec![SubTree::Node(d_node)]
-                        ))
-                    })),
-                    vec![SubTree::branch(Forest {
-                        label: unsound::label::new("e"),
-                        forest: NonEmpty::new(SubTree::Node(f_node)),
-                    })]
-                ))
-            }])
+                        ))))
+                    },
+                    vec![SubTree::Branch {
+                        key: String::from("e"),
+                        forest: Box::new(Forest::node(f_node))
+                    },]
+                )))
+            )))
         );
     }
 
     #[test]
     fn test_insert_branches_and_node() {
-        let a_label = unsound::label::new("a");
-        let b_label = unsound::label::new("b");
-        let c_label = unsound::label::new("c");
-        let d_label = unsound::label::new("d");
-        let e_label = unsound::label::new("e");
-        let f_label = unsound::label::new("f");
-        let g_label = unsound::label::new("g");
+        let a_label = String::from("a");
+        let b_label = String::from("b");
+        let c_label = String::from("c");
+        let d_label = String::from("d");
+        let e_label = String::from("e");
+        let f_label = String::from("f");
+        let g_label = String::from("g");
 
-        let b_path = NonEmpty::from((a_label.clone(), vec![b_label]));
-        let f_path = NonEmpty::from((a_label.clone(), vec![f_label.clone()]));
+        let b_path = vec![a_label.clone(), b_label];
+        let f_path = vec![a_label.clone(), f_label.clone()];
 
         let mut tree = Tree::root();
 
         let c_node = TestNode {
-            label: c_label,
+            key: c_label,
             id: 1,
         };
 
         let d_node = TestNode {
-            label: d_label,
+            key: d_label,
             id: 3,
         };
 
         let e_node = TestNode {
-            label: e_label,
+            key: e_label,
             id: 2,
         };
 
         let g_node = TestNode {
-            label: g_label,
+            key: g_label,
             id: 2,
         };
 
         tree.insert(b_path.clone(), d_node.clone());
         tree.insert(b_path, c_node.clone());
-        tree.insert(NonEmpty::new(a_label), e_node.clone());
+        tree.insert(vec![a_label], e_node.clone());
         tree.insert(f_path, g_node.clone());
 
         assert_eq!(
             tree,
-            Tree(vec![Forest {
-                label: unsound::label::new("a"),
-                forest: NonEmpty::from((
-                    SubTree::Branch(Box::new(Forest {
-                        label: unsound::label::new("b"),
-                        forest: NonEmpty::from((
+            Tree(Some(Forest::branch(
+                String::from("a"),
+                Forest(NonEmpty::from((
+                    SubTree::Branch {
+                        key: String::from("b"),
+                        forest: Box::new(Forest(NonEmpty::from((
                             SubTree::Node(c_node),
                             vec![SubTree::Node(d_node)]
-                        ))
-                    })),
+                        ))))
+                    },
                     vec![
                         SubTree::Node(e_node),
-                        SubTree::branch(Forest {
-                            label: unsound::label::new("f"),
-                            forest: NonEmpty::new(SubTree::Node(g_node)),
-                        })
+                        SubTree::Branch {
+                            key: String::from("f"),
+                            forest: Box::new(Forest::node(g_node))
+                        },
                     ]
-                ))
-            }])
+                )))
+            )))
         );
     }
 }
