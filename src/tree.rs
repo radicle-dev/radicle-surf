@@ -7,11 +7,11 @@ pub trait HasKey<K> {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum SubTree<K, A> {
     Node(A),
-    Branch { key: K, forest: Box<Forest<K, A>> },
+    Branch { key: K, forest: Box<Tree<K, A>> },
 }
 
 impl<K, A> SubTree<K, A> {
-    fn branch(key: K, tree: Forest<K, A>) -> Self {
+    fn branch(key: K, tree: Tree<K, A>) -> Self {
         SubTree::Branch {
             key,
             forest: Box::new(tree),
@@ -29,18 +29,18 @@ impl<K, A: HasKey<K>> HasKey<K> for SubTree<K, A> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct Forest<K, A>(NonEmpty<SubTree<K, A>>);
+struct Tree<K, A>(NonEmpty<SubTree<K, A>>);
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Tree<K, A>(Option<Forest<K, A>>);
+pub struct Forest<K, A>(Option<Tree<K, A>>);
 
-impl<K, A> Forest<K, A> {
+impl<K, A> Tree<K, A> {
     fn branch(key: K, forest: Self) -> Self {
-        Forest(NonEmpty::new(SubTree::branch(key, forest)))
+        Tree(NonEmpty::new(SubTree::branch(key, forest)))
     }
 
     fn node(node: A) -> Self {
-        Forest(NonEmpty::new(SubTree::Node(node)))
+        Tree(NonEmpty::new(SubTree::Node(node)))
     }
 
     fn new(keys: NonEmpty<K>, node: A) -> Self
@@ -50,15 +50,15 @@ impl<K, A> Forest<K, A> {
         let (start, middle, last) = keys.split();
 
         if start == last && middle.is_empty() {
-            Forest::branch(start.clone(), Forest::node(node))
+            Tree::branch(start.clone(), Tree::node(node))
         } else {
-            let mut branch = SubTree::branch(last.clone(), Forest::node(node));
+            let mut branch = SubTree::branch(last.clone(), Tree::node(node));
 
             for key in middle.iter().rev() {
-                branch = SubTree::branch(key.clone(), Forest(NonEmpty::new(branch)))
+                branch = SubTree::branch(key.clone(), Tree(NonEmpty::new(branch)))
             }
 
-            Forest::branch(start.clone(), Forest(NonEmpty::new(branch)))
+            Tree::branch(start.clone(), Tree(NonEmpty::new(branch)))
         }
     }
 
@@ -112,9 +112,9 @@ impl<K, A> Forest<K, A> {
             Err(index) => match tail {
                 None => self
                     .0
-                    .insert(index, SubTree::branch(head.clone(), Forest::node(node))),
+                    .insert(index, SubTree::branch(head.clone(), Tree::node(node))),
                 Some(tail) => {
-                    let branch = Forest::new(tail, node);
+                    let branch = Tree::new(tail, node);
                     self.0.insert(index, SubTree::branch(head.clone(), branch))
                 }
             },
@@ -122,16 +122,16 @@ impl<K, A> Forest<K, A> {
     }
 }
 
-impl<K, A> Tree<K, A> {
+impl<K, A> Forest<K, A> {
     pub fn root() -> Self {
-        Tree(None)
+        Forest(None)
     }
 
     pub fn is_empty(&self) -> bool {
         self.0.is_none()
     }
 
-    fn insert_forest(&mut self, forest: Forest<K, A>) {
+    fn insert_forest(&mut self, forest: Tree<K, A>) {
         self.0 = Some(forest)
     }
 
@@ -146,8 +146,8 @@ impl<K, A> Tree<K, A> {
                 Some(keys) => forest.insert(keys, node),
             },
             None => match NonEmpty::from_slice(&keys) {
-                None => self.insert_forest(Forest::node(node)),
-                Some(keys) => self.insert_forest(Forest::new(keys, node)),
+                None => self.insert_forest(Tree::node(node)),
+                Some(keys) => self.insert_forest(Tree::new(keys, node)),
             },
         }
     }
@@ -174,7 +174,7 @@ mod tests {
     fn test_insert_root_node() {
         let a_label = String::from("a");
 
-        let mut tree = Tree::root();
+        let mut tree = Forest::root();
 
         let a_node = TestNode {
             key: a_label,
@@ -183,7 +183,7 @@ mod tests {
 
         tree.insert(vec![], a_node.clone());
 
-        assert_eq!(tree, Tree(Some(Forest::node(a_node))));
+        assert_eq!(tree, Forest(Some(Tree::node(a_node))));
     }
 
     #[test]
@@ -193,7 +193,7 @@ mod tests {
         let c_label = String::from("c");
         let path = vec![a_label, b_label];
 
-        let mut tree = Tree::root();
+        let mut tree = Forest::root();
 
         let c_node = TestNode {
             key: c_label,
@@ -204,9 +204,9 @@ mod tests {
 
         assert_eq!(
             tree,
-            Tree(Some(Forest::branch(
+            Forest(Some(Tree::branch(
                 String::from("a"),
-                Forest::branch(String::from("b"), Forest::node(c_node))
+                Tree::branch(String::from("b"), Tree::node(c_node))
             )))
         );
     }
@@ -219,7 +219,7 @@ mod tests {
         let d_label = String::from("d");
         let b_path = vec![a_label, b_label];
 
-        let mut tree = Tree::root();
+        let mut tree = Forest::root();
 
         let c_node = TestNode {
             key: c_label,
@@ -237,11 +237,11 @@ mod tests {
 
         assert_eq!(
             tree,
-            Tree(Some(Forest::branch(
+            Forest(Some(Tree::branch(
                 String::from("a"),
-                Forest::branch(
+                Tree::branch(
                     String::from("b"),
-                    Forest(NonEmpty::from((
+                    Tree(NonEmpty::from((
                         SubTree::Node(c_node),
                         vec![SubTree::Node(d_node)]
                     )))
@@ -258,7 +258,7 @@ mod tests {
         let d_label = String::from("d");
         let b_path = vec![a_label, b_label];
 
-        let mut tree = Tree::root();
+        let mut tree = Forest::root();
 
         let d_node = TestNode {
             key: d_label,
@@ -276,11 +276,11 @@ mod tests {
 
         assert_eq!(
             tree,
-            Tree(Some(Forest::branch(
+            Forest(Some(Tree::branch(
                 String::from("a"),
-                Forest::branch(
+                Tree::branch(
                     String::from("b"),
-                    Forest(NonEmpty::from((
+                    Tree(NonEmpty::from((
                         SubTree::Node(c_node),
                         vec![SubTree::Node(d_node)]
                     )))
@@ -301,7 +301,7 @@ mod tests {
         let b_path = vec![a_label.clone(), b_label];
         let e_path = vec![a_label, e_label];
 
-        let mut tree = Tree::root();
+        let mut tree = Forest::root();
 
         let c_node = TestNode {
             key: c_label,
@@ -324,19 +324,19 @@ mod tests {
 
         assert_eq!(
             tree,
-            Tree(Some(Forest::branch(
+            Forest(Some(Tree::branch(
                 String::from("a"),
-                Forest(NonEmpty::from((
+                Tree(NonEmpty::from((
                     SubTree::Branch {
                         key: String::from("b"),
-                        forest: Box::new(Forest(NonEmpty::from((
+                        forest: Box::new(Tree(NonEmpty::from((
                             SubTree::Node(c_node),
                             vec![SubTree::Node(d_node)]
                         ))))
                     },
                     vec![SubTree::Branch {
                         key: String::from("e"),
-                        forest: Box::new(Forest::node(f_node))
+                        forest: Box::new(Tree::node(f_node))
                     },]
                 )))
             )))
@@ -356,7 +356,7 @@ mod tests {
         let b_path = vec![a_label.clone(), b_label];
         let f_path = vec![a_label.clone(), f_label.clone()];
 
-        let mut tree = Tree::root();
+        let mut tree = Forest::root();
 
         let c_node = TestNode {
             key: c_label,
@@ -385,12 +385,12 @@ mod tests {
 
         assert_eq!(
             tree,
-            Tree(Some(Forest::branch(
+            Forest(Some(Tree::branch(
                 String::from("a"),
-                Forest(NonEmpty::from((
+                Tree(NonEmpty::from((
                     SubTree::Branch {
                         key: String::from("b"),
-                        forest: Box::new(Forest(NonEmpty::from((
+                        forest: Box::new(Tree(NonEmpty::from((
                             SubTree::Node(c_node),
                             vec![SubTree::Node(d_node)]
                         ))))
@@ -399,7 +399,7 @@ mod tests {
                         SubTree::Node(e_node),
                         SubTree::Branch {
                             key: String::from("f"),
-                            forest: Box::new(Forest::node(g_node))
+                            forest: Box::new(Tree::node(g_node))
                         },
                     ]
                 )))
