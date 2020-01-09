@@ -251,6 +251,12 @@ impl<'repo> vcs::GetVCS<'repo, GitError> for GitRepository {
     }
 }
 
+impl From<git2::Repository> for GitRepository {
+    fn from(repo: git2::Repository) -> Self {
+        GitRepository(repo)
+    }
+}
+
 /// The combination of a branch's name and where its locality (remote or local).
 ///
 /// **Note**: The `PartialOrd` and `Ord` implementations compare on `BranchName`
