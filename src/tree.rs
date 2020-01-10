@@ -179,7 +179,7 @@ impl<K, A> Forest<K, A> {
 
     pub fn find(&self, keys: NonEmpty<K>) -> Option<&SubTree<K, A>>
     where
-        A: HasKey<K> + Clone,
+        A: HasKey<K>,
         K: Ord + Clone,
     {
         self.0.as_ref().and_then(|trees| trees.find(keys))
