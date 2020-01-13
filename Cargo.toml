@@ -11,7 +11,7 @@ license = "GPL-3.0-only"
 
 [dependencies]
 git2 = "0.10.1"
-nonempty = "0.1.5"
+nonempty = "0.2.0"
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"
