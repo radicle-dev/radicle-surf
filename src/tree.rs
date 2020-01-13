@@ -1,4 +1,5 @@
 use nonempty::NonEmpty;
+use std::cmp::Ordering;
 
 pub trait HasKey<K> {
     fn key(&self) -> &K;
@@ -19,6 +20,44 @@ impl<K, A> SubTree<K, A> {
         SubTree::Branch {
             key,
             forest: Box::new(tree),
+        }
+    }
+
+    pub fn compare_by<F>(&self, other: &Self, f: &F) -> Ordering
+    where
+        F: Fn(&A, &A) -> Ordering,
+    {
+        match (self, other) {
+            (SubTree::Node(node), SubTree::Node(other_node)) => f(&node, &other_node),
+            (SubTree::Branch { forest, .. }, SubTree::Node(other_node)) => {
+                let max_forest = forest.maximum_by(f);
+                f(&max_forest, &other_node)
+            }
+            (SubTree::Node(node), SubTree::Branch { forest, .. }) => {
+                let max_forest = &forest.maximum_by(f);
+                f(&node, &max_forest)
+            }
+            (
+                SubTree::Branch { forest, .. },
+                SubTree::Branch {
+                    forest: other_forest,
+                    ..
+                },
+            ) => {
+                let max_forest = forest.maximum_by(f);
+                let max_other_forest = other_forest.maximum_by(f);
+                f(&max_forest, &max_other_forest)
+            }
+        }
+    }
+
+    pub fn maximum_by<F>(&self, f: &F) -> &A
+    where
+        F: Fn(&A, &A) -> Ordering,
+    {
+        match self {
+            SubTree::Node(node) => node,
+            SubTree::Branch { forest, .. } => forest.maximum_by(f),
         }
     }
 }
@@ -196,6 +235,20 @@ impl<K, A> Tree<K, A> {
             }
         }
     }
+
+    pub fn maximum_by<F>(&self, f: &F) -> &A
+    where
+        F: Fn(&A, &A) -> Ordering,
+    {
+        self.0.maximum_by(|s, t| s.compare_by(t, f)).maximum_by(f)
+    }
+
+    pub fn maximum(&self) -> &A
+    where
+        A: Ord,
+    {
+        self.maximum_by(&|a, b| a.cmp(b))
+    }
 }
 
 impl<K, A> Forest<K, A> {
@@ -253,6 +306,13 @@ impl<K, A> Forest<K, A> {
         K: Ord + Clone,
     {
         self.0.as_ref().and_then(|trees| trees.find(keys))
+    }
+
+    pub fn maximum_by<F>(&self, f: F) -> Option<&A>
+    where
+        F: Fn(&A, &A) -> Ordering,
+    {
+        self.0.as_ref().map(|trees| trees.maximum_by(&f))
     }
 }
 
@@ -825,6 +885,102 @@ mod tests {
         assert_eq!(
             tree.find(NonEmpty::from((String::from("a"), vec![String::from("c")]))),
             None
+        );
+    }
+
+    #[test]
+    fn test_maximum_by_root_nodes() {
+        let mut tree = Forest::root();
+
+        let a_node = TestNode {
+            key: String::from("a"),
+            id: 1,
+        };
+
+        let b_node = TestNode {
+            key: String::from("b"),
+            id: 3,
+        };
+
+        tree.insert(vec![], a_node.clone());
+        tree.insert(vec![], b_node.clone());
+
+        assert_eq!(tree.maximum_by(|a, b| a.id.cmp(&b.id)), Some(&b_node));
+        assert_eq!(
+            tree.maximum_by(|a, b| a.id.cmp(&b.id).reverse()),
+            Some(&a_node)
+        );
+    }
+
+    #[test]
+    fn test_maximum_by_branch_and_node() {
+        let mut tree = Forest::root();
+
+        let a_node = TestNode {
+            key: String::from("a"),
+            id: 1,
+        };
+
+        let b_node = TestNode {
+            key: String::from("b"),
+            id: 3,
+        };
+
+        tree.insert(vec![String::from("c")], a_node.clone());
+        tree.insert(vec![], b_node.clone());
+
+        assert_eq!(tree.maximum_by(|a, b| a.id.cmp(&b.id)), Some(&b_node));
+        assert_eq!(
+            tree.maximum_by(|a, b| a.id.cmp(&b.id).reverse()),
+            Some(&a_node)
+        );
+    }
+
+    #[test]
+    fn test_maximum_by_branch_and_branch() {
+        let mut tree = Forest::root();
+
+        let a_node = TestNode {
+            key: String::from("a"),
+            id: 1,
+        };
+
+        let b_node = TestNode {
+            key: String::from("b"),
+            id: 3,
+        };
+
+        tree.insert(vec![String::from("c")], a_node.clone());
+        tree.insert(vec![String::from("d")], b_node.clone());
+
+        assert_eq!(tree.maximum_by(|a, b| a.id.cmp(&b.id)), Some(&b_node));
+        assert_eq!(
+            tree.maximum_by(|a, b| a.id.cmp(&b.id).reverse()),
+            Some(&a_node)
+        );
+    }
+
+    #[test]
+    fn test_maximum_by_branch_nodes() {
+        let mut tree = Forest::root();
+
+        let a_node = TestNode {
+            key: String::from("a"),
+            id: 1,
+        };
+
+        let b_node = TestNode {
+            key: String::from("b"),
+            id: 3,
+        };
+
+        tree.insert(vec![String::from("c")], a_node.clone());
+        tree.insert(vec![String::from("c")], b_node.clone());
+
+        assert_eq!(tree.maximum_by(|a, b| a.id.cmp(&b.id)), Some(&b_node));
+        assert_eq!(
+            tree.maximum_by(|a, b| a.id.cmp(&b.id).reverse()),
+            Some(&a_node)
         );
     }
 }

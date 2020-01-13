@@ -11,7 +11,7 @@ git2 = "0.10.1"
 
 [dependencies.nonempty]
 git = "https://github.com/FintanH/nonempty.git"
-rev = "7db2cc2e052a3ce4e5fd5ddc6fe003bcded82956"
+rev = "411d9ad0e0c1ab625f50aed18a4f65c12124961c"
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"
