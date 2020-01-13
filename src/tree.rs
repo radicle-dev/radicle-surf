@@ -23,7 +23,7 @@ impl<K, A> SubTree<K, A> {
         }
     }
 
-    pub fn compare_by<F>(&self, other: &Self, f: &F) -> Ordering
+    fn compare_by<F>(&self, other: &Self, f: &F) -> Ordering
     where
         F: Fn(&A, &A) -> Ordering,
     {
