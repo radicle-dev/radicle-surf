@@ -209,6 +209,10 @@ impl<K, A> Tree<K, A> {
         }
     }
 
+    pub fn iter(&self) -> impl Iterator<Item = &SubTree<K, A>> {
+        self.0.iter()
+    }
+
     pub fn find_node(&self, keys: NonEmpty<K>) -> Option<&A>
     where
         A: HasKey<K>,
