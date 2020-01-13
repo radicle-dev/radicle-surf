@@ -1,10 +1,13 @@
 [package]
 name = "radicle-surf"
-version = "0.1.0"
-authors = ["Fintan Halpenny <fintan.halpenny@gmail.com>"]
+description = "A code surfing library for VCS file systems"
+readme = "README.md"
+version = "0.0.1"
+authors = ["Monadic GmbH <radicle@monadic.xyz>"]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+homepage = "https://github.com/radicle-dev/radicle-surf"
+repository = "https://github.com/radicle-dev/radicle-surf"
+license = "GPL-3.0-only"
 
 [dependencies]
 git2 = "0.10.1"
