@@ -8,10 +8,7 @@ edition = "2018"
 
 [dependencies]
 git2 = "0.10.1"
-
-[dependencies.nonempty]
-git = "https://github.com/FintanH/nonempty.git"
-rev = "411d9ad0e0c1ab625f50aed18a4f65c12124961c"
+nonempty = "0.2.0"
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"
