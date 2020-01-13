@@ -37,11 +37,11 @@
 //! ```
 
 // Re-export git2 as sub-module
-pub use git2;
+pub mod error;
 
 use crate::file_system;
-use crate::file_system::error as file_error;
 use crate::vcs;
+use crate::vcs::git::error::*;
 use crate::vcs::VCS;
 use git2::{
     BranchType, Commit, Diff, Error, Oid, Reference, Repository, TreeEntry, TreeWalkMode,
@@ -51,6 +51,7 @@ use nonempty::NonEmpty;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::str;
 
 #[derive(Debug, PartialEq)]
 pub enum GitError {
@@ -433,37 +434,6 @@ impl std::fmt::Debug for GitRepository {
 /// `git2::Commit` as the artifact, and [`GitError`](enum.GitError.html) for error reporting.
 pub type GitBrowser<'repo> = vcs::Browser<'repo, GitRepository, Commit<'repo>, GitError>;
 
-/// A private enum that captures a recoverable and
-/// non-recoverable error when walking the git tree.
-///
-/// In the case of `NotBlob` we abort the the computation but do
-/// a check for it and recover.
-///
-/// In the of `Git` we abort both computations.
-#[derive(Debug)]
-enum TreeWalkError {
-    NotBlob,
-    Git(GitError),
-}
-
-impl From<Error> for TreeWalkError {
-    fn from(err: Error) -> Self {
-        TreeWalkError::Git(err.into())
-    }
-}
-
-impl From<file_error::Error> for TreeWalkError {
-    fn from(err: file_error::Error) -> Self {
-        err.into()
-    }
-}
-
-impl From<GitError> for TreeWalkError {
-    fn from(err: GitError) -> Self {
-        err.into()
-    }
-}
-
 impl<'repo> GitBrowser<'repo> {
     /// Create a new browser to interact with.
     ///
@@ -698,17 +668,13 @@ impl<'repo> GitBrowser<'repo> {
             .and_then(|mut branches| {
                 branches.try_fold(vec![], |mut acc, branch| {
                     let (branch, branch_type) = branch?;
-                    let branch_name = branch.name()?;
-                    if let Some(name) = branch_name {
-                        let branch = Branch {
-                            name: BranchName(name.to_string()),
-                            locality: branch_type,
-                        };
-                        acc.push(branch);
-                        Ok(acc)
-                    } else {
-                        Err(GitError::BranchDecode)
-                    }
+                    let name = str::from_utf8(branch.name_bytes()?)?;
+                    let branch = Branch {
+                        name: BranchName(name.to_string()),
+                        locality: branch_type,
+                    };
+                    acc.push(branch);
+                    Ok(acc)
                 })
             })
     }
@@ -945,7 +911,7 @@ impl<'repo> GitBrowser<'repo> {
 
         let object = entry.to_object(repo)?;
         let blob = object.as_blob().ok_or(TreeWalkError::NotBlob)?;
-        let name = entry.name().ok_or(GitError::NameDecode)?;
+        let name = str::from_utf8(entry.name_bytes())?;
 
         let name = file_system::Label::try_from(name).map_err(GitError::FileSystem)?;
 
