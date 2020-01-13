@@ -209,6 +209,17 @@ impl<K, A> Tree<K, A> {
         }
     }
 
+    pub fn find_node(&self, keys: NonEmpty<K>) -> Option<&A>
+    where
+        A: HasKey<K>,
+        K: Ord + Clone,
+    {
+        self.find(keys).and_then(|tree| match tree {
+            SubTree::Node(node) => Some(node),
+            SubTree::Branch { .. } => None,
+        })
+    }
+
     /// Find a `SubTree` given a search path. If the path does not match
     /// it will return `None`.
     pub fn find(&self, keys: NonEmpty<K>) -> Option<&SubTree<K, A>>
