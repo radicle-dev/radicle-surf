@@ -8,13 +8,13 @@ use nonempty::NonEmpty;
 
 use radicle_surf::diff::Diff;
 use radicle_surf::file_system::Directory;
-use radicle_surf::vcs::git::{GitBrowser, GitRepository};
+use radicle_surf::vcs::git::{GitBrowser, Repository};
 use radicle_surf::vcs::History;
 
 fn main() {
     let options = get_options_or_exit();
     let repo = init_repository_or_exit(&options.path_to_repo);
-    let mut browser = init_browser_or_exit(&repo);
+    let mut browser = init_browser_or_exit(repo);
 
     match options.head_revision {
         HeadRevision::HEAD => {
@@ -52,8 +52,8 @@ fn get_options_or_exit() -> Options {
     };
 }
 
-fn init_repository_or_exit(path_to_repo: &str) -> GitRepository {
-    match GitRepository::new(path_to_repo) {
+fn init_repository_or_exit(path_to_repo: &str) -> Repository {
+    match Repository::new(path_to_repo) {
         Ok(repo) => return repo,
         Err(e) => {
             println!("Failed to create repository: {:?}", e);
@@ -62,8 +62,8 @@ fn init_repository_or_exit(path_to_repo: &str) -> GitRepository {
     };
 }
 
-fn init_browser_or_exit(repo: &GitRepository) -> GitBrowser {
-    match GitBrowser::new(&repo) {
+fn init_browser_or_exit(repo: Repository) -> GitBrowser {
+    match GitBrowser::new(repo) {
         Ok(browser) => return browser,
         Err(e) => {
             println!("Failed to create browser: {:?}", e);
@@ -95,7 +95,7 @@ fn set_browser_history(browser: &mut GitBrowser, commit_id: &str) -> Result<(), 
     };
     let commit = match browser
         .get_history()
-        .find_in_history(&oid, |artifact| artifact.id())
+        .find_in_history(&oid, |artifact| artifact.id)
     {
         Some(commit) => commit,
         None => return Err(format!("Git commit not found: {}", commit_id)),

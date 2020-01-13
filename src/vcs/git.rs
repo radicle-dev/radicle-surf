@@ -877,7 +877,7 @@ impl GitBrowser {
             Error,
         > = Ok(HashMap::new());
 
-        let commit = repo.find_commit(commit.id).expect("TODO");
+        let commit = repo.find_commit(commit.id)?;
         let tree = commit.as_object().peel_to_tree()?;
 
         tree.walk(

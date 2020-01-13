@@ -8,16 +8,16 @@
 //! Let's start surfing (and apologies for the `unwrap`s):
 //!
 //! ```
-//! use radicle_surf::vcs::git::{GitBrowser, GitRepository, Sha1};
+//! use radicle_surf::vcs::git::{GitBrowser, Repository, Sha1};
 //! use radicle_surf::file_system::{Label, Path, SystemType};
 //! use radicle_surf::file_system::unsound;
 //! use pretty_assertions::assert_eq;
 //!
 //! // We're going to point to this repo.
-//! let repo = GitRepository::new("./data/git-platinum").expect("Failed to initialise repo");
+//! let repo = Repository::new("./data/git-platinum").expect("Failed to initialise repo");
 //!
 //! // Here we initialise a new Broswer for a the git repo.
-//! let mut browser = GitBrowser::new(&repo).expect("Failed to initialise browser");
+//! let mut browser = GitBrowser::new(repo).expect("Failed to initialise browser");
 //!
 //! // Set the history to a particular commit
 //! browser.commit(Sha1::new("80ded66281a4de2889cc07293a8f10947c6d57fe"))
