@@ -12,14 +12,14 @@ Alongside this, we will wish to take two snapshots and view their differences.
 Let's start surfing (and apologies for the `unwrap`s):
 
 ```rust
-use radicle_surf::vcs::git::{GitBrowser, GitRepository};
+use radicle_surf::vcs::git;
 use radicle_surf::file_system::{Label, Path, SystemType};
 
 // We're going to point to this repo.
-let repo = GitRepository::new(".").unwrap();
+let repo = git::Repository::new(".").unwrap();
 
 // Here we initialise a new Broswer for a the git repo.
-let browser = GitBrowser::new(&repo).unwrap();
+let browser = git::Browser::new(&repo).unwrap();
 
 // Get the snapshot of the directory for our current
 // HEAD of history.
