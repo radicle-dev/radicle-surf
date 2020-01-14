@@ -37,7 +37,7 @@
 //! ```
 
 // Re-export git2 as sub-module
-pub use git2::{BranchType, Error as GitError, Oid, Time};
+pub use git2;
 
 pub mod error;
 
@@ -45,7 +45,6 @@ use crate::file_system;
 use crate::vcs;
 use crate::vcs::git::error::*;
 use crate::vcs::VCS;
-use git2;
 use nonempty::NonEmpty;
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -663,7 +662,8 @@ impl Browser {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Branch, BranchName, BranchType, Browser, Repository};
+    /// use radicle_surf::vcs::git::{Branch, BranchName, Browser, Repository};
+    /// use radicle_surf::vcs::git::git2::{BranchType};
     ///
     /// let repo = Repository::new("./data/git-platinum").unwrap();
     /// let mut browser = Browser::new(repo).unwrap();
@@ -810,7 +810,8 @@ impl Browser {
     /// ```
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{BranchName, Browser, Repository, Oid, Sha1};
+    /// use radicle_surf::vcs::git::{BranchName, Browser, Repository, Sha1};
+    /// use radicle_surf::vcs::git::git2::{Oid};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     /// use radicle_surf::file_system::unsound;
     ///
@@ -833,7 +834,8 @@ impl Browser {
     /// ```
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{BranchName, Browser, Repository, Oid, Sha1};
+    /// use radicle_surf::vcs::git::{BranchName, Browser, Repository, Sha1};
+    /// use radicle_surf::vcs::git::git2::{Oid};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     /// use radicle_surf::file_system::unsound;
     ///
