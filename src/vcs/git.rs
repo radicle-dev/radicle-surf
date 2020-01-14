@@ -207,7 +207,7 @@ impl<'repo> Repository {
             .ok_or(Error::EmptyCommitHistory)
     }
 
-    fn last_commit(
+    fn file_history(
         &'repo self,
         commit: Commit,
     ) -> Result<Forest<file_system::Label, NonEmpty<OrderedCommit>>, Error> {
@@ -909,11 +909,11 @@ impl GitBrowser {
     ///
     /// assert_eq!(gitignore_last_commit_id, Some(expected_commit_id));
     pub fn last_commit(&self, path: &file_system::Path) -> Result<Option<Commit>, Error> {
-        let file_histories = self
+        let file_history = self
             .repository
-            .last_commit(self.get_history().first().clone())?;
+            .file_history(self.get_history().first().clone())?;
 
-        Ok(file_histories.find(path.0.clone()).map(|tree| {
+        Ok(file_history.find(&path.0).map(|tree| {
             tree.maximum_by(&|c: &NonEmpty<OrderedCommit>, d| c.first().compare_by_id(&d.first()))
                 .first()
                 .commit

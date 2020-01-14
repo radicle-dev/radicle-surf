@@ -243,7 +243,7 @@ impl<K, A> Tree<K, A> {
         self.0.iter()
     }
 
-    pub fn find_node(&self, keys: NonEmpty<K>) -> Option<&A>
+    pub fn find_node(&self, keys: &NonEmpty<K>) -> Option<&A>
     where
         K: Ord + Clone,
     {
@@ -255,7 +255,7 @@ impl<K, A> Tree<K, A> {
 
     /// Find a `SubTree` given a search path. If the path does not match
     /// it will return `None`.
-    pub fn find(&self, keys: NonEmpty<K>) -> Option<&SubTree<K, A>>
+    pub fn find(&self, keys: &NonEmpty<K>) -> Option<&SubTree<K, A>>
     where
         K: Ord + Clone,
     {
@@ -278,7 +278,7 @@ impl<K, A> Tree<K, A> {
                                 None
                             }
                         }
-                        SubTree::Branch { forest, .. } => forest.find(keys),
+                        SubTree::Branch { forest, .. } => forest.find(&keys),
                     },
                 }
             }
@@ -361,11 +361,11 @@ impl<K, A> Forest<K, A> {
 
     /// Find a `SubTree` given a search path. If the path does not match
     /// it will return `None`.
-    pub fn find(&self, keys: NonEmpty<K>) -> Option<&SubTree<K, A>>
+    pub fn find(&self, keys: &NonEmpty<K>) -> Option<&SubTree<K, A>>
     where
         K: Ord + Clone,
     {
-        self.0.as_ref().and_then(|trees| trees.find(keys))
+        self.0.as_ref().and_then(|trees| trees.find(&keys))
     }
 
     pub fn maximum_by<F>(&self, f: F) -> Option<&A>
@@ -906,14 +906,14 @@ mod tests {
         tree.insert(NonEmpty::new(a_label), a_node.clone());
 
         assert_eq!(
-            tree.find(NonEmpty::new(String::from("a"))),
+            tree.find(&NonEmpty::new(String::from("a"))),
             Some(&SubTree::Node {
                 key: String::from("a"),
                 value: a_node
             })
         );
 
-        assert_eq!(tree.find(NonEmpty::new(String::from("b"))), None);
+        assert_eq!(tree.find(&NonEmpty::new(String::from("b"))), None);
     }
 
     #[test]
@@ -930,7 +930,7 @@ mod tests {
         tree.insert(path, c_node.clone());
 
         assert_eq!(
-            tree.find(NonEmpty::new(String::from("a"))),
+            tree.find(&NonEmpty::new(String::from("a"))),
             Some(&SubTree::Branch {
                 key: String::from("a"),
                 forest: Box::new(Tree::branch(
@@ -941,7 +941,10 @@ mod tests {
         );
 
         assert_eq!(
-            tree.find(NonEmpty::from((String::from("a"), vec![String::from("b")]))),
+            tree.find(&NonEmpty::from((
+                String::from("a"),
+                vec![String::from("b")]
+            ))),
             Some(&SubTree::Branch {
                 key: String::from("b"),
                 forest: Box::new(Tree::node(String::from("c"), c_node.clone()))
@@ -949,7 +952,7 @@ mod tests {
         );
 
         assert_eq!(
-            tree.find(NonEmpty::from((
+            tree.find(&NonEmpty::from((
                 String::from("a"),
                 vec![String::from("b"), String::from("c")]
             ))),
@@ -959,10 +962,13 @@ mod tests {
             })
         );
 
-        assert_eq!(tree.find(NonEmpty::new(String::from("b"))), None);
+        assert_eq!(tree.find(&NonEmpty::new(String::from("b"))), None);
 
         assert_eq!(
-            tree.find(NonEmpty::from((String::from("a"), vec![String::from("c")]))),
+            tree.find(&NonEmpty::from((
+                String::from("a"),
+                vec![String::from("c")]
+            ))),
             None
         );
     }
