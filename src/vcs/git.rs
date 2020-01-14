@@ -103,7 +103,7 @@ impl<'repo> TryFrom<git2::Commit<'repo>> for Commit {
 }
 
 /// A `History` that uses `git2::Commit` as the underlying artifact.
-pub type GitHistory = vcs::History<Commit>;
+pub type History = vcs::History<Commit>;
 
 /// Wrapper around the `git2`'s `git2::Repository` type.
 /// This is to to limit the functionality that we can do
@@ -146,18 +146,18 @@ impl<'repo> Repository {
         Ok(commit)
     }
 
-    /// Build a `GitHistory` using the `head` reference.
-    pub(crate) fn head(&'repo self) -> Result<GitHistory, Error> {
+    /// Build a `History` using the `head` reference.
+    pub(crate) fn head(&'repo self) -> Result<History, Error> {
         let head = self.0.head()?;
         self.to_history(&head)
     }
 
-    /// Turn a `git2::Reference` into a `GitHistory` by completing
+    /// Turn a `git2::Reference` into a `History` by completing
     /// a revwalk over the first commit in the reference.
     pub(crate) fn to_history(
         &'repo self,
         history: &git2::Reference<'repo>,
-    ) -> Result<GitHistory, Error> {
+    ) -> Result<History, Error> {
         let head = history.peel_to_commit()?;
         let mut commits = Vec::new();
         let mut revwalk = self.0.revwalk()?;
@@ -181,7 +181,7 @@ impl<'repo> Repository {
     fn last_commit(
         &'repo self,
         commit: Commit,
-    ) -> Result<HashMap<file_system::Path, GitHistory>, Error> {
+    ) -> Result<HashMap<file_system::Path, History>, Error> {
         let mut file_histories = HashMap::new();
         self.collect_file_history(&commit.id, &mut file_histories)?;
         Ok(file_histories)
@@ -190,7 +190,7 @@ impl<'repo> Repository {
     fn collect_file_history(
         &'repo self,
         commit_id: &git2::Oid,
-        file_histories: &mut HashMap<file_system::Path, GitHistory>,
+        file_histories: &mut HashMap<file_system::Path, History>,
     ) -> Result<(), Error> {
         let mut revwalk = self.0.revwalk()?;
 
@@ -206,7 +206,7 @@ impl<'repo> Repository {
             for path in paths {
                 file_histories
                     .entry(path)
-                    .and_modify(|commits: &mut GitHistory| commits.push(parent_commit.clone()))
+                    .and_modify(|commits: &mut History| commits.push(parent_commit.clone()))
                     .or_insert_with(|| vcs::History::new(parent_commit.clone()));
             }
         }
@@ -370,7 +370,7 @@ impl Sha1 {
 }
 
 /// An enumeration of git objects we can fetch and turn
-/// into a [`GitHistory`](struct.GitHistory.html).
+/// into a [`History`](struct.History.html).
 #[derive(Debug, Clone)]
 pub enum Object {
     Branch(BranchName),
@@ -398,7 +398,7 @@ impl vcs::VCS<Commit, Error> for Repository {
     type HistoryId = Object;
     type ArtefactId = git2::Oid;
 
-    fn get_history(&self, history_id: Self::HistoryId) -> Result<GitHistory, Error> {
+    fn get_history(&self, history_id: Self::HistoryId) -> Result<History, Error> {
         let reference = self
             .0
             .resolve_reference_from_short_name(&history_id.get_name())?;
@@ -418,7 +418,7 @@ impl vcs::VCS<Commit, Error> for Repository {
         }
     }
 
-    fn get_histories(&self) -> Result<Vec<GitHistory>, Error> {
+    fn get_histories(&self) -> Result<Vec<History>, Error> {
         self.0
             .references()
             .map_err(Error::from)
@@ -473,7 +473,7 @@ impl Browser {
     /// ```
     pub fn new(repository: Repository) -> Result<Self, Error> {
         let history = repository.head()?;
-        let snapshot = Box::new(|repository: &Repository, history: &GitHistory| {
+        let snapshot = Box::new(|repository: &Repository, history: &History| {
             let tree = Self::get_tree(&repository.0, history.0.first())?;
             Ok(file_system::Directory::from::<Repository>(tree))
         });
