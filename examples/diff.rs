@@ -8,7 +8,7 @@ use nonempty::NonEmpty;
 
 use radicle_surf::diff::Diff;
 use radicle_surf::file_system::Directory;
-use radicle_surf::vcs::git::{GitBrowser, Repository};
+use radicle_surf::vcs::git;
 use radicle_surf::vcs::History;
 
 fn main() {
@@ -52,8 +52,8 @@ fn get_options_or_exit() -> Options {
     };
 }
 
-fn init_repository_or_exit(path_to_repo: &str) -> Repository {
-    match Repository::new(path_to_repo) {
+fn init_repository_or_exit(path_to_repo: &str) -> git::Repository {
+    match git::Repository::new(path_to_repo) {
         Ok(repo) => return repo,
         Err(e) => {
             println!("Failed to create repository: {:?}", e);
@@ -62,8 +62,8 @@ fn init_repository_or_exit(path_to_repo: &str) -> Repository {
     };
 }
 
-fn init_browser_or_exit(repo: Repository) -> GitBrowser {
-    match GitBrowser::new(repo) {
+fn init_browser_or_exit(repo: git::Repository) -> git::Browser {
+    match git::Browser::new(repo) {
         Ok(browser) => return browser,
         Err(e) => {
             println!("Failed to create browser: {:?}", e);
@@ -72,14 +72,14 @@ fn init_browser_or_exit(repo: Repository) -> GitBrowser {
     };
 }
 
-fn reset_browser_to_head_or_exit(browser: &mut GitBrowser) {
+fn reset_browser_to_head_or_exit(browser: &mut git::Browser) {
     if let Err(e) = browser.head() {
         println!("Failed to set browser to HEAD: {:?}", e);
         std::process::exit(1);
     }
 }
 
-fn set_browser_history_or_exit(browser: &mut GitBrowser, commit_id: &str) {
+fn set_browser_history_or_exit(browser: &mut git::Browser, commit_id: &str) {
     // TODO: Might consider to not require resetting to HEAD when history is not at HEAD
     reset_browser_to_head_or_exit(browser);
     if let Err(e) = set_browser_history(browser, commit_id) {
@@ -88,7 +88,7 @@ fn set_browser_history_or_exit(browser: &mut GitBrowser, commit_id: &str) {
     }
 }
 
-fn set_browser_history(browser: &mut GitBrowser, commit_id: &str) -> Result<(), String> {
+fn set_browser_history(browser: &mut git::Browser, commit_id: &str) -> Result<(), String> {
     let oid = match Oid::from_str(commit_id) {
         Ok(oid) => oid,
         Err(e) => return Err(format!("{}", e)),
@@ -104,7 +104,7 @@ fn set_browser_history(browser: &mut GitBrowser, commit_id: &str) -> Result<(), 
     Ok(())
 }
 
-fn get_directory_or_exit(browser: &GitBrowser) -> Directory {
+fn get_directory_or_exit(browser: &git::Browser) -> Directory {
     match browser.get_directory() {
         Ok(dir) => return dir,
         Err(e) => {
