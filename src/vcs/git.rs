@@ -891,13 +891,13 @@ impl Browser {
     /// ```
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{BranchName, GitBrowser, Repository, Oid, Sha1};
+    /// use radicle_surf::vcs::git::{BranchName, Browser, Repository, Oid, Sha1};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     /// use radicle_surf::file_system::unsound;
     ///
     /// let repo = Repository::new("./data/git-platinum")
     ///     .expect("Could not retrieve ./data/git-platinum as git repository");
-    /// let mut browser = GitBrowser::new(repo).expect("Could not initialise Browser");
+    /// let mut browser = Browser::new(repo).expect("Could not initialise Browser");
     ///
     /// let expected_commit_id =
     ///     Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95").unwrap();
