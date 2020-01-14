@@ -42,6 +42,7 @@ pub use git2::{BranchType, Error as GitError, Oid, Time};
 pub mod error;
 
 use crate::file_system;
+use crate::tree::*;
 use crate::vcs;
 use crate::vcs::git::error::*;
 use crate::vcs::VCS;
@@ -109,6 +110,40 @@ pub type GitHistory = vcs::History<Commit>;
 /// This is to to limit the functionality that we can do
 /// on the underlying object.
 pub struct Repository(pub(crate) git2::Repository);
+
+struct OrderedCommit {
+    id: usize,
+    file_name: file_system::Label,
+    commit: Commit,
+}
+
+impl std::fmt::Debug for OrderedCommit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "OrderedCommit {{ id: {}, file_name: {}, commit: {} }}",
+            self.id, self.file_name, self.commit.id
+        )
+    }
+}
+
+impl OrderedCommit {
+    fn compare_by_id(&self, other: &Self) -> Ordering {
+        self.id.cmp(&other.id).reverse()
+    }
+}
+
+impl HasKey<file_system::Label> for OrderedCommit {
+    fn key(&self) -> &file_system::Label {
+        &self.file_name
+    }
+}
+
+impl From<OrderedCommit> for Commit {
+    fn from(ordered_commit: OrderedCommit) -> Self {
+        ordered_commit.commit
+    }
+}
 
 impl<'repo> Repository {
     /// Open a git repository given its URI.
@@ -181,8 +216,8 @@ impl<'repo> Repository {
     fn last_commit(
         &'repo self,
         commit: Commit,
-    ) -> Result<HashMap<file_system::Path, GitHistory>, Error> {
-        let mut file_histories = HashMap::new();
+    ) -> Result<Forest<file_system::Label, OrderedCommit>, Error> {
+        let mut file_histories = Forest::root();
         self.collect_file_history(&commit.id, &mut file_histories)?;
         Ok(file_histories)
     }
@@ -190,24 +225,35 @@ impl<'repo> Repository {
     fn collect_file_history(
         &'repo self,
         commit_id: &git2::Oid,
-        file_histories: &mut HashMap<file_system::Path, GitHistory>,
+        file_histories: &mut Forest<file_system::Label, OrderedCommit>,
     ) -> Result<(), Error> {
         let mut revwalk = self.0.revwalk()?;
 
         // Set the revwalk to the head commit
         revwalk.push(commit_id.clone())?;
 
-        for commit_result in revwalk {
+        for (id, commit_result) in revwalk.enumerate() {
             let parent_id = commit_result?;
 
             let parent = self.0.find_commit(parent_id)?;
             let paths = self.diff_commit_and_parents(&parent)?;
             let parent_commit = Commit::try_from(parent)?;
             for path in paths {
-                file_histories
-                    .entry(path)
-                    .and_modify(|commits: &mut GitHistory| commits.push(parent_commit.clone()))
-                    .or_insert_with(|| vcs::History::new(parent_commit.clone()));
+                let (directory, file_name) = path.split_last();
+                let parent_commit = OrderedCommit {
+                    id,
+                    file_name,
+                    commit: parent_commit.clone(),
+                };
+
+                if directory.is_empty() {
+                    file_histories.insert(vec![file_system::Label::root()], parent_commit)
+                } else {
+                    match file_histories.find(path.0) {
+                        Some(_) => continue,
+                        None => file_histories.insert(directory, parent_commit),
+                    }
+                }
             }
         }
         Ok(())
@@ -852,17 +898,37 @@ impl GitBrowser {
     ///     .expect("Failed to get last commit")
     ///     .map(|commit| commit.id);
     ///
-    /// // TODO(fintan): Fix this when we figure out how to get last commit on directory
-    /// assert_eq!(gitignore_last_commit_id, None);
+    /// assert_eq!(gitignore_last_commit_id, Some(expected_commit_id));
     /// ```
+    ///
+    /// ```
+    /// use radicle_surf::vcs::git::{BranchName, GitBrowser, Repository, Oid, Sha1};
+    /// use radicle_surf::file_system::{Label, Path, SystemType};
+    /// use radicle_surf::file_system::unsound;
+    ///
+    /// let repo = Repository::new("./data/git-platinum")
+    ///     .expect("Could not retrieve ./data/git-platinum as git repository");
+    /// let mut browser = GitBrowser::new(repo).expect("Could not initialise Browser");
+    ///
+    /// let expected_commit_id =
+    ///     Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95").unwrap();
+    ///
+    /// let gitignore_last_commit_id = browser
+    ///     .last_commit(&Path::root())
+    ///     .expect("Failed to get last commit")
+    ///     .map(|commit| commit.id);
+    ///
+    /// assert_eq!(gitignore_last_commit_id, Some(expected_commit_id));
     pub fn last_commit(&self, path: &file_system::Path) -> Result<Option<Commit>, Error> {
         let file_histories = self
             .repository
             .last_commit(self.get_history().first().clone())?;
 
-        Ok(file_histories
-            .get(path)
-            .map(|commits| commits.first().clone()))
+        Ok(file_histories.find(path.0.clone()).map(|tree| {
+            tree.maximum_by(&|c: &OrderedCommit, d| c.compare_by_id(&d))
+                .commit
+                .clone()
+        }))
     }
 
     /// Do a pre-order TreeWalk of the given commit. This turns a Tree
