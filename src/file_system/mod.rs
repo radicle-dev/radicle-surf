@@ -133,6 +133,12 @@ impl FromStr for Path {
     }
 }
 
+impl From<Path> for Vec<Label> {
+    fn from(path: Path) -> Self {
+        path.0.into()
+    }
+}
+
 impl Path {
     pub fn new(label: Label) -> Path {
         Path(NonEmpty::new(label))
