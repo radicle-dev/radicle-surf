@@ -111,9 +111,9 @@ pub type GitHistory = vcs::History<Commit>;
 /// on the underlying object.
 pub struct Repository(pub(crate) git2::Repository);
 
+#[derive(Clone)]
 struct OrderedCommit {
     id: usize,
-    file_name: file_system::Label,
     commit: Commit,
 }
 
@@ -121,8 +121,8 @@ impl std::fmt::Debug for OrderedCommit {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "OrderedCommit {{ id: {}, file_name: {}, commit: {} }}",
-            self.id, self.file_name, self.commit.id
+            "OrderedCommit {{ id: {}, commit: {} }}",
+            self.id, self.commit.id
         )
     }
 }
@@ -130,12 +130,6 @@ impl std::fmt::Debug for OrderedCommit {
 impl OrderedCommit {
     fn compare_by_id(&self, other: &Self) -> Ordering {
         self.id.cmp(&other.id).reverse()
-    }
-}
-
-impl HasKey<file_system::Label> for OrderedCommit {
-    fn key(&self) -> &file_system::Label {
-        &self.file_name
     }
 }
 
@@ -216,7 +210,7 @@ impl<'repo> Repository {
     fn last_commit(
         &'repo self,
         commit: Commit,
-    ) -> Result<Forest<file_system::Label, OrderedCommit>, Error> {
+    ) -> Result<Forest<file_system::Label, NonEmpty<OrderedCommit>>, Error> {
         let mut file_histories = Forest::root();
         self.collect_file_history(&commit.id, &mut file_histories)?;
         Ok(file_histories)
@@ -225,7 +219,7 @@ impl<'repo> Repository {
     fn collect_file_history(
         &'repo self,
         commit_id: &git2::Oid,
-        file_histories: &mut Forest<file_system::Label, OrderedCommit>,
+        file_histories: &mut Forest<file_system::Label, NonEmpty<OrderedCommit>>,
     ) -> Result<(), Error> {
         let mut revwalk = self.0.revwalk()?;
 
@@ -239,21 +233,16 @@ impl<'repo> Repository {
             let paths = self.diff_commit_and_parents(&parent)?;
             let parent_commit = Commit::try_from(parent)?;
             for path in paths {
-                let (directory, file_name) = path.split_last();
                 let parent_commit = OrderedCommit {
                     id,
-                    file_name,
                     commit: parent_commit.clone(),
                 };
 
-                if directory.is_empty() {
-                    file_histories.insert(vec![file_system::Label::root()], parent_commit)
-                } else {
-                    match file_histories.find(path.0) {
-                        Some(_) => continue,
-                        None => file_histories.insert(directory, parent_commit),
-                    }
-                }
+                file_histories.insert_with(
+                    path.0,
+                    NonEmpty::new(parent_commit.clone()),
+                    |commits| commits.push(parent_commit),
+                );
             }
         }
         Ok(())
@@ -925,7 +914,8 @@ impl GitBrowser {
             .last_commit(self.get_history().first().clone())?;
 
         Ok(file_histories.find(path.0.clone()).map(|tree| {
-            tree.maximum_by(&|c: &OrderedCommit, d| c.compare_by_id(&d))
+            tree.maximum_by(&|c: &NonEmpty<OrderedCommit>, d| c.first().compare_by_id(&d.first()))
+                .first()
                 .commit
                 .clone()
         }))
