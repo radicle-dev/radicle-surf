@@ -38,6 +38,7 @@
 
 // Re-export git2 as sub-module
 pub use git2;
+pub use git2::{BranchType, Error as Git2Error, Oid, Time};
 
 pub mod error;
 
@@ -583,9 +584,8 @@ impl Browser {
     /// # Examples
     ///
     /// ```
-    /// use git2::Oid;
     /// use radicle_surf::vcs::History;
-    /// use radicle_surf::vcs::git::{TagName, Browser, Repository};
+    /// use radicle_surf::vcs::git::{TagName, Browser, Oid, Repository};
     ///
     /// let repo = Repository::new("./data/git-platinum").unwrap();
     /// let mut browser = Browser::new(repo).unwrap();
@@ -662,8 +662,7 @@ impl Browser {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Branch, BranchName, Browser, Repository};
-    /// use radicle_surf::vcs::git::git2::{BranchType};
+    /// use radicle_surf::vcs::git::{Branch, BranchType, BranchName, Browser, Repository};
     ///
     /// let repo = Repository::new("./data/git-platinum").unwrap();
     /// let mut browser = Browser::new(repo).unwrap();
@@ -810,8 +809,7 @@ impl Browser {
     /// ```
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{BranchName, Browser, Repository, Sha1};
-    /// use radicle_surf::vcs::git::git2::{Oid};
+    /// use radicle_surf::vcs::git::{BranchName, Browser, Oid, Repository, Sha1};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     /// use radicle_surf::file_system::unsound;
     ///
