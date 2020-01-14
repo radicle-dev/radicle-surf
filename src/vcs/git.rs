@@ -5,9 +5,9 @@
 //! use radicle_surf::vcs::git::*;
 //! use std::collections::HashMap;
 //!
-//! let repo = GitRepository::new("./data/git-platinum")
+//! let repo = Repository::new("./data/git-platinum")
 //!     .expect("Could not retrieve ./data/git-platinum as git repository");
-//! let browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
+//! let browser = GitBrowser::new(repo).expect("Could not initialise Browser");
 //! let directory = browser.get_directory().expect("Could not render Directory");
 //! let mut directory_contents = directory.list_directory();
 //! directory_contents.sort();
@@ -37,62 +37,88 @@
 //! ```
 
 // Re-export git2 as sub-module
-pub use git2;
+pub use git2::{BranchType, Error as GitError, Oid, Time};
+
+pub mod error;
 
 use crate::file_system;
-use crate::file_system::error as file_error;
 use crate::vcs;
+use crate::vcs::git::error::*;
 use crate::vcs::VCS;
-use git2::{
-    BranchType, Commit, Diff, Error, Oid, Reference, Repository, TreeEntry, TreeWalkMode,
-    TreeWalkResult,
-};
+use git2;
 use nonempty::NonEmpty;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::str;
 
-#[derive(Debug, PartialEq)]
-pub enum GitError {
-    EmptyCommitHistory,
-    BranchDecode,
-    NotBranch,
-    NotTag,
-    NameDecode,
-    FileSystem(file_error::Error),
-    FileDiffException,
-    Internal(Error),
+#[derive(Clone)]
+pub struct Signature {
+    pub name: String,
+    pub email: String,
+    pub time: git2::Time,
 }
 
-impl From<file_error::Error> for GitError {
-    fn from(err: file_error::Error) -> Self {
-        GitError::FileSystem(err)
+impl<'repo> TryFrom<git2::Signature<'repo>> for Signature {
+    type Error = Error;
+
+    fn try_from(signature: git2::Signature) -> Result<Self, Self::Error> {
+        let name = str::from_utf8(signature.name_bytes())?.into();
+        let email = str::from_utf8(signature.email_bytes())?.into();
+        let time = signature.when();
+
+        Ok(Signature { name, email, time })
     }
 }
 
-impl From<Error> for GitError {
-    fn from(err: Error) -> Self {
-        GitError::Internal(err)
+#[derive(Clone)]
+pub struct Commit {
+    pub id: git2::Oid,
+    pub author: Signature,
+    pub committer: Signature,
+    pub message: String,
+    pub summary: String,
+}
+
+impl<'repo> TryFrom<git2::Commit<'repo>> for Commit {
+    type Error = Error;
+
+    fn try_from(commit: git2::Commit) -> Result<Self, Self::Error> {
+        let id = commit.id();
+        let author = Signature::try_from(commit.author())?;
+        let committer = Signature::try_from(commit.committer())?;
+        let message_raw = commit.message_bytes();
+        let message = str::from_utf8(message_raw)?.into();
+        let summary_raw = commit.summary_bytes().expect("TODO");
+        let summary = str::from_utf8(summary_raw)?.into();
+
+        Ok(Commit {
+            id,
+            author,
+            committer,
+            message,
+            summary,
+        })
     }
 }
 
 /// A `History` that uses `git2::Commit` as the underlying artifact.
-pub type GitHistory<'repo> = vcs::History<Commit<'repo>>;
+pub type GitHistory = vcs::History<Commit>;
 
 /// Wrapper around the `git2`'s `git2::Repository` type.
 /// This is to to limit the functionality that we can do
 /// on the underlying object.
-pub struct GitRepository(pub(crate) Repository);
+pub struct Repository(pub(crate) git2::Repository);
 
-impl<'repo> GitRepository {
+impl<'repo> Repository {
     /// Open a git repository given its URI.
     ///
     /// # Examples
     /// ```
-    /// use radicle_surf::vcs::git::{Branch, BranchName, GitBrowser, GitRepository};
+    /// use radicle_surf::vcs::git::{Branch, BranchName, GitBrowser, Repository};
     ///
-    /// let repo = GitRepository::new("./data/git-platinum").unwrap();
-    /// let browser = GitBrowser::new(&repo).unwrap();
+    /// let repo = Repository::new("./data/git-platinum").unwrap();
+    /// let browser = GitBrowser::new(repo).unwrap();
     ///
     /// let mut branches = browser.list_branches(None).unwrap();
     /// branches.sort();
@@ -107,21 +133,21 @@ impl<'repo> GitRepository {
     ///     ]
     /// );
     /// ```
-    pub fn new(repo_uri: &str) -> Result<Self, GitError> {
-        Repository::open(repo_uri)
-            .map(GitRepository)
-            .map_err(GitError::from)
+    pub fn new(repo_uri: &str) -> Result<Self, Error> {
+        git2::Repository::open(repo_uri)
+            .map(Repository)
+            .map_err(Error::from)
     }
 
     /// Get a particular `Commit`.
-    pub(crate) fn get_commit(&'repo self, sha: Sha1) -> Result<Commit<'repo>, GitError> {
-        let oid = Oid::from_str(&sha.0)?;
+    pub(crate) fn get_commit(&'repo self, sha: Sha1) -> Result<git2::Commit<'repo>, Error> {
+        let oid = git2::Oid::from_str(&sha.0)?;
         let commit = self.0.find_commit(oid)?;
         Ok(commit)
     }
 
     /// Build a `GitHistory` using the `head` reference.
-    pub(crate) fn head(&'repo self) -> Result<GitHistory, GitError> {
+    pub(crate) fn head(&'repo self) -> Result<GitHistory, Error> {
         let head = self.0.head()?;
         self.to_history(&head)
     }
@@ -130,8 +156,8 @@ impl<'repo> GitRepository {
     /// a revwalk over the first commit in the reference.
     pub(crate) fn to_history(
         &'repo self,
-        history: &Reference<'repo>,
-    ) -> Result<GitHistory, GitError> {
+        history: &git2::Reference<'repo>,
+    ) -> Result<GitHistory, Error> {
         let head = history.peel_to_commit()?;
         let mut commits = Vec::new();
         let mut revwalk = self.0.revwalk()?;
@@ -142,45 +168,46 @@ impl<'repo> GitRepository {
         for commit_result_id in revwalk {
             // The revwalk iter returns results so
             // we unpack these and push them to the history
-            let commit_id: Oid = commit_result_id?;
-            let commit = self.0.find_commit(commit_id)?;
-            commits.push(commit.clone());
+            let commit_id: git2::Oid = commit_result_id?;
+            let commit = Commit::try_from(self.0.find_commit(commit_id)?)?;
+            commits.push(commit);
         }
 
         NonEmpty::from_slice(&commits)
             .map(vcs::History)
-            .ok_or(GitError::EmptyCommitHistory)
+            .ok_or(Error::EmptyCommitHistory)
     }
 
     fn last_commit(
         &'repo self,
-        commit: Commit<'repo>,
-    ) -> Result<HashMap<file_system::Path, GitHistory<'repo>>, GitError> {
+        commit: Commit,
+    ) -> Result<HashMap<file_system::Path, GitHistory>, Error> {
         let mut file_histories = HashMap::new();
-        self.collect_file_history(commit, &mut file_histories)?;
+        self.collect_file_history(&commit.id, &mut file_histories)?;
         Ok(file_histories)
     }
 
     fn collect_file_history(
         &'repo self,
-        commit: Commit<'repo>,
-        file_histories: &mut HashMap<file_system::Path, GitHistory<'repo>>,
-    ) -> Result<(), GitError> {
+        commit_id: &git2::Oid,
+        file_histories: &mut HashMap<file_system::Path, GitHistory>,
+    ) -> Result<(), Error> {
         let mut revwalk = self.0.revwalk()?;
 
         // Set the revwalk to the head commit
-        revwalk.push(commit.id())?;
+        revwalk.push(commit_id.clone())?;
 
         for commit_result in revwalk {
             let parent_id = commit_result?;
 
             let parent = self.0.find_commit(parent_id)?;
             let paths = self.diff_commit_and_parents(&parent)?;
+            let parent_commit = Commit::try_from(parent)?;
             for path in paths {
                 file_histories
                     .entry(path)
-                    .and_modify(|commits: &mut GitHistory| commits.push(parent.clone()))
-                    .or_insert_with(|| vcs::History::new(parent.clone()));
+                    .and_modify(|commits: &mut GitHistory| commits.push(parent_commit.clone()))
+                    .or_insert_with(|| vcs::History::new(parent_commit.clone()));
             }
         }
         Ok(())
@@ -188,17 +215,17 @@ impl<'repo> GitRepository {
 
     fn diff_commit_and_parents(
         &'repo self,
-        commit: &'repo Commit,
-    ) -> Result<Vec<file_system::Path>, GitError> {
+        commit: &'repo git2::Commit,
+    ) -> Result<Vec<file_system::Path>, Error> {
         let mut parents = commit.parents();
         let head = parents.next();
         let mut touched_files = vec![];
 
-        let mut add_deltas = |diff: Diff| -> Result<(), GitError> {
+        let mut add_deltas = |diff: git2::Diff| -> Result<(), Error> {
             let deltas = diff.deltas();
 
             for delta in deltas {
-                let new = delta.new_file().path().ok_or(GitError::FileDiffException)?;
+                let new = delta.new_file().path().ok_or(Error::FileDiffException)?;
                 let path = file_system::Path::try_from(new.to_path_buf())?;
                 touched_files.push(path);
             }
@@ -227,9 +254,9 @@ impl<'repo> GitRepository {
 
     fn diff_commits(
         &'repo self,
-        left: &'repo Commit,
-        right: Option<&'repo Commit>,
-    ) -> Result<Diff, GitError> {
+        left: &'repo git2::Commit,
+        right: Option<&'repo git2::Commit>,
+    ) -> Result<git2::Diff, Error> {
         let left_tree = left.tree()?;
         let right_tree = right.map_or(Ok(None), |commit| commit.tree().map(Some))?;
 
@@ -241,19 +268,19 @@ impl<'repo> GitRepository {
     }
 }
 
-impl<'repo> vcs::GetVCS<'repo, GitError> for GitRepository {
-    type RepoId = &'repo str;
+impl vcs::GetVCS<Error> for Repository {
+    type RepoId = String;
 
-    fn get_repo(repo_id: Self::RepoId) -> Result<Self, GitError> {
-        Repository::open(repo_id)
-            .map(GitRepository)
-            .map_err(GitError::from)
+    fn get_repo(repo_id: Self::RepoId) -> Result<Self, Error> {
+        git2::Repository::open(&repo_id)
+            .map(Repository)
+            .map_err(Error::from)
     }
 }
 
-impl From<git2::Repository> for GitRepository {
+impl From<git2::Repository> for Repository {
     fn from(repo: git2::Repository) -> Self {
-        GitRepository(repo)
+        Repository(repo)
     }
 }
 
@@ -264,7 +291,7 @@ impl From<git2::Repository> for GitRepository {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Branch {
     pub name: BranchName,
-    pub locality: BranchType,
+    pub locality: git2::BranchType,
 }
 
 impl PartialOrd for Branch {
@@ -284,7 +311,7 @@ impl Branch {
     pub fn remote(name: BranchName) -> Self {
         Branch {
             name,
-            locality: BranchType::Remote,
+            locality: git2::BranchType::Remote,
         }
     }
 
@@ -292,7 +319,7 @@ impl Branch {
     pub fn local(name: BranchName) -> Self {
         Branch {
             name,
-            locality: BranchType::Local,
+            locality: git2::BranchType::Local,
         }
     }
 }
@@ -345,33 +372,33 @@ impl Sha1 {
 /// An enumeration of git objects we can fetch and turn
 /// into a [`GitHistory`](struct.GitHistory.html).
 #[derive(Debug, Clone)]
-pub enum GitObject {
+pub enum Object {
     Branch(BranchName),
     Tag(TagName),
 }
 
-impl GitObject {
+impl Object {
     pub fn branch(name: &str) -> Self {
-        GitObject::Branch(BranchName::new(name))
+        Object::Branch(BranchName::new(name))
     }
 
     pub fn tag(name: &str) -> Self {
-        GitObject::Tag(TagName::new(name))
+        Object::Tag(TagName::new(name))
     }
 
     fn get_name(&self) -> String {
         match self {
-            GitObject::Branch(name) => name.0.clone(),
-            GitObject::Tag(name) => name.0.clone(),
+            Object::Branch(name) => name.0.clone(),
+            Object::Tag(name) => name.0.clone(),
         }
     }
 }
 
-impl<'repo> vcs::VCS<'repo, Commit<'repo>, GitError> for GitRepository {
-    type HistoryId = GitObject;
-    type ArtefactId = Oid;
+impl vcs::VCS<Commit, Error> for Repository {
+    type HistoryId = Object;
+    type ArtefactId = git2::Oid;
 
-    fn get_history(&'repo self, history_id: Self::HistoryId) -> Result<GitHistory, GitError> {
+    fn get_history(&self, history_id: Self::HistoryId) -> Result<GitHistory, Error> {
         let reference = self
             .0
             .resolve_reference_from_short_name(&history_id.get_name())?;
@@ -383,21 +410,21 @@ impl<'repo> vcs::VCS<'repo, Commit<'repo>, GitError> for GitRepository {
             }
         };
         match history_id {
-            GitObject::Branch(_) => to_history(
+            Object::Branch(_) => to_history(
                 reference.is_branch() || reference.is_remote(),
-                GitError::NotBranch,
+                Error::NotBranch,
             ),
-            GitObject::Tag(_) => to_history(reference.is_tag(), GitError::NotTag),
+            Object::Tag(_) => to_history(reference.is_tag(), Error::NotTag),
         }
     }
 
-    fn get_histories(&'repo self) -> Result<Vec<GitHistory>, GitError> {
+    fn get_histories(&self) -> Result<Vec<GitHistory>, Error> {
         self.0
             .references()
-            .map_err(GitError::from)
+            .map_err(Error::from)
             .and_then(|mut references| {
                 references.try_fold(vec![], |mut acc, reference| {
-                    reference.map_err(GitError::from).and_then(|r| {
+                    reference.map_err(Error::from).and_then(|r| {
                         let history = self.to_history(&r)?;
                         acc.push(history);
                         Ok(acc)
@@ -406,12 +433,12 @@ impl<'repo> vcs::VCS<'repo, Commit<'repo>, GitError> for GitRepository {
             })
     }
 
-    fn get_identifier(artifact: &'repo Commit) -> Self::ArtefactId {
-        artifact.id()
+    fn get_identifier(artifact: &Commit) -> Self::ArtefactId {
+        artifact.id
     }
 }
 
-impl file_system::RepoBackend for GitRepository {
+impl file_system::RepoBackend for Repository {
     fn repo_directory() -> file_system::Directory {
         file_system::Directory {
             name: file_system::Label {
@@ -423,68 +450,37 @@ impl file_system::RepoBackend for GitRepository {
     }
 }
 
-impl std::fmt::Debug for GitRepository {
+impl std::fmt::Debug for Repository {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, ".git")
     }
 }
 
-/// A `Browser` that uses [`GitRepository`](struct.GitRepository.html) as the underlying repository backend,
-/// `git2::Commit` as the artifact, and [`GitError`](enum.GitError.html) for error reporting.
-pub type GitBrowser<'repo> = vcs::Browser<'repo, GitRepository, Commit<'repo>, GitError>;
+/// A `Browser` that uses [`Repository`](struct.Repository.html) as the underlying repository backend,
+/// `git2::Commit` as the artifact, and [`Error`](enum.Error.html) for error reporting.
+pub type GitBrowser = vcs::Browser<Repository, Commit, Error>;
 
-/// A private enum that captures a recoverable and
-/// non-recoverable error when walking the git tree.
-///
-/// In the case of `NotBlob` we abort the the computation but do
-/// a check for it and recover.
-///
-/// In the of `Git` we abort both computations.
-#[derive(Debug)]
-enum TreeWalkError {
-    NotBlob,
-    Git(GitError),
-}
-
-impl From<Error> for TreeWalkError {
-    fn from(err: Error) -> Self {
-        TreeWalkError::Git(err.into())
-    }
-}
-
-impl From<file_error::Error> for TreeWalkError {
-    fn from(err: file_error::Error) -> Self {
-        err.into()
-    }
-}
-
-impl From<GitError> for TreeWalkError {
-    fn from(err: GitError) -> Self {
-        err.into()
-    }
-}
-
-impl<'repo> GitBrowser<'repo> {
+impl GitBrowser {
     /// Create a new browser to interact with.
     ///
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{GitBrowser, GitRepository};
+    /// use radicle_surf::vcs::git::{GitBrowser, Repository};
     ///
-    /// let repo = GitRepository::new("./data/git-platinum").unwrap();
-    /// let browser = GitBrowser::new(&repo).unwrap();
+    /// let repo = Repository::new("./data/git-platinum").unwrap();
+    /// let browser = GitBrowser::new(repo).unwrap();
     /// ```
-    pub fn new(repository: &'repo GitRepository) -> Result<Self, GitError> {
+    pub fn new(repository: Repository) -> Result<Self, Error> {
         let history = repository.head()?;
-        let snapshot = Box::new(|repository: &GitRepository, history: &GitHistory| {
+        let snapshot = Box::new(|repository: &Repository, history: &GitHistory| {
             let tree = Self::get_tree(&repository.0, history.0.first())?;
-            Ok(file_system::Directory::from::<GitRepository>(tree))
+            Ok(file_system::Directory::from::<Repository>(tree))
         });
         Ok(vcs::Browser {
             snapshot,
             history,
-            repository: &repository,
+            repository,
         })
     }
 
@@ -493,10 +489,10 @@ impl<'repo> GitBrowser<'repo> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{GitBrowser, GitRepository};
+    /// use radicle_surf::vcs::git::{GitBrowser, Repository};
     ///
-    /// let repo = GitRepository::new("./data/git-platinum").unwrap();
-    /// let mut browser = GitBrowser::new(&repo).unwrap();
+    /// let repo = Repository::new("./data/git-platinum").unwrap();
+    /// let mut browser = GitBrowser::new(repo).unwrap();
     ///
     /// // ensure we're at HEAD
     /// browser.head();
@@ -506,7 +502,7 @@ impl<'repo> GitBrowser<'repo> {
     /// // We are able to render the directory
     /// assert!(directory.is_ok());
     /// ```
-    pub fn head(&mut self) -> Result<(), GitError> {
+    pub fn head(&mut self) -> Result<(), Error> {
         let history = self.repository.head()?;
         self.set_history(history);
         Ok(())
@@ -518,10 +514,10 @@ impl<'repo> GitBrowser<'repo> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{BranchName, GitBrowser, GitRepository};
+    /// use radicle_surf::vcs::git::{BranchName, GitBrowser, Repository};
     ///
-    /// let repo = GitRepository::new("./data/git-platinum").unwrap();
-    /// let mut browser = GitBrowser::new(&repo).unwrap();
+    /// let repo = Repository::new("./data/git-platinum").unwrap();
+    /// let mut browser = GitBrowser::new(repo).unwrap();
     ///
     /// // ensure we're on 'master'
     /// browser.branch(BranchName::new("master"));
@@ -533,12 +529,12 @@ impl<'repo> GitBrowser<'repo> {
     /// ```
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{BranchName, GitBrowser, GitRepository};
+    /// use radicle_surf::vcs::git::{BranchName, GitBrowser, Repository};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     /// use radicle_surf::file_system::unsound;
     ///
-    /// let repo = GitRepository::new("./data/git-platinum").unwrap();
-    /// let mut browser = GitBrowser::new(&repo).unwrap();
+    /// let repo = Repository::new("./data/git-platinum").unwrap();
+    /// let mut browser = GitBrowser::new(repo).unwrap();
     /// browser
     ///     .branch(BranchName::new("origin/dev"))
     ///     .expect("Failed to change branch to dev");
@@ -576,10 +572,8 @@ impl<'repo> GitBrowser<'repo> {
     ///     ]
     /// );
     /// ```
-    pub fn branch(&mut self, branch_name: BranchName) -> Result<(), GitError> {
-        let branch = self
-            .repository
-            .get_history(GitObject::Branch(branch_name))?;
+    pub fn branch(&mut self, branch_name: BranchName) -> Result<(), Error> {
+        let branch = self.repository.get_history(Object::Branch(branch_name))?;
         self.set_history(branch);
         Ok(())
     }
@@ -592,10 +586,10 @@ impl<'repo> GitBrowser<'repo> {
     /// ```
     /// use git2::Oid;
     /// use radicle_surf::vcs::History;
-    /// use radicle_surf::vcs::git::{TagName, GitBrowser, GitRepository};
+    /// use radicle_surf::vcs::git::{TagName, GitBrowser, Repository};
     ///
-    /// let repo = GitRepository::new("./data/git-platinum").unwrap();
-    /// let mut browser = GitBrowser::new(&repo).unwrap();
+    /// let repo = Repository::new("./data/git-platinum").unwrap();
+    /// let mut browser = GitBrowser::new(repo).unwrap();
     ///
     /// // Switch to "v0.3.0"
     /// browser.tag(TagName::new("v0.3.0")).expect("Failed to switch tag");
@@ -609,13 +603,13 @@ impl<'repo> GitBrowser<'repo> {
     ///     ]
     /// ).into());
     ///
-    /// let history_ids = browser.get_history().map(|commit| commit.id());
+    /// let history_ids = browser.get_history().map(|commit| commit.id);
     ///
     /// // We are able to render the directory
     /// assert_eq!(history_ids, expected_history);
     /// ```
-    pub fn tag(&mut self, tag_name: TagName) -> Result<(), GitError> {
-        let branch = self.repository.get_history(GitObject::Tag(tag_name))?;
+    pub fn tag(&mut self, tag_name: TagName) -> Result<(), Error> {
+        let branch = self.repository.get_history(Object::Tag(tag_name))?;
         self.set_history(branch);
         Ok(())
     }
@@ -627,12 +621,12 @@ impl<'repo> GitBrowser<'repo> {
     ///
     /// ```
     /// use radicle_surf::file_system::{Label, SystemType};
-    /// use radicle_surf::vcs::git::{GitBrowser, GitRepository, Sha1};
+    /// use radicle_surf::vcs::git::{GitBrowser, Repository, Sha1};
     /// use radicle_surf::file_system::unsound;
     ///
-    /// let repo = GitRepository::new("./data/git-platinum")
+    /// let repo = Repository::new("./data/git-platinum")
     ///     .expect("Could not retrieve ./data/git-platinum as git repository");
-    /// let mut browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
+    /// let mut browser = GitBrowser::new(repo).expect("Could not initialise Browser");
     ///
     /// // Set to the initial commit
     /// browser
@@ -657,23 +651,22 @@ impl<'repo> GitBrowser<'repo> {
     /// // We have the single commit
     /// assert!(browser.get_history().0.len() == 1);
     /// ```
-    pub fn commit(&mut self, sha: Sha1) -> Result<(), GitError> {
-        let commit = self.repository.get_commit(sha)?;
+    pub fn commit(&mut self, sha: Sha1) -> Result<(), Error> {
+        let commit = Commit::try_from(self.repository.get_commit(sha)?)?;
         self.set_history(vcs::History(NonEmpty::new(commit)));
         Ok(())
     }
 
     /// List the names of the branches that are contained in the
-    /// underlying [`GitRepository`](struct.GitRepository.hmtl).
+    /// underlying [`Repository`](struct.Repository.hmtl).
     ///
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Branch, BranchName, GitBrowser, GitRepository};
-    /// use radicle_surf::vcs::git::git2::BranchType;
+    /// use radicle_surf::vcs::git::{Branch, BranchName, BranchType, GitBrowser, Repository};
     ///
-    /// let repo = GitRepository::new("./data/git-platinum").unwrap();
-    /// let mut browser = GitBrowser::new(&repo).unwrap();
+    /// let repo = Repository::new("./data/git-platinum").unwrap();
+    /// let mut browser = GitBrowser::new(repo).unwrap();
     ///
     /// let branches = browser.list_branches(None).unwrap();
     ///
@@ -690,39 +683,35 @@ impl<'repo> GitBrowser<'repo> {
     ///     Branch::remote(BranchName::new("origin/master")),
     /// ]);
     /// ```
-    pub fn list_branches(&self, filter: Option<BranchType>) -> Result<Vec<Branch>, GitError> {
+    pub fn list_branches(&self, filter: Option<git2::BranchType>) -> Result<Vec<Branch>, Error> {
         self.repository
             .0
             .branches(filter)
-            .map_err(GitError::from)
+            .map_err(Error::from)
             .and_then(|mut branches| {
                 branches.try_fold(vec![], |mut acc, branch| {
                     let (branch, branch_type) = branch?;
-                    let branch_name = branch.name()?;
-                    if let Some(name) = branch_name {
-                        let branch = Branch {
-                            name: BranchName(name.to_string()),
-                            locality: branch_type,
-                        };
-                        acc.push(branch);
-                        Ok(acc)
-                    } else {
-                        Err(GitError::BranchDecode)
-                    }
+                    let name = str::from_utf8(branch.name_bytes()?)?;
+                    let branch = Branch {
+                        name: BranchName(name.to_string()),
+                        locality: branch_type,
+                    };
+                    acc.push(branch);
+                    Ok(acc)
                 })
             })
     }
 
     /// List the names of the tags that are contained in the
-    /// underlying [`GitRepository`](struct.GitRepository.hmtl).
+    /// underlying [`Repository`](struct.Repository.hmtl).
     ///
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{GitBrowser, GitRepository, TagName};
+    /// use radicle_surf::vcs::git::{GitBrowser, Repository, TagName};
     ///
-    /// let repo = GitRepository::new("./data/git-platinum").unwrap();
-    /// let mut browser = GitBrowser::new(&repo).unwrap();
+    /// let repo = Repository::new("./data/git-platinum").unwrap();
+    /// let mut browser = GitBrowser::new(repo).unwrap();
     ///
     /// let tags = browser.list_tags().unwrap();
     ///
@@ -739,7 +728,7 @@ impl<'repo> GitBrowser<'repo> {
     ///     ]
     /// );
     /// ```
-    pub fn list_tags(&self) -> Result<Vec<TagName>, GitError> {
+    pub fn list_tags(&self) -> Result<Vec<TagName>, Error> {
         let tags = self.repository.0.tag_names(None)?;
         Ok(tags
             .into_iter()
@@ -753,15 +742,15 @@ impl<'repo> GitBrowser<'repo> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{GitBrowser, GitRepository, Sha1};
+    /// use radicle_surf::vcs::git::{GitBrowser, Repository, Sha1};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     /// use radicle_surf::file_system::unsound;
     ///
     /// use git2;
     ///
-    /// let repo = GitRepository::new("./data/git-platinum")
+    /// let repo = Repository::new("./data/git-platinum")
     ///     .expect("Could not retrieve ./data/git-test as git repository");
-    /// let mut browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
+    /// let mut browser = GitBrowser::new(repo).expect("Could not initialise Browser");
     ///
     /// // Clamp the Browser to a particular commit
     /// browser.commit(Sha1::new("d6880352fc7fda8f521ae9b7357668b17bb5bad5")).expect("Failed to set
@@ -774,7 +763,7 @@ impl<'repo> GitBrowser<'repo> {
     /// let readme_last_commit = browser
     ///     .last_commit(&Path::with_root(&[unsound::label::new("README.md")]))
     ///     .expect("Failed to get last commit")
-    ///     .map(|commit| commit.id());
+    ///     .map(|commit| commit.id);
     ///
     /// assert_eq!(readme_last_commit, Some(expected_commit));
     ///
@@ -784,19 +773,19 @@ impl<'repo> GitBrowser<'repo> {
     /// let memory_last_commit = browser
     ///     .last_commit(&Path::with_root(&[unsound::label::new("src"), unsound::label::new("memory.rs")]))
     ///     .expect("Failed to get last commit")
-    ///     .map(|commit| commit.id());
+    ///     .map(|commit| commit.id);
     ///
     /// assert_eq!(memory_last_commit, Some(expected_commit));
     /// ```
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{GitBrowser, GitRepository, Sha1};
+    /// use radicle_surf::vcs::git::{GitBrowser, Repository, Sha1};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     /// use radicle_surf::file_system::unsound;
     ///
-    /// let repo = GitRepository::new("./data/git-platinum")
+    /// let repo = Repository::new("./data/git-platinum")
     ///     .expect("Could not retrieve ./data/git-platinum as git repository");
-    /// let mut browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
+    /// let mut browser = GitBrowser::new(repo).expect("Could not initialise Browser");
     ///
     /// // Set the browser history to the initial commit
     /// browser.commit(Sha1::new("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3")).unwrap();
@@ -807,7 +796,7 @@ impl<'repo> GitBrowser<'repo> {
     /// let memory_last_commit = browser
     ///     .last_commit(&Path::with_root(&[unsound::label::new("src"), unsound::label::new("memory.rs")]))
     ///     .expect("Failed to get last commit")
-    ///     .map(|commit| commit.id());
+    ///     .map(|commit| commit.id);
     ///
     /// assert_eq!(memory_last_commit, None);
     ///
@@ -815,20 +804,19 @@ impl<'repo> GitBrowser<'repo> {
     /// let readme_last_commit = browser
     ///     .last_commit(&Path::with_root(&[unsound::label::new("README.md")]))
     ///     .expect("Failed to get last commit")
-    ///     .map(|commit| commit.id());
+    ///     .map(|commit| commit.id);
     ///
-    /// assert_eq!(readme_last_commit, Some(head_commit.id()));
+    /// assert_eq!(readme_last_commit, Some(head_commit.id));
     /// ```
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{BranchName, GitBrowser, GitRepository, Sha1};
-    /// use radicle_surf::vcs::git::git2::{Oid};
+    /// use radicle_surf::vcs::git::{BranchName, GitBrowser, Repository, Oid, Sha1};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     /// use radicle_surf::file_system::unsound;
     ///
-    /// let repo = GitRepository::new("./data/git-platinum")
+    /// let repo = Repository::new("./data/git-platinum")
     ///     .expect("Could not retrieve ./data/git-platinum as git repository");
-    /// let mut browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
+    /// let mut browser = GitBrowser::new(repo).expect("Could not initialise Browser");
     ///
     /// // Check that last commit is the actual last commit even if head commit differs.
     /// browser.commit(Sha1::new("19bec071db6474af89c866a1bd0e4b1ff76e2b97")).unwrap();
@@ -839,20 +827,19 @@ impl<'repo> GitBrowser<'repo> {
     /// let gitignore_last_commit_id = browser
     ///     .last_commit(&unsound::path::new("~/examples/Folder.svelte"))
     ///     .expect("Failed to get last commit")
-    ///     .map(|commit| commit.id());
+    ///     .map(|commit| commit.id);
     ///
     /// assert_eq!(gitignore_last_commit_id, Some(expected_commit_id));
     /// ```
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{BranchName, GitBrowser, GitRepository, Sha1};
-    /// use radicle_surf::vcs::git::git2::{Oid};
+    /// use radicle_surf::vcs::git::{BranchName, GitBrowser, Repository, Oid, Sha1};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     /// use radicle_surf::file_system::unsound;
     ///
-    /// let repo = GitRepository::new("./data/git-platinum")
+    /// let repo = Repository::new("./data/git-platinum")
     ///     .expect("Could not retrieve ./data/git-platinum as git repository");
-    /// let mut browser = GitBrowser::new(&repo).expect("Could not initialise Browser");
+    /// let mut browser = GitBrowser::new(repo).expect("Could not initialise Browser");
     ///
     /// // Check that last commit is the actual last commit even if head commit differs.
     /// browser.commit(Sha1::new("19bec071db6474af89c866a1bd0e4b1ff76e2b97")).unwrap();
@@ -863,12 +850,12 @@ impl<'repo> GitBrowser<'repo> {
     /// let gitignore_last_commit_id = browser
     ///     .last_commit(&unsound::path::new("~/this/is/a/really/deeply/nested/directory/tree"))
     ///     .expect("Failed to get last commit")
-    ///     .map(|commit| commit.id());
+    ///     .map(|commit| commit.id);
     ///
     /// // TODO(fintan): Fix this when we figure out how to get last commit on directory
     /// assert_eq!(gitignore_last_commit_id, None);
     /// ```
-    pub fn last_commit(&self, path: &file_system::Path) -> Result<Option<Commit>, GitError> {
+    pub fn last_commit(&self, path: &file_system::Path) -> Result<Option<Commit>, Error> {
         let file_histories = self
             .repository
             .last_commit(self.get_history().first().clone())?;
@@ -882,18 +869,19 @@ impl<'repo> GitBrowser<'repo> {
     /// into a HashMap of Paths and a list of Files. We can then turn that
     /// into a Directory.
     fn get_tree(
-        repo: &Repository,
+        repo: &git2::Repository,
         commit: &Commit,
-    ) -> Result<HashMap<file_system::Path, NonEmpty<file_system::File>>, GitError> {
+    ) -> Result<HashMap<file_system::Path, NonEmpty<file_system::File>>, Error> {
         let mut file_paths_or_error: Result<
             HashMap<file_system::Path, NonEmpty<file_system::File>>,
-            GitError,
+            Error,
         > = Ok(HashMap::new());
 
+        let commit = repo.find_commit(commit.id)?;
         let tree = commit.as_object().peel_to_tree()?;
 
         tree.walk(
-            TreeWalkMode::PreOrder,
+            git2::TreeWalkMode::PreOrder,
             |s, entry| match Self::tree_entry_to_file_and_path(repo, s, entry) {
                 Ok((path, file)) => {
                     match file_paths_or_error.as_mut() {
@@ -902,16 +890,16 @@ impl<'repo> GitBrowser<'repo> {
                         // We don't need to update, we want to keep the error.
                         Err(_err) => {}
                     }
-                    TreeWalkResult::Ok
+                    git2::TreeWalkResult::Ok
                 }
                 Err(err) => match err {
                     // We want to continue if the entry was not a Blob.
-                    TreeWalkError::NotBlob => TreeWalkResult::Ok,
+                    TreeWalkError::NotBlob => git2::TreeWalkResult::Ok,
 
                     // But we want to keep the error and abort otherwise.
                     TreeWalkError::Git(err) => {
                         file_paths_or_error = Err(err);
-                        TreeWalkResult::Abort
+                        git2::TreeWalkResult::Abort
                     }
                 },
             },
@@ -932,9 +920,9 @@ impl<'repo> GitBrowser<'repo> {
     }
 
     fn tree_entry_to_file_and_path(
-        repo: &Repository,
+        repo: &git2::Repository,
         tree_path: &str,
-        entry: &TreeEntry,
+        entry: &git2::TreeEntry,
     ) -> Result<(file_system::Path, file_system::File), TreeWalkError> {
         // Account for the "root" of git being the empty string
         let path = if tree_path.is_empty() {
@@ -945,9 +933,9 @@ impl<'repo> GitBrowser<'repo> {
 
         let object = entry.to_object(repo)?;
         let blob = object.as_blob().ok_or(TreeWalkError::NotBlob)?;
-        let name = entry.name().ok_or(GitError::NameDecode)?;
+        let name = str::from_utf8(entry.name_bytes())?;
 
-        let name = file_system::Label::try_from(name).map_err(GitError::FileSystem)?;
+        let name = file_system::Label::try_from(name).map_err(Error::FileSystem)?;
 
         Ok((
             path,

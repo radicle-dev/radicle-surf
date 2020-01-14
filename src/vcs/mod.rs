@@ -99,19 +99,18 @@ impl<A> History<A> {
 
 /// A Snapshot is a function that renders a `Directory` given
 /// the `Repo` object and a `History` of artifacts.
-type Snapshot<'browser, A, Repo, Error> =
-    Box<dyn Fn(&Repo, &History<A>) -> Result<Directory, Error> + 'browser>;
+type Snapshot<A, Repo, Error> = Box<dyn Fn(&Repo, &History<A>) -> Result<Directory, Error>>;
 
 /// A `Browser` is a way of rendering a `History` into a
 /// `Directory` snapshot, and the current `History` it is
 /// viewing.
-pub struct Browser<'browser, Repo, A, Error> {
-    snapshot: Snapshot<'browser, A, Repo, Error>,
+pub struct Browser<Repo, A, Error> {
+    snapshot: Snapshot<A, Repo, Error>,
     history: History<A>,
-    repository: &'browser Repo,
+    repository: Repo,
 }
 
-impl<'browser, Repo, A, Error> Browser<'browser, Repo, A, Error> {
+impl<Repo, A, Error> Browser<Repo, A, Error> {
     /// Get the current `History` the `Browser` is viewing.
     pub fn get_history(&self) -> History<A>
     where
@@ -149,29 +148,27 @@ impl<'browser, Repo, A, Error> Browser<'browser, Repo, A, Error> {
     }
 }
 
-impl<'browser, Repo, A, Error> VCS<'browser, A, Error> for Browser<'browser, Repo, A, Error>
+impl<Repo, A, Error> VCS<A, Error> for Browser<Repo, A, Error>
 where
-    A: 'browser,
-    Error: 'browser,
-    Repo: VCS<'browser, A, Error>,
+    Repo: VCS<A, Error>,
 {
     type HistoryId = Repo::HistoryId;
     type ArtefactId = Repo::ArtefactId;
 
-    fn get_history(&'browser self, identifier: Self::HistoryId) -> Result<History<A>, Error> {
+    fn get_history(&self, identifier: Self::HistoryId) -> Result<History<A>, Error> {
         self.repository.get_history(identifier)
     }
 
-    fn get_histories(&'browser self) -> Result<Vec<History<A>>, Error> {
+    fn get_histories(&self) -> Result<Vec<History<A>>, Error> {
         self.repository.get_histories()
     }
 
-    fn get_identifier(artifact: &'browser A) -> Self::ArtefactId {
+    fn get_identifier(artifact: &A) -> Self::ArtefactId {
         Repo::get_identifier(artifact)
     }
 }
 
-pub(crate) trait GetVCS<'repo, Error>
+pub(crate) trait GetVCS<Error>
 where
     Self: Sized,
 {
@@ -182,9 +179,9 @@ where
     fn get_repo(identifier: Self::RepoId) -> Result<Self, Error>;
 }
 
-pub trait VCS<'repo, A: 'repo, Error>
+pub trait VCS<A, Error>
 where
-    Self: 'repo + Sized,
+    Self: Sized,
 {
     /// The way to identify a History.
     type HistoryId;
@@ -193,11 +190,11 @@ where
     type ArtefactId;
 
     /// Find a History in a Repo given a way to identify it
-    fn get_history(&'repo self, identifier: Self::HistoryId) -> Result<History<A>, Error>;
+    fn get_history(&self, identifier: Self::HistoryId) -> Result<History<A>, Error>;
 
     /// Find all histories in a Repo
-    fn get_histories(&'repo self) -> Result<Vec<History<A>>, Error>;
+    fn get_histories(&self) -> Result<Vec<History<A>>, Error>;
 
     /// Identify artifacts of a Repository
-    fn get_identifier(artifact: &'repo A) -> Self::ArtefactId;
+    fn get_identifier(artifact: &A) -> Self::ArtefactId;
 }
