@@ -7,7 +7,7 @@
 //!
 //! let repo = Repository::new("./data/git-platinum")
 //!     .expect("Could not retrieve ./data/git-platinum as git repository");
-//! let browser = GitBrowser::new(repo).expect("Could not initialise Browser");
+//! let browser = Browser::new(repo).expect("Could not initialise Browser");
 //! let directory = browser.get_directory().expect("Could not render Directory");
 //! let mut directory_contents = directory.list_directory();
 //! directory_contents.sort();
@@ -37,7 +37,8 @@
 //! ```
 
 // Re-export git2 as sub-module
-pub use git2::{BranchType, Error as GitError, Oid, Time};
+pub use git2;
+pub use git2::{BranchType, Error as Git2Error, Oid, Time};
 
 pub mod error;
 
@@ -46,7 +47,6 @@ use crate::tree::*;
 use crate::vcs;
 use crate::vcs::git::error::*;
 use crate::vcs::VCS;
-use git2;
 use nonempty::NonEmpty;
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -104,7 +104,7 @@ impl<'repo> TryFrom<git2::Commit<'repo>> for Commit {
 }
 
 /// A `History` that uses `git2::Commit` as the underlying artifact.
-pub type GitHistory = vcs::History<Commit>;
+pub type History = vcs::History<Commit>;
 
 /// Wrapper around the `git2`'s `git2::Repository` type.
 /// This is to to limit the functionality that we can do
@@ -144,10 +144,10 @@ impl<'repo> Repository {
     ///
     /// # Examples
     /// ```
-    /// use radicle_surf::vcs::git::{Branch, BranchName, GitBrowser, Repository};
+    /// use radicle_surf::vcs::git::{Branch, BranchName, Browser, Repository};
     ///
     /// let repo = Repository::new("./data/git-platinum").unwrap();
-    /// let browser = GitBrowser::new(repo).unwrap();
+    /// let browser = Browser::new(repo).unwrap();
     ///
     /// let mut branches = browser.list_branches(None).unwrap();
     /// branches.sort();
@@ -175,18 +175,18 @@ impl<'repo> Repository {
         Ok(commit)
     }
 
-    /// Build a `GitHistory` using the `head` reference.
-    pub(crate) fn head(&'repo self) -> Result<GitHistory, Error> {
+    /// Build a `History` using the `head` reference.
+    pub(crate) fn head(&'repo self) -> Result<History, Error> {
         let head = self.0.head()?;
         self.to_history(&head)
     }
 
-    /// Turn a `git2::Reference` into a `GitHistory` by completing
+    /// Turn a `git2::Reference` into a `History` by completing
     /// a revwalk over the first commit in the reference.
     pub(crate) fn to_history(
         &'repo self,
         history: &git2::Reference<'repo>,
-    ) -> Result<GitHistory, Error> {
+    ) -> Result<History, Error> {
         let head = history.peel_to_commit()?;
         let mut commits = Vec::new();
         let mut revwalk = self.0.revwalk()?;
@@ -405,7 +405,7 @@ impl Sha1 {
 }
 
 /// An enumeration of git objects we can fetch and turn
-/// into a [`GitHistory`](struct.GitHistory.html).
+/// into a [`History`](struct.History.html).
 #[derive(Debug, Clone)]
 pub enum Object {
     Branch(BranchName),
@@ -433,7 +433,7 @@ impl vcs::VCS<Commit, Error> for Repository {
     type HistoryId = Object;
     type ArtefactId = git2::Oid;
 
-    fn get_history(&self, history_id: Self::HistoryId) -> Result<GitHistory, Error> {
+    fn get_history(&self, history_id: Self::HistoryId) -> Result<History, Error> {
         let reference = self
             .0
             .resolve_reference_from_short_name(&history_id.get_name())?;
@@ -453,7 +453,7 @@ impl vcs::VCS<Commit, Error> for Repository {
         }
     }
 
-    fn get_histories(&self) -> Result<Vec<GitHistory>, Error> {
+    fn get_histories(&self) -> Result<Vec<History>, Error> {
         self.0
             .references()
             .map_err(Error::from)
@@ -493,22 +493,22 @@ impl std::fmt::Debug for Repository {
 
 /// A `Browser` that uses [`Repository`](struct.Repository.html) as the underlying repository backend,
 /// `git2::Commit` as the artifact, and [`Error`](enum.Error.html) for error reporting.
-pub type GitBrowser = vcs::Browser<Repository, Commit, Error>;
+pub type Browser = vcs::Browser<Repository, Commit, Error>;
 
-impl GitBrowser {
+impl Browser {
     /// Create a new browser to interact with.
     ///
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{GitBrowser, Repository};
+    /// use radicle_surf::vcs::git::{Browser, Repository};
     ///
     /// let repo = Repository::new("./data/git-platinum").unwrap();
-    /// let browser = GitBrowser::new(repo).unwrap();
+    /// let browser = Browser::new(repo).unwrap();
     /// ```
     pub fn new(repository: Repository) -> Result<Self, Error> {
         let history = repository.head()?;
-        let snapshot = Box::new(|repository: &Repository, history: &GitHistory| {
+        let snapshot = Box::new(|repository: &Repository, history: &History| {
             let tree = Self::get_tree(&repository.0, history.0.first())?;
             Ok(file_system::Directory::from::<Repository>(tree))
         });
@@ -519,15 +519,15 @@ impl GitBrowser {
         })
     }
 
-    /// Set the current `GitBrowser` history to the `HEAD` commit of the underlying repository.
+    /// Set the current `Browser` history to the `HEAD` commit of the underlying repository.
     ///
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{GitBrowser, Repository};
+    /// use radicle_surf::vcs::git::{Browser, Repository};
     ///
     /// let repo = Repository::new("./data/git-platinum").unwrap();
-    /// let mut browser = GitBrowser::new(repo).unwrap();
+    /// let mut browser = Browser::new(repo).unwrap();
     ///
     /// // ensure we're at HEAD
     /// browser.head();
@@ -543,16 +543,16 @@ impl GitBrowser {
         Ok(())
     }
 
-    /// Set the current `GitBrowser` history to the [`BranchName`](struct.BranchName.html)
+    /// Set the current `Browser` history to the [`BranchName`](struct.BranchName.html)
     /// provided.
     ///
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{BranchName, GitBrowser, Repository};
+    /// use radicle_surf::vcs::git::{BranchName, Browser, Repository};
     ///
     /// let repo = Repository::new("./data/git-platinum").unwrap();
-    /// let mut browser = GitBrowser::new(repo).unwrap();
+    /// let mut browser = Browser::new(repo).unwrap();
     ///
     /// // ensure we're on 'master'
     /// browser.branch(BranchName::new("master"));
@@ -564,12 +564,12 @@ impl GitBrowser {
     /// ```
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{BranchName, GitBrowser, Repository};
+    /// use radicle_surf::vcs::git::{BranchName, Browser, Repository};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     /// use radicle_surf::file_system::unsound;
     ///
     /// let repo = Repository::new("./data/git-platinum").unwrap();
-    /// let mut browser = GitBrowser::new(repo).unwrap();
+    /// let mut browser = Browser::new(repo).unwrap();
     /// browser
     ///     .branch(BranchName::new("origin/dev"))
     ///     .expect("Failed to change branch to dev");
@@ -613,18 +613,17 @@ impl GitBrowser {
         Ok(())
     }
 
-    /// Set the current `GitBrowser` history to the [`TagName`](struct.TagName.html)
+    /// Set the current `Browser` history to the [`TagName`](struct.TagName.html)
     /// provided.
     ///
     /// # Examples
     ///
     /// ```
-    /// use git2::Oid;
     /// use radicle_surf::vcs::History;
-    /// use radicle_surf::vcs::git::{TagName, GitBrowser, Repository};
+    /// use radicle_surf::vcs::git::{TagName, Browser, Oid, Repository};
     ///
     /// let repo = Repository::new("./data/git-platinum").unwrap();
-    /// let mut browser = GitBrowser::new(repo).unwrap();
+    /// let mut browser = Browser::new(repo).unwrap();
     ///
     /// // Switch to "v0.3.0"
     /// browser.tag(TagName::new("v0.3.0")).expect("Failed to switch tag");
@@ -649,19 +648,19 @@ impl GitBrowser {
         Ok(())
     }
 
-    /// Set the current `GitBrowser` history to the [`Sha1`](struct.Sha1.html)
+    /// Set the current `Browser` history to the [`Sha1`](struct.Sha1.html)
     /// provided. The history will consist of a single [`Commit`](struct.Commit.html).
     ///
     /// # Examples
     ///
     /// ```
     /// use radicle_surf::file_system::{Label, SystemType};
-    /// use radicle_surf::vcs::git::{GitBrowser, Repository, Sha1};
+    /// use radicle_surf::vcs::git::{Browser, Repository, Sha1};
     /// use radicle_surf::file_system::unsound;
     ///
     /// let repo = Repository::new("./data/git-platinum")
     ///     .expect("Could not retrieve ./data/git-platinum as git repository");
-    /// let mut browser = GitBrowser::new(repo).expect("Could not initialise Browser");
+    /// let mut browser = Browser::new(repo).expect("Could not initialise Browser");
     ///
     /// // Set to the initial commit
     /// browser
@@ -698,10 +697,10 @@ impl GitBrowser {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Branch, BranchName, BranchType, GitBrowser, Repository};
+    /// use radicle_surf::vcs::git::{Branch, BranchType, BranchName, Browser, Repository};
     ///
     /// let repo = Repository::new("./data/git-platinum").unwrap();
-    /// let mut browser = GitBrowser::new(repo).unwrap();
+    /// let mut browser = Browser::new(repo).unwrap();
     ///
     /// let branches = browser.list_branches(None).unwrap();
     ///
@@ -743,10 +742,10 @@ impl GitBrowser {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{GitBrowser, Repository, TagName};
+    /// use radicle_surf::vcs::git::{Browser, Repository, TagName};
     ///
     /// let repo = Repository::new("./data/git-platinum").unwrap();
-    /// let mut browser = GitBrowser::new(repo).unwrap();
+    /// let mut browser = Browser::new(repo).unwrap();
     ///
     /// let tags = browser.list_tags().unwrap();
     ///
@@ -777,7 +776,7 @@ impl GitBrowser {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{GitBrowser, Repository, Sha1};
+    /// use radicle_surf::vcs::git::{Browser, Repository, Sha1};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     /// use radicle_surf::file_system::unsound;
     ///
@@ -785,7 +784,7 @@ impl GitBrowser {
     ///
     /// let repo = Repository::new("./data/git-platinum")
     ///     .expect("Could not retrieve ./data/git-test as git repository");
-    /// let mut browser = GitBrowser::new(repo).expect("Could not initialise Browser");
+    /// let mut browser = Browser::new(repo).expect("Could not initialise Browser");
     ///
     /// // Clamp the Browser to a particular commit
     /// browser.commit(Sha1::new("d6880352fc7fda8f521ae9b7357668b17bb5bad5")).expect("Failed to set
@@ -814,13 +813,13 @@ impl GitBrowser {
     /// ```
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{GitBrowser, Repository, Sha1};
+    /// use radicle_surf::vcs::git::{Browser, Repository, Sha1};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     /// use radicle_surf::file_system::unsound;
     ///
     /// let repo = Repository::new("./data/git-platinum")
     ///     .expect("Could not retrieve ./data/git-platinum as git repository");
-    /// let mut browser = GitBrowser::new(repo).expect("Could not initialise Browser");
+    /// let mut browser = Browser::new(repo).expect("Could not initialise Browser");
     ///
     /// // Set the browser history to the initial commit
     /// browser.commit(Sha1::new("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3")).unwrap();
@@ -845,13 +844,13 @@ impl GitBrowser {
     /// ```
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{BranchName, GitBrowser, Repository, Oid, Sha1};
+    /// use radicle_surf::vcs::git::{BranchName, Browser, Oid, Repository, Sha1};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     /// use radicle_surf::file_system::unsound;
     ///
     /// let repo = Repository::new("./data/git-platinum")
     ///     .expect("Could not retrieve ./data/git-platinum as git repository");
-    /// let mut browser = GitBrowser::new(repo).expect("Could not initialise Browser");
+    /// let mut browser = Browser::new(repo).expect("Could not initialise Browser");
     ///
     /// // Check that last commit is the actual last commit even if head commit differs.
     /// browser.commit(Sha1::new("19bec071db6474af89c866a1bd0e4b1ff76e2b97")).unwrap();
@@ -868,13 +867,14 @@ impl GitBrowser {
     /// ```
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{BranchName, GitBrowser, Repository, Oid, Sha1};
+    /// use radicle_surf::vcs::git::{BranchName, Browser, Repository, Sha1};
+    /// use radicle_surf::vcs::git::git2::{Oid};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     /// use radicle_surf::file_system::unsound;
     ///
     /// let repo = Repository::new("./data/git-platinum")
     ///     .expect("Could not retrieve ./data/git-platinum as git repository");
-    /// let mut browser = GitBrowser::new(repo).expect("Could not initialise Browser");
+    /// let mut browser = Browser::new(repo).expect("Could not initialise Browser");
     ///
     /// // Check that last commit is the actual last commit even if head commit differs.
     /// browser.commit(Sha1::new("19bec071db6474af89c866a1bd0e4b1ff76e2b97")).unwrap();
