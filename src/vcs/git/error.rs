@@ -40,6 +40,7 @@ impl From<git2::Error> for Error {
 #[derive(Debug)]
 pub(crate) enum TreeWalkError {
     NotBlob,
+    Commit,
     Git(Error),
 }
 
