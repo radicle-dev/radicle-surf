@@ -947,3 +947,11 @@ impl Browser {
         ))
     }
 }
+
+#[test]
+fn submodule_failure() {
+    let repo = Repository::new(".").unwrap();
+    let browser = Browser::new(repo).unwrap();
+
+    browser.get_directory().unwrap();
+}
