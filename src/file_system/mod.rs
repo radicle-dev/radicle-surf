@@ -1,3 +1,4 @@
+use crate::nonempty::split_last;
 use nonempty::NonEmpty;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
@@ -306,18 +307,7 @@ impl Path {
     /// );
     /// ```
     pub fn split_last(&self) -> (Vec<Label>, Label) {
-        let (first, middle, last) = self.0.split();
-
-        // first == last, so drop first
-        if first == last && middle.is_empty() {
-            (vec![], last.clone())
-        } else {
-            // Create the prefix vector
-            let mut vec = vec![first.clone()];
-            let mut middle = middle.to_vec();
-            vec.append(&mut middle);
-            (vec, last.clone())
-        }
+        split_last(&self.0)
     }
 
     /// Construct a `Path` given at least one [`Label`](struct.Label)

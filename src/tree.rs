@@ -1,23 +1,6 @@
+use crate::nonempty::split_last;
 use nonempty::NonEmpty;
 use std::cmp::Ordering;
-
-pub fn split_last<T>(non_empty: &NonEmpty<T>) -> (Vec<T>, T)
-where
-    T: Clone + Eq,
-{
-    let (first, middle, last) = non_empty.split();
-
-    // first == last, so drop first
-    if first == last && middle.is_empty() {
-        (vec![], last.clone())
-    } else {
-        // Create the prefix vector
-        let mut vec = vec![first.clone()];
-        let mut middle = middle.to_vec();
-        vec.append(&mut middle);
-        (vec, last.clone())
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SubTree<K, A> {

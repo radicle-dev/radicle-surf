@@ -61,7 +61,10 @@
 //! ```
 pub mod diff;
 pub mod file_system;
-pub mod tree;
 pub mod vcs;
+
+// Private modules
+mod nonempty;
+mod tree;
 
 pub use crate::vcs::git;
