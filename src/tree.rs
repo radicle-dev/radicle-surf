@@ -222,10 +222,12 @@ impl<K, A> Tree<K, A> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn iter(&self) -> impl Iterator<Item = &SubTree<K, A>> {
         self.0.iter()
     }
 
+    #[allow(dead_code)]
     pub fn find_node(&self, keys: &NonEmpty<K>) -> Option<&A>
     where
         K: Ord + Clone,
@@ -275,6 +277,7 @@ impl<K, A> Tree<K, A> {
         self.0.maximum_by(|s, t| s.compare_by(t, f)).maximum_by(f)
     }
 
+    #[allow(dead_code)]
     pub fn maximum(&self) -> &A
     where
         A: Ord,
@@ -288,6 +291,7 @@ impl<K, A> Forest<K, A> {
         Forest(None)
     }
 
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.0.is_none()
     }
@@ -310,6 +314,7 @@ impl<K, A> Forest<K, A> {
     /// then the node `c` will be replaced by a branch `c/d`.
     ///
     /// If the path does not exist it will be inserted into the set of sub-trees.
+    #[allow(dead_code)]
     pub fn insert(&mut self, keys: NonEmpty<K>, node: A)
     where
         A: Clone,
@@ -351,6 +356,7 @@ impl<K, A> Forest<K, A> {
         self.0.as_ref().and_then(|trees| trees.find(&keys))
     }
 
+    #[allow(dead_code)]
     pub fn maximum_by<F>(&self, f: F) -> Option<&A>
     where
         F: Fn(&A, &A) -> Ordering,
