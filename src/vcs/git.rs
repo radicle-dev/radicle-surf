@@ -59,6 +59,16 @@ pub struct Signature {
     pub time: git2::Time,
 }
 
+impl std::fmt::Debug for Signature {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Signature {{ name: {}, email: {} }}",
+            self.name, self.email
+        )
+    }
+}
+
 impl<'repo> TryFrom<git2::Signature<'repo>> for Signature {
     type Error = Error;
 
@@ -71,7 +81,7 @@ impl<'repo> TryFrom<git2::Signature<'repo>> for Signature {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Commit {
     pub id: git2::Oid,
     pub author: Signature,
@@ -896,6 +906,10 @@ impl Browser {
                     // We want to continue if the entry was not a Blob.
                     TreeWalkError::NotBlob => git2::TreeWalkResult::Ok,
 
+                    // We found a ObjectType::Commit (likely a submodule) and
+                    // so we can skip it.
+                    TreeWalkError::Commit => git2::TreeWalkResult::Ok,
+
                     // But we want to keep the error and abort otherwise.
                     TreeWalkError::Git(err) => {
                         file_paths_or_error = Err(err);
@@ -931,6 +945,12 @@ impl Browser {
             file_system::Path::try_from(tree_path)
         }?;
 
+        // We found a Commit object in the Tree, likely a submodule.
+        // We will skip this entry.
+        if let Some(git2::ObjectType::Commit) = entry.kind() {
+            return Err(TreeWalkError::Commit);
+        }
+
         let object = entry.to_object(repo)?;
         let blob = object.as_blob().ok_or(TreeWalkError::NotBlob)?;
         let name = str::from_utf8(entry.name_bytes())?;
@@ -948,10 +968,16 @@ impl Browser {
     }
 }
 
-#[test]
-fn submodule_failure() {
-    let repo = Repository::new(".").unwrap();
-    let browser = Browser::new(repo).unwrap();
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    browser.get_directory().unwrap();
+    #[test]
+    // An issue with submodules, see: https://github.com/radicle-dev/radicle-surf/issues/54
+    fn test_submodule_failure() {
+        let repo = Repository::new(".").unwrap();
+        let browser = Browser::new(repo).unwrap();
+
+        browser.get_directory().unwrap();
+    }
 }
