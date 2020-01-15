@@ -882,12 +882,12 @@ impl Browser {
     /// let expected_commit_id =
     ///     Oid::from_str("2429f097664f9af0c5b7b389ab998b2199ffa977").unwrap();
     ///
-    /// let gitignore_last_commit_id = browser
+    /// let nested_directory_tree_commit_id = browser
     ///     .last_commit(&unsound::path::new("~/this/is/a/really/deeply/nested/directory/tree"))
     ///     .expect("Failed to get last commit")
     ///     .map(|commit| commit.id);
     ///
-    /// assert_eq!(gitignore_last_commit_id, Some(expected_commit_id));
+    /// assert_eq!(nested_directory_tree_commit_id, Some(expected_commit_id));
     /// ```
     ///
     /// ```
@@ -902,12 +902,12 @@ impl Browser {
     /// let expected_commit_id =
     ///     Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95").unwrap();
     ///
-    /// let gitignore_last_commit_id = browser
+    /// let root_last_commit_id = browser
     ///     .last_commit(&Path::root())
     ///     .expect("Failed to get last commit")
     ///     .map(|commit| commit.id);
     ///
-    /// assert_eq!(gitignore_last_commit_id, Some(expected_commit_id));
+    /// assert_eq!(root_last_commit_id, Some(expected_commit_id));
     pub fn last_commit(&self, path: &file_system::Path) -> Result<Option<Commit>, Error> {
         let file_history = self
             .repository
