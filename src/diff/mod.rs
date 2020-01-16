@@ -1,7 +1,6 @@
 #![allow(dead_code, unused_variables)]
 
-use crate::file_system::{Directory, Path};
-use crate::file_system::{DirectoryContents, File};
+use crate::file_system::{Directory, DirectoryContents, File, Path};
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::ops::Deref;
