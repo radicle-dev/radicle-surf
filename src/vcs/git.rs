@@ -178,6 +178,32 @@ impl<'repo> Repository {
             .map_err(Error::from)
     }
 
+    pub fn list_branches(&self, filter: Option<git2::BranchType>) -> Result<Vec<Branch>, Error> {
+        self.0
+            .branches(filter)
+            .map_err(Error::from)
+            .and_then(|mut branches| {
+                branches.try_fold(vec![], |mut acc, branch| {
+                    let (branch, branch_type) = branch?;
+                    let name = str::from_utf8(branch.name_bytes()?)?;
+                    let branch = Branch {
+                        name: BranchName(name.to_string()),
+                        locality: branch_type,
+                    };
+                    acc.push(branch);
+                    Ok(acc)
+                })
+            })
+    }
+
+    pub fn list_tags(&self) -> Result<Vec<TagName>, Error> {
+        let tags = self.0.tag_names(None)?;
+        Ok(tags
+            .into_iter()
+            .filter_map(|tag| tag.map(TagName::new))
+            .collect())
+    }
+
     /// Get a particular `Commit`.
     pub(crate) fn get_commit(&'repo self, sha: Sha1) -> Result<git2::Commit<'repo>, Error> {
         let oid = git2::Oid::from_str(&sha.0)?;
@@ -508,6 +534,8 @@ pub type Browser = vcs::Browser<Repository, Commit, Error>;
 impl Browser {
     /// Create a new browser to interact with.
     ///
+    /// It uses the current HEAD as the starting `History`.
+    ///
     /// # Examples
     ///
     /// ```
@@ -518,6 +546,33 @@ impl Browser {
     /// ```
     pub fn new(repository: Repository) -> Result<Self, Error> {
         let history = repository.head()?;
+        let snapshot = Box::new(|repository: &Repository, history: &History| {
+            let tree = Self::get_tree(&repository.0, history.0.first())?;
+            Ok(file_system::Directory::from::<Repository>(tree))
+        });
+        Ok(vcs::Browser {
+            snapshot,
+            history,
+            repository,
+        })
+    }
+
+    /// Create a new browser to interact with.
+    ///
+    /// It uses the branch supplied as the starting `History`.
+    /// If the branch does not exist an error will be returned.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use radicle_surf::vcs::git::{Browser, Repository};
+    ///
+    /// let repo = Repository::new("./data/git-platinum").unwrap();
+    /// let first_branch = repo.list_branches(None).unwrap().first().cloned().unwrap();
+    /// let browser = Browser::new_with_branch(repo, first_branch.name).unwrap();
+    /// ```
+    pub fn new_with_branch(repository: Repository, branch_name: BranchName) -> Result<Self, Error> {
+        let history = repository.get_history(Object::Branch(branch_name))?;
         let snapshot = Box::new(|repository: &Repository, history: &History| {
             let tree = Self::get_tree(&repository.0, history.0.first())?;
             Ok(file_system::Directory::from::<Repository>(tree))
@@ -728,22 +783,7 @@ impl Browser {
     /// ]);
     /// ```
     pub fn list_branches(&self, filter: Option<git2::BranchType>) -> Result<Vec<Branch>, Error> {
-        self.repository
-            .0
-            .branches(filter)
-            .map_err(Error::from)
-            .and_then(|mut branches| {
-                branches.try_fold(vec![], |mut acc, branch| {
-                    let (branch, branch_type) = branch?;
-                    let name = str::from_utf8(branch.name_bytes()?)?;
-                    let branch = Branch {
-                        name: BranchName(name.to_string()),
-                        locality: branch_type,
-                    };
-                    acc.push(branch);
-                    Ok(acc)
-                })
-            })
+        self.repository.list_branches(filter)
     }
 
     /// List the names of the tags that are contained in the
@@ -773,11 +813,7 @@ impl Browser {
     /// );
     /// ```
     pub fn list_tags(&self) -> Result<Vec<TagName>, Error> {
-        let tags = self.repository.0.tag_names(None)?;
-        Ok(tags
-            .into_iter()
-            .filter_map(|tag| tag.map(TagName::new))
-            .collect())
+        self.repository.list_tags()
     }
 
     /// Given a [`Path`](../../file_system/struct.Path.html) to a file, return the last `Commit`
