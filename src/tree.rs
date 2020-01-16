@@ -27,6 +27,23 @@ impl<K, A> SubTree<K, A> {
         }
     }
 
+    fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = &A> + 'a> {
+        match self {
+            SubTree::Node { value, .. } => Box::new(std::iter::once(value)),
+            SubTree::Branch { ref forest, .. } => Box::new(forest.iter()),
+        }
+    }
+
+    fn iter_keys<'a>(&'a self) -> Box<dyn Iterator<Item = &K> + 'a> {
+        match self {
+            SubTree::Node { key, .. } => Box::new(std::iter::once(key)),
+            SubTree::Branch {
+                ref key,
+                ref forest,
+            } => Box::new(std::iter::once(key).chain(forest.iter_keys())),
+        }
+    }
+
     fn compare_by<F>(&self, other: &Self, f: &F) -> Ordering
     where
         F: Fn(&A, &A) -> Ordering,
@@ -69,13 +86,30 @@ impl<K, A> SubTree<K, A> {
             SubTree::Branch { forest, .. } => forest.maximum_by(f),
         }
     }
+
+    pub fn map<F, B>(&self, f: F) -> SubTree<K, B>
+    where
+        K: Clone,
+        F: Fn(&A) -> B,
+    {
+        match self {
+            SubTree::Node { key, value } => SubTree::Node {
+                key: key.clone(),
+                value: f(value),
+            },
+            SubTree::Branch { key, ref forest } => SubTree::Branch {
+                key: key.clone(),
+                forest: Box::new(forest.map(&f)),
+            },
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Tree<K, A>(NonEmpty<SubTree<K, A>>);
+pub struct Tree<K, A>(pub(crate) NonEmpty<SubTree<K, A>>);
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Forest<K, A>(Option<Tree<K, A>>);
+pub struct Forest<K, A>(pub(crate) Option<Tree<K, A>>);
 
 impl<K, A> Tree<K, A> {
     /// Create a new `Tree` containing a single `Branch` given
@@ -118,6 +152,14 @@ impl<K, A> Tree<K, A> {
         K: Ord,
     {
         self.0.binary_search_by(|tree| tree.key().cmp(key))
+    }
+
+    pub fn map<F, B>(&self, f: &F) -> Tree<K, B>
+    where
+        K: Clone,
+        F: Fn(&A) -> B,
+    {
+        Tree(self.0.map(|tree| tree.map(f)))
     }
 
     /// Insert a `node` into the list of sub-trees.
@@ -222,9 +264,12 @@ impl<K, A> Tree<K, A> {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn iter(&self) -> impl Iterator<Item = &SubTree<K, A>> {
-        self.0.iter()
+    pub fn iter<'a>(&'a self) -> impl Iterator<Item = &A> + 'a {
+        self.0.iter().flat_map(|tree| tree.iter())
+    }
+
+    pub fn iter_keys<'a>(&'a self) -> impl Iterator<Item = &K> + 'a {
+        self.0.iter().flat_map(|tree| tree.iter_keys())
     }
 
     #[allow(dead_code)]
@@ -347,6 +392,13 @@ impl<K, A> Forest<K, A> {
         }
     }
 
+    pub fn find_node(&self, keys: &NonEmpty<K>) -> Option<&A>
+    where
+        K: Ord + Clone,
+    {
+        self.0.as_ref().and_then(|trees| trees.find_node(keys))
+    }
+
     /// Find a `SubTree` given a search path. If the path does not match
     /// it will return `None`.
     pub fn find(&self, keys: &NonEmpty<K>) -> Option<&SubTree<K, A>>
@@ -362,6 +414,14 @@ impl<K, A> Forest<K, A> {
         F: Fn(&A, &A) -> Ordering,
     {
         self.0.as_ref().map(|trees| trees.maximum_by(&f))
+    }
+
+    pub fn iter<'a>(&'a self) -> impl Iterator<Item = &A> + 'a {
+        self.0.iter().flat_map(|trees| trees.iter())
+    }
+
+    pub fn iter_keys<'a>(&'a self) -> impl Iterator<Item = &K> + 'a {
+        self.0.iter().flat_map(|trees| trees.iter_keys())
     }
 }
 
@@ -1047,5 +1107,19 @@ mod tests {
             tree.maximum_by(|a, b| a.id.cmp(&b.id).reverse()),
             Some(&a_node)
         );
+    }
+
+    #[test]
+    fn test_fold_root_nodes() {
+        let mut tree = Forest::root();
+
+        let a_node = TestNode { id: 1 };
+
+        let b_node = TestNode { id: 3 };
+
+        tree.insert(NonEmpty::new(String::from("a")), a_node.clone());
+        tree.insert(NonEmpty::new(String::from("b")), b_node.clone());
+
+        assert_eq!(tree.iter().fold(0, |b, a| a.id + b), 4);
     }
 }
