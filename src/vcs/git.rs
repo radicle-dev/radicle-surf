@@ -534,6 +534,8 @@ pub type Browser = vcs::Browser<Repository, Commit, Error>;
 impl Browser {
     /// Create a new browser to interact with.
     ///
+    /// It uses the current HEAD as the starting `History`.
+    ///
     /// # Examples
     ///
     /// ```
@@ -544,6 +546,33 @@ impl Browser {
     /// ```
     pub fn new(repository: Repository) -> Result<Self, Error> {
         let history = repository.head()?;
+        let snapshot = Box::new(|repository: &Repository, history: &History| {
+            let tree = Self::get_tree(&repository.0, history.0.first())?;
+            Ok(file_system::Directory::from::<Repository>(tree))
+        });
+        Ok(vcs::Browser {
+            snapshot,
+            history,
+            repository,
+        })
+    }
+
+    /// Create a new browser to interact with.
+    ///
+    /// It uses the branch supplied as the starting `History`.
+    /// If the branch does not exist an error will be returned.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use radicle_surf::vcs::git::{Browser, Repository};
+    ///
+    /// let repo = Repository::new("./data/git-platinum").unwrap();
+    /// let first_branch = repo.list_branches(None).unwrap().first().cloned().unwrap();
+    /// let browser = Browser::new_with_branch(repo, first_branch.name).unwrap();
+    /// ```
+    pub fn new_with_branch(repository: Repository, branch_name: BranchName) -> Result<Self, Error> {
+        let history = repository.get_history(Object::Branch(branch_name))?;
         let snapshot = Box::new(|repository: &Repository, history: &History| {
             let tree = Self::get_tree(&repository.0, history.0.first())?;
             Ok(file_system::Directory::from::<Repository>(tree))
