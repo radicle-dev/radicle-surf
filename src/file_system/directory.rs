@@ -85,7 +85,7 @@ impl File {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum Location {
     Root,
     SubDirectory(Label),
@@ -95,16 +95,44 @@ enum Location {
 /// The entries are a set of [`DirectoryContents`](struct.DirectoryContents.html)
 /// and there should be at least one entry.
 /// This is because empty directories do not generally exist in VCSes.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Directory {
     current: Location,
     sub_directories: Forest<Label, File>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DirectoryContents {
+    File { name: Label, file: File },
+    Directory(Directory),
+}
+
+impl From<SubTree<Label, File>> for DirectoryContents {
+    fn from(sub_tree: SubTree<Label, File>) -> Self {
+        match sub_tree {
+            SubTree::Node { key, value } => DirectoryContents::File {
+                name: key,
+                file: value,
+            },
+            SubTree::Branch { key, forest } => DirectoryContents::Directory(Directory {
+                current: Location::SubDirectory(key),
+                sub_directories: (*forest).into(),
+            }),
+        }
+    }
 }
 
 impl Directory {
     pub fn root() -> Self {
         Directory {
             current: Location::Root,
+            sub_directories: Forest::root(),
+        }
+    }
+
+    pub fn new(label: Label) -> Self {
+        Directory {
+            current: Location::SubDirectory(label),
             sub_directories: Forest::root(),
         }
     }
@@ -123,6 +151,63 @@ impl Directory {
                 })
                 .collect(),
         }
+    }
+
+    /// Get the `Label` of the current directory.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use radicle_surf::file_system::{Directory, DirectoryContents, File, Label};
+    /// use radicle_surf::file_system::unsound;
+    ///
+    /// let mut root = Directory::root();
+    ///
+    /// let main = File::new(b"println!(\"Hello, world!\")");
+    /// root.insert_file(&unsound::path::new("main.rs"), main.clone());
+    ///
+    /// let lib = File::new(b"struct Hello(String)");
+    /// root.insert_file(&unsound::path::new("lib.rs"), lib.clone());
+    ///
+    /// let test_mod = File::new(b"assert_eq!(1 + 1, 2);");
+    /// root.insert_file(&unsound::path::new("test/mod.rs"), test_mod.clone());
+    ///
+    /// let mut root_iter = root.iter();
+    ///
+    /// assert_eq!(root_iter.next(), Some(DirectoryContents::File {
+    ///     name: unsound::label::new("lib.rs"),
+    ///     file: lib
+    /// }));
+    ///
+    /// assert_eq!(root_iter.next(), Some(DirectoryContents::File {
+    ///     name: unsound::label::new("main.rs"),
+    ///     file: main
+    /// }));
+    ///
+    /// let mut test_dir = Directory::new(unsound::label::new("test"));
+    /// test_dir.insert_file(&unsound::path::new("mod.rs"), test_mod);
+    ///
+    /// assert_eq!(root_iter.next(), Some(DirectoryContents::Directory(test_dir)));
+    /// ```
+    pub fn iter<'a>(&'a self) -> impl Iterator<Item = DirectoryContents> + 'a {
+        let mut empty_iter = None;
+        let mut trees_iter = None;
+        match &self.sub_directories.0 {
+            None => empty_iter = Some(std::iter::empty()),
+            Some(trees) => {
+                trees_iter = Some(
+                    trees
+                        .iter_subtrees()
+                        .cloned()
+                        .map(|sub_tree| sub_tree.into()),
+                )
+            }
+        }
+
+        empty_iter
+            .into_iter()
+            .flatten()
+            .chain(trees_iter.into_iter().flatten())
     }
 
     /// Find a `File` in the directory given the `Path` to
