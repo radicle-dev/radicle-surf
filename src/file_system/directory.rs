@@ -107,6 +107,15 @@ pub enum DirectoryContents {
     Directory(Directory),
 }
 
+impl DirectoryContents {
+    pub fn label(&self) -> Label {
+        match self {
+            DirectoryContents::File { name, .. } => name.clone(),
+            DirectoryContents::Directory(directory) => directory.current(),
+        }
+    }
+}
+
 impl From<SubTree<Label, File>> for DirectoryContents {
     fn from(sub_tree: SubTree<Label, File>) -> Self {
         match sub_tree {
