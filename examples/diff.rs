@@ -1,3 +1,4 @@
+/*
 extern crate radicle_surf;
 
 use std::env::Args;
@@ -174,4 +175,8 @@ impl Options {
             head_revision,
         })
     }
+}
+*/
+fn main() {
+    println!("TODO")
 }
