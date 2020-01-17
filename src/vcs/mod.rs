@@ -1,4 +1,4 @@
-use crate::file_system::Directory;
+use crate::file_system::directory::Directory;
 use nonempty::NonEmpty;
 
 pub mod git;
