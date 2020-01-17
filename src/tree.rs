@@ -304,6 +304,10 @@ impl<K, A> Tree<K, A> {
         self.0.iter().flat_map(|tree| tree.iter_keys())
     }
 
+    pub fn iter_subtrees<'a>(&'a self) -> impl Iterator<Item = &SubTree<K, A>> + 'a {
+        self.0.iter()
+    }
+
     pub fn find_node(&self, keys: &NonEmpty<K>) -> Option<&A>
     where
         K: Ord + Clone,
