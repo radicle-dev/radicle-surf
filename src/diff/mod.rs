@@ -1,6 +1,6 @@
 #![allow(dead_code, unused_variables)]
 
-use crate::file_system::{Directory, File, Path};
+use crate::file_system::{Directory, DirectoryContents, File, Label, Path};
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::ops::Deref;
@@ -62,7 +62,10 @@ impl Diff {
     // For now using conventional approach with the right being "newer".
     pub fn diff(left: Directory, right: Directory) -> Result<Diff, DiffError> {
         let mut diff = Diff::new();
-        let path = Rc::new(RefCell::new(Path::from_labels(right.name.clone(), &[])));
+        let path = Rc::new(RefCell::new(Path::from_labels(
+            right.current().clone(),
+            &[],
+        )));
         Diff::collect_diff(&left, &right, &path, &mut diff)?;
 
         // TODO: Some of the deleted files may actually be moved (renamed) to one of the created files.
@@ -101,58 +104,77 @@ impl Diff {
                             diff.add_created_files(new_entry, parent_path)?;
                             new_entry_opt = new_iter.next();
                         }
-                        Ordering::Equal => {
-                            use DirectoryContents::{File, Repo, SubDirectory};
-                            match (new_entry, old_entry) {
-                                (File(new_file), File(old_file)) => {
-                                    if old_file.size != new_file.size
-                                        || old_file.checksum() != new_file.checksum()
-                                    {
-                                        diff.add_modified_file(
-                                            new_file,
-                                            &RefCell::borrow(parent_path),
-                                        );
-                                    }
-                                    old_entry_opt = old_iter.next();
-                                    new_entry_opt = new_iter.next();
+                        Ordering::Equal => match (new_entry, old_entry) {
+                            (
+                                DirectoryContents::File {
+                                    name: new_file_name,
+                                    file: new_file,
+                                },
+                                DirectoryContents::File {
+                                    name: old_file_name,
+                                    file: old_file,
+                                },
+                            ) => {
+                                if old_file.size != new_file.size
+                                    || old_file.checksum() != new_file.checksum()
+                                {
+                                    diff.add_modified_file(
+                                        &new_file_name,
+                                        new_file,
+                                        &RefCell::borrow(parent_path),
+                                    );
                                 }
-                                (File(new_file), SubDirectory(old_dir)) => {
-                                    diff.add_created_file(new_file, &RefCell::borrow(parent_path));
-                                    diff.add_deleted_files(old_entry, parent_path)?;
-                                    old_entry_opt = old_iter.next();
-                                    new_entry_opt = new_iter.next();
-                                }
-                                (SubDirectory(new_dir), File(old_file)) => {
-                                    diff.add_created_files(new_entry, parent_path)?;
-                                    diff.add_deleted_file(old_file, &RefCell::borrow(parent_path));
-                                    old_entry_opt = old_iter.next();
-                                    new_entry_opt = new_iter.next();
-                                }
-                                (SubDirectory(new_dir), SubDirectory(old_dir)) => {
-                                    parent_path.borrow_mut().push(new_dir.name.clone());
-                                    Diff::collect_diff(
-                                        old_dir.deref(),
-                                        new_dir.deref(),
-                                        parent_path,
-                                        diff,
-                                    )?;
-                                    parent_path.borrow_mut().pop();
-                                    old_entry_opt = old_iter.next();
-                                    new_entry_opt = new_iter.next();
-                                }
-                                // need to skip Repos
-                                (Repo, Repo) => {
-                                    old_entry_opt = old_iter.next();
-                                    new_entry_opt = new_iter.next();
-                                }
-                                (Repo, _) => {
-                                    old_entry_opt = old_iter.next();
-                                }
-                                (_, Repo) => {
-                                    new_entry_opt = new_iter.next();
-                                }
+                                old_entry_opt = old_iter.next();
+                                new_entry_opt = new_iter.next();
                             }
-                        }
+                            (
+                                DirectoryContents::File {
+                                    name: new_file_name,
+                                    file: new_file,
+                                },
+                                DirectoryContents::Directory(old_dir),
+                            ) => {
+                                diff.add_created_file(
+                                    &new_file_name,
+                                    new_file,
+                                    &RefCell::borrow(parent_path),
+                                );
+                                diff.add_deleted_files(old_entry, parent_path)?;
+                                old_entry_opt = old_iter.next();
+                                new_entry_opt = new_iter.next();
+                            }
+                            (
+                                DirectoryContents::Directory(new_dir),
+                                DirectoryContents::File {
+                                    name: old_file_name,
+                                    file: old_file,
+                                },
+                            ) => {
+                                diff.add_created_files(new_entry, parent_path)?;
+                                diff.add_deleted_file(
+                                    &old_file_name,
+                                    old_file,
+                                    &RefCell::borrow(parent_path),
+                                );
+                                old_entry_opt = old_iter.next();
+                                new_entry_opt = new_iter.next();
+                            }
+                            (
+                                DirectoryContents::Directory(new_dir),
+                                DirectoryContents::Directory(old_dir),
+                            ) => {
+                                parent_path.borrow_mut().push(new_dir.current().clone());
+                                Diff::collect_diff(
+                                    old_dir.deref(),
+                                    new_dir.deref(),
+                                    parent_path,
+                                    diff,
+                                )?;
+                                parent_path.borrow_mut().pop();
+                                old_entry_opt = old_iter.next();
+                                new_entry_opt = new_iter.next();
+                            }
+                        },
                     }
                 }
                 (Some(old_entry), None) => {
@@ -177,15 +199,14 @@ impl Diff {
         mapper: F,
     ) -> Result<Vec<T>, String>
     where
-        F: Fn(&File, &Path) -> T + Copy,
+        F: Fn(&Label, &File, &Path) -> T + Copy,
     {
         match entry {
-            DirectoryContents::SubDirectory(dir) => Diff::collect_files(dir, parent_path, mapper),
-            DirectoryContents::File(file) => {
-                let mapped = mapper(file, &RefCell::borrow(parent_path));
+            DirectoryContents::Directory(dir) => Diff::collect_files(dir, parent_path, mapper),
+            DirectoryContents::File { name, file } => {
+                let mapped = mapper(name, file, &RefCell::borrow(parent_path));
                 Ok(vec![mapped])
             }
-            DirectoryContents::Repo => Ok(vec![]),
         }
     }
 
@@ -195,7 +216,7 @@ impl Diff {
         mapper: F,
     ) -> Result<Vec<T>, String>
     where
-        F: Fn(&File, &Path) -> T + Copy,
+        F: Fn(&Label, &File, &Path) -> T + Copy,
     {
         let mut files: Vec<T> = Vec::new();
         Diff::collect_files_inner(dir, parent_path, mapper, &mut files)?;
@@ -209,45 +230,44 @@ impl Diff {
         files: &mut Vec<T>,
     ) -> Result<(), String>
     where
-        F: Fn(&File, &Path) -> T + Copy,
+        F: Fn(&Label, &File, &Path) -> T + Copy,
     {
-        parent_path.borrow_mut().push(dir.name.clone());
-        for entry in dir.entries.iter() {
+        parent_path.borrow_mut().push(dir.current().clone());
+        for entry in dir.iter() {
             match entry {
-                DirectoryContents::SubDirectory(subdir) => {
-                    Diff::collect_files_inner(subdir.deref(), parent_path, mapper, files)?;
+                DirectoryContents::Directory(subdir) => {
+                    Diff::collect_files_inner(&subdir, parent_path, mapper, files)?;
                 }
-                DirectoryContents::File(file) => {
-                    files.push(mapper(file, &RefCell::borrow(parent_path)));
+                DirectoryContents::File { name, file } => {
+                    files.push(mapper(&name, &file, &RefCell::borrow(parent_path)));
                 }
-                DirectoryContents::Repo => { /* Skip repo directory */ }
             }
         }
         parent_path.borrow_mut().pop();
         Ok(())
     }
 
-    fn convert_to_deleted(file: &File, parent_path: &Path) -> DeleteFile {
-        DeleteFile(Diff::build_path(file, parent_path))
+    fn convert_to_deleted(name: &Label, file: &File, parent_path: &Path) -> DeleteFile {
+        DeleteFile(Diff::build_path(&name, file, parent_path))
     }
 
-    fn convert_to_created(file: &File, parent_path: &Path) -> CreateFile {
-        CreateFile(Diff::build_path(file, parent_path))
+    fn convert_to_created(name: &Label, file: &File, parent_path: &Path) -> CreateFile {
+        CreateFile(Diff::build_path(&name, file, parent_path))
     }
 
-    fn add_modified_file(&mut self, file: &File, parent_path: &Path) {
+    fn add_modified_file(&mut self, name: &Label, file: &File, parent_path: &Path) {
         // TODO: file diff can be calculated at this point
         // Use pijul's transaction diff as an inspiration?
         // https://nest.pijul.com/pijul_org/pijul:master/1468b7281a6f3785e9#anesp4Qdq3V
         self.modified.push(ModifiedFile {
-            path: Diff::build_path(file, parent_path),
+            path: Diff::build_path(&name, file, parent_path),
             diff: FileDiff {},
         });
     }
 
-    fn add_created_file(&mut self, file: &File, parent_path: &Path) {
+    fn add_created_file(&mut self, name: &Label, file: &File, parent_path: &Path) {
         self.created
-            .push(Diff::convert_to_created(file, parent_path));
+            .push(Diff::convert_to_created(name, file, parent_path));
     }
 
     fn add_created_files(
@@ -261,9 +281,9 @@ impl Diff {
         Ok(())
     }
 
-    fn add_deleted_file(&mut self, file: &File, parent_path: &Path) {
+    fn add_deleted_file(&mut self, name: &Label, file: &File, parent_path: &Path) {
         self.deleted
-            .push(Diff::convert_to_deleted(file, parent_path));
+            .push(Diff::convert_to_deleted(name, file, parent_path));
     }
 
     fn add_deleted_files(
@@ -277,20 +297,19 @@ impl Diff {
         Ok(())
     }
 
-    fn build_path(file: &File, parent_path: &Path) -> Path {
+    fn build_path(name: &Label, file: &File, parent_path: &Path) -> Path {
         let mut result_path = parent_path.clone();
-        result_path.push(file.name.clone());
+        result_path.push(name.clone());
         result_path
     }
 }
 
 // returns list of contents, sorted by label; Repos are prepended to the beginning
-fn get_sorted_contents(dir: &Directory) -> Vec<&DirectoryContents> {
-    let mut vec: Vec<&DirectoryContents> = dir.entries.iter().collect();
+fn get_sorted_contents(dir: &Directory) -> Vec<DirectoryContents> {
+    let mut vec: Vec<DirectoryContents> = dir.iter().collect();
     vec.sort_by_key(|e| match e {
-        DirectoryContents::SubDirectory(subdir) => Some(subdir.name.clone()),
-        DirectoryContents::File(file) => Some(file.name.clone()),
-        DirectoryContents::Repo => None,
+        DirectoryContents::Directory(subdir) => Some(subdir.current().clone()),
+        DirectoryContents::File { name, file } => Some(name.clone()),
     });
     vec
 }
@@ -298,42 +317,20 @@ fn get_sorted_contents(dir: &Directory) -> Vec<&DirectoryContents> {
 #[cfg(test)]
 mod tests {
     use crate::diff::*;
+    use crate::file_system::unsound;
     use crate::file_system::*;
     use nonempty::NonEmpty;
     use pretty_assertions::assert_eq;
 
-    #[derive(Debug, Clone)]
-    struct TestRepo {}
-
-    impl RepoBackend for TestRepo {
-        fn repo_directory() -> Directory {
-            Directory {
-                name: unsound::label::new(".test"),
-                entries: NonEmpty::new(DirectoryContents::Repo),
-            }
-        }
-    }
-
     #[test]
     fn test_create_file() {
-        let directory: Directory = Directory {
-            name: Label::root(),
-            entries: NonEmpty::new(DirectoryContents::Repo),
-        };
+        let directory = Directory::root();
 
-        let new_directory: Directory = Directory {
-            name: Label::root(),
-            entries: (
-                DirectoryContents::Repo,
-                vec![DirectoryContents::file(
-                    unsound::label::new("banana.rs"),
-                    b"use banana",
-                )],
-            )
-                .into(),
-        };
+        let mut new_directory = Directory::root();
+        new_directory.insert_file(&unsound::path::new("banana.rs"), File::new(b"use banana"));
 
         let diff = Diff::diff(directory, new_directory).expect("diff failed");
+
         let expected_diff = Diff {
             created: vec![CreateFile(Path::with_root(&[unsound::label::new(
                 "banana.rs",
@@ -348,24 +345,13 @@ mod tests {
 
     #[test]
     fn test_delete_file() {
-        let directory: Directory = Directory {
-            name: Label::root(),
-            entries: (
-                DirectoryContents::Repo,
-                vec![DirectoryContents::file(
-                    unsound::label::new("banana.rs"),
-                    b"use banana",
-                )],
-            )
-                .into(),
-        };
+        let mut directory = Directory::root();
+        directory.insert_file(&unsound::path::new("banana.rs"), File::new(b"use banana"));
 
-        let new_directory: Directory = Directory {
-            name: Label::root(),
-            entries: NonEmpty::new(DirectoryContents::Repo),
-        };
+        let new_directory = Directory::root();
 
         let diff = Diff::diff(directory, new_directory).expect("diff failed");
+
         let expected_diff = Diff {
             created: vec![],
             deleted: vec![DeleteFile(Path::with_root(&[unsound::label::new(
@@ -380,21 +366,11 @@ mod tests {
 
     #[test]
     fn test_moved_file() {
-        let directory: Directory = Directory {
-            name: Label::root(),
-            entries: NonEmpty::new(DirectoryContents::file(
-                unsound::label::new("mod.rs"),
-                b"use banana",
-            )),
-        };
+        let mut directory = Directory::root();
+        directory.insert_file(&unsound::path::new("mod.rs"), File::new(b"use banana"));
 
-        let new_directory: Directory = Directory {
-            name: Label::root(),
-            entries: NonEmpty::new(DirectoryContents::file(
-                unsound::label::new("banana.rs"),
-                b"use banana",
-            )),
-        };
+        let mut new_directory = Directory::root();
+        new_directory.insert_file(&unsound::path::new("banana.rs"), File::new(b"use banana"));
 
         let diff = Diff::diff(directory, new_directory).expect("diff failed");
 
@@ -405,31 +381,14 @@ mod tests {
 
     #[test]
     fn test_modify_file() {
-        let directory: Directory = Directory {
-            name: Label::root(),
-            entries: (
-                DirectoryContents::Repo,
-                vec![DirectoryContents::file(
-                    unsound::label::new("banana.rs"),
-                    b"use banana",
-                )],
-            )
-                .into(),
-        };
+        let mut directory = Directory::root();
+        directory.insert_file(&unsound::path::new("banana.rs"), File::new(b"use banana"));
 
-        let new_directory: Directory = Directory {
-            name: Label::root(),
-            entries: (
-                DirectoryContents::Repo,
-                vec![DirectoryContents::file(
-                    unsound::label::new("banana.rs"),
-                    b"use banana;",
-                )],
-            )
-                .into(),
-        };
+        let mut new_directory = Directory::root();
+        new_directory.insert_file(&unsound::path::new("banana.rs"), File::new(b"use banana;"));
 
         let diff = Diff::diff(directory, new_directory).expect("diff failed");
+
         let expected_diff = Diff {
             created: vec![],
             deleted: vec![],
@@ -445,27 +404,16 @@ mod tests {
 
     #[test]
     fn test_create_directory() {
-        let directory: Directory = Directory {
-            name: Label::root(),
-            entries: NonEmpty::new(DirectoryContents::Repo),
-        };
+        let mut directory = Directory::root();
 
-        let new_directory: Directory = Directory {
-            name: Label::root(),
-            entries: (
-                DirectoryContents::Repo,
-                vec![DirectoryContents::sub_directory(Directory {
-                    name: unsound::label::new("src"),
-                    entries: NonEmpty::new(DirectoryContents::file(
-                        unsound::label::new("banana.rs"),
-                        b"use banana",
-                    )),
-                })],
-            )
-                .into(),
-        };
+        let mut new_directory = Directory::root();
+        new_directory.insert_file(
+            &unsound::path::new("src/banana.rs"),
+            File::new(b"use banana"),
+        );
 
         let diff = Diff::diff(directory, new_directory).expect("diff failed");
+
         let expected_diff = Diff {
             created: vec![CreateFile(Path::with_root(&[
                 unsound::label::new("src"),
@@ -481,27 +429,16 @@ mod tests {
 
     #[test]
     fn test_delete_directory() {
-        let directory: Directory = Directory {
-            name: Label::root(),
-            entries: (
-                DirectoryContents::Repo,
-                vec![DirectoryContents::sub_directory(Directory {
-                    name: unsound::label::new("src"),
-                    entries: NonEmpty::new(DirectoryContents::file(
-                        unsound::label::new("banana.rs"),
-                        b"use banana",
-                    )),
-                })],
-            )
-                .into(),
-        };
+        let mut directory = Directory::root();
+        directory.insert_file(
+            &unsound::path::new("src/banana.rs"),
+            File::new(b"use banana"),
+        );
 
-        let new_directory: Directory = Directory {
-            name: Label::root(),
-            entries: NonEmpty::new(DirectoryContents::Repo),
-        };
+        let mut new_directory = Directory::root();
 
         let diff = Diff::diff(directory, new_directory).expect("diff failed");
+
         let expected_diff = Diff {
             created: vec![],
             deleted: vec![DeleteFile(Path::with_root(&[
@@ -517,37 +454,20 @@ mod tests {
 
     #[test]
     fn test_modify_file_directory() {
-        let directory: Directory = Directory {
-            name: Label::root(),
-            entries: (
-                DirectoryContents::Repo,
-                vec![DirectoryContents::sub_directory(Directory {
-                    name: unsound::label::new("src"),
-                    entries: NonEmpty::new(DirectoryContents::file(
-                        unsound::label::new("banana.rs"),
-                        b"use banana",
-                    )),
-                })],
-            )
-                .into(),
-        };
+        let mut directory = Directory::root();
+        directory.insert_file(
+            &unsound::path::new("src/banana.rs"),
+            File::new(b"use banana"),
+        );
 
-        let new_directory: Directory = Directory {
-            name: Label::root(),
-            entries: (
-                DirectoryContents::Repo,
-                vec![DirectoryContents::sub_directory(Directory {
-                    name: unsound::label::new("src"),
-                    entries: NonEmpty::new(DirectoryContents::file(
-                        unsound::label::new("banana.rs"),
-                        b"use banana;",
-                    )),
-                })],
-            )
-                .into(),
-        };
+        let mut new_directory = Directory::root();
+        new_directory.insert_file(
+            &unsound::path::new("src/banana.rs"),
+            File::new(b"use banana;"),
+        );
 
         let diff = Diff::diff(directory, new_directory).expect("diff failed");
+
         let expected_diff = Diff {
             created: vec![],
             deleted: vec![],
@@ -566,29 +486,20 @@ mod tests {
 
     #[test]
     fn test_disjoint_directories() {
-        let directory: Directory = Directory {
-            name: unsound::label::new("foo"),
-            entries: NonEmpty::new(DirectoryContents::sub_directory(Directory {
-                name: unsound::label::new("src"),
-                entries: NonEmpty::new(DirectoryContents::file(
-                    unsound::label::new("banana.rs"),
-                    b"use banana",
-                )),
-            })),
-        };
+        let mut directory = Directory::root();
+        directory.insert_file(
+            &unsound::path::new("foo/src/banana.rs"),
+            File::new(b"use banana"),
+        );
 
-        let other_directory: Directory = Directory {
-            name: unsound::label::new("bar"),
-            entries: NonEmpty::new(DirectoryContents::sub_directory(Directory {
-                name: unsound::label::new("src"),
-                entries: NonEmpty::new(DirectoryContents::file(
-                    unsound::label::new("pineapple.rs"),
-                    b"use pineapple",
-                )),
-            })),
-        };
+        let mut other_directory = Directory::root();
+        other_directory.insert_file(
+            &unsound::path::new("bar/src/pineapple.rs"),
+            File::new(b"use pineapple"),
+        );
 
         let diff = Diff::diff(directory, other_directory).expect("diff failed");
+
         let expected_diff = Diff {
             created: vec![CreateFile(Path::from_labels(
                 unsound::label::new("bar"),
