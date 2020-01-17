@@ -43,6 +43,7 @@ pub use git2::{BranchType, Error as Git2Error, Oid, Time};
 pub mod error;
 
 use crate::file_system;
+use crate::file_system::directory;
 use crate::tree::*;
 use crate::vcs;
 use crate::vcs::git::error::*;
@@ -275,7 +276,7 @@ impl<'repo> Repository {
                 };
 
                 file_histories.insert_with(
-                    path.0,
+                    &path.0,
                     NonEmpty::new(parent_commit.clone()),
                     |commits| commits.push(parent_commit),
                 );
@@ -509,18 +510,6 @@ impl vcs::VCS<Commit, Error> for Repository {
     }
 }
 
-impl file_system::RepoBackend for Repository {
-    fn repo_directory() -> file_system::Directory {
-        file_system::Directory {
-            name: file_system::Label {
-                label: ".git".into(),
-                hidden: true,
-            },
-            entries: NonEmpty::new(file_system::DirectoryContents::Repo),
-        }
-    }
-}
-
 impl std::fmt::Debug for Repository {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, ".git")
@@ -548,7 +537,7 @@ impl Browser {
         let history = repository.head()?;
         let snapshot = Box::new(|repository: &Repository, history: &History| {
             let tree = Self::get_tree(&repository.0, history.0.first())?;
-            Ok(file_system::Directory::from::<Repository>(tree))
+            Ok(directory::Directory::from_hash_map(tree))
         });
         Ok(vcs::Browser {
             snapshot,
@@ -575,7 +564,7 @@ impl Browser {
         let history = repository.get_history(Object::Branch(branch_name))?;
         let snapshot = Box::new(|repository: &Repository, history: &History| {
             let tree = Self::get_tree(&repository.0, history.0.first())?;
-            Ok(file_system::Directory::from::<Repository>(tree))
+            Ok(directory::Directory::from_hash_map(tree))
         });
         Ok(vcs::Browser {
             snapshot,
@@ -973,9 +962,10 @@ impl Browser {
     fn get_tree(
         repo: &git2::Repository,
         commit: &Commit,
-    ) -> Result<HashMap<file_system::Path, NonEmpty<file_system::File>>, Error> {
+    ) -> Result<HashMap<file_system::Path, NonEmpty<(file_system::Label, directory::File)>>, Error>
+    {
         let mut file_paths_or_error: Result<
-            HashMap<file_system::Path, NonEmpty<file_system::File>>,
+            HashMap<file_system::Path, NonEmpty<(file_system::Label, directory::File)>>,
             Error,
         > = Ok(HashMap::new());
 
@@ -985,9 +975,9 @@ impl Browser {
         tree.walk(
             git2::TreeWalkMode::PreOrder,
             |s, entry| match Self::tree_entry_to_file_and_path(repo, s, entry) {
-                Ok((path, file)) => {
+                Ok((path, name, file)) => {
                     match file_paths_or_error.as_mut() {
-                        Ok(mut files) => Self::update_file_map(path, file, &mut files),
+                        Ok(mut files) => Self::update_file_map(path, name, file, &mut files),
 
                         // We don't need to update, we want to keep the error.
                         Err(_err) => {}
@@ -1016,20 +1006,21 @@ impl Browser {
 
     fn update_file_map(
         path: file_system::Path,
-        file: file_system::File,
-        files: &mut HashMap<file_system::Path, NonEmpty<file_system::File>>,
+        name: file_system::Label,
+        file: directory::File,
+        files: &mut HashMap<file_system::Path, NonEmpty<(file_system::Label, directory::File)>>,
     ) {
         files
             .entry(path)
-            .and_modify(|entries| entries.push(file.clone()))
-            .or_insert_with(|| NonEmpty::new(file));
+            .and_modify(|entries| entries.push((name.clone(), file.clone())))
+            .or_insert_with(|| NonEmpty::new((name, file)));
     }
 
     fn tree_entry_to_file_and_path(
         repo: &git2::Repository,
         tree_path: &str,
         entry: &git2::TreeEntry,
-    ) -> Result<(file_system::Path, file_system::File), TreeWalkError> {
+    ) -> Result<(file_system::Path, file_system::Label, directory::File), TreeWalkError> {
         // Account for the "root" of git being the empty string
         let path = if tree_path.is_empty() {
             Ok(file_system::Path::root())
@@ -1051,8 +1042,8 @@ impl Browser {
 
         Ok((
             path,
-            file_system::File {
-                name,
+            name,
+            directory::File {
                 contents: blob.content().to_owned(),
                 size: blob.size(),
             },
