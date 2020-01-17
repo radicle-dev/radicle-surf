@@ -85,27 +85,33 @@ impl File {
     }
 }
 
+#[derive(Debug, Clone)]
+enum Location {
+    Root,
+    SubDirectory(Label),
+}
+
 /// A `Directory` consists of its [`Label`](struct.Label.html) and its entries.
 /// The entries are a set of [`DirectoryContents`](struct.DirectoryContents.html)
 /// and there should be at least one entry.
 /// This is because empty directories do not generally exist in VCSes.
 #[derive(Debug, Clone)]
-pub struct Directory(Forest<Label, File>);
-
-impl From<Forest<Label, File>> for Directory {
-    fn from(forest: Forest<Label, File>) -> Self {
-        Directory(forest)
-    }
+pub struct Directory {
+    current: Location,
+    sub_directories: Forest<Label, File>,
 }
 
 impl Directory {
     pub fn root() -> Self {
-        Forest::root().into()
+        Directory {
+            current: Location::Root,
+            sub_directories: Forest::root(),
+        }
     }
 
     /// List the current `Directory`'s files and sub-directories.
     pub fn list_directory(&self) -> Vec<(Label, SystemType)> {
-        let forest = &self.0;
+        let forest = &self.sub_directories;
         match &forest.0 {
             None => vec![],
             Some(trees) => trees
@@ -125,7 +131,7 @@ impl Directory {
     /// This operation fails if the path does not lead to
     /// the `File`.
     pub fn find_file(&self, path: &Path) -> Option<File> {
-        self.0.find_node(&path.0).cloned()
+        self.sub_directories.find_node(&path.0).cloned()
     }
 
     /// Find a `Directory` in the directory given the `Path` to
@@ -134,10 +140,43 @@ impl Directory {
     /// This operation fails if the path does not lead to
     /// the `Directory`.
     pub fn find_directory(&self, path: &Path) -> Option<Self> {
-        self.0
+        self.sub_directories
             .find_branch(&path.0)
             .cloned()
-            .map(|tree| Directory(tree.into()))
+            .map(|tree| {
+                let (_, current) = path.split_last();
+                Directory {
+                    current: Location::SubDirectory(current),
+                    sub_directories: tree.into(),
+                }
+            })
+    }
+
+    /// Get the `Label` of the current directory.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use radicle_surf::file_system::{Directory, File, Label};
+    /// use radicle_surf::file_system::unsound;
+    ///
+    /// let mut root = Directory::root();
+    /// root.insert_file(&unsound::path::new("main.rs"), File::new(b"println!(\"Hello, world!\")"));
+    /// root.insert_file(&unsound::path::new("lib.rs"), File::new(b"struct Hello(String)"));
+    /// root.insert_file(&unsound::path::new("test/mod.rs"), File::new(b"assert_eq!(1 + 1, 2);"));
+    ///
+    /// assert_eq!(root.current(), Label::root());
+    ///
+    /// let test = root.find_directory(
+    ///     &unsound::path::new("test")
+    /// ).expect("Missing test directory");
+    /// assert_eq!(test.current(), unsound::label::new("test"));
+    /// ```
+    pub fn current(&self) -> Label {
+        match &self.current {
+            Location::Root => Label::root(),
+            Location::SubDirectory(label) => label.clone(),
+        }
     }
 
     // TODO(fintan): This is going to be a bit trickier so going to leave it out for now
@@ -188,11 +227,13 @@ impl Directory {
     /// assert_eq!(root.size(), 66);
     /// ```
     pub fn size(&self) -> usize {
-        self.0.iter().fold(0, |size, file| size + file.size())
+        self.sub_directories
+            .iter()
+            .fold(0, |size, file| size + file.size())
     }
 
     pub fn insert_file(&mut self, path: &Path, file: File) {
-        self.0.insert(&path.0, file)
+        self.sub_directories.insert(&path.0, file)
     }
 
     pub fn insert_files(&mut self, directory_path: &[Label], files: NonEmpty<(Label, File)>) {
