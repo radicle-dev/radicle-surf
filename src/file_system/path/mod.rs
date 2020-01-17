@@ -6,6 +6,8 @@ use std::fmt;
 use std::path;
 use std::str::FromStr;
 
+pub mod unsound;
+
 /// A label for [`Directory`](struct.Directory.html)
 /// and [`File`](struct.File.html) to allow for search.
 ///
