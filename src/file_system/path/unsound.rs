@@ -1,5 +1,5 @@
 pub mod path {
-    use crate::file_system::Path;
+    use crate::file_system::path::Path;
     use std::convert::TryFrom;
 
     /// **NB**: Use with caution!
@@ -13,7 +13,7 @@ pub mod path {
 }
 
 pub mod label {
-    use crate::file_system::Label;
+    use crate::file_system::path::Label;
     use std::convert::TryFrom;
 
     /// **NB**: Use with caution!
