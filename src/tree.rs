@@ -194,7 +194,6 @@ impl<K, A> Tree<K, A> {
     fn insert_node_with<F>(&mut self, key: K, value: A, f: F)
     where
         F: FnOnce(&mut A),
-        A: Clone,
         K: Ord,
     {
         let result = self.search(&key);
@@ -228,7 +227,6 @@ impl<K, A> Tree<K, A> {
     fn insert_with<F>(&mut self, keys: &NonEmpty<K>, value: A, f: F)
     where
         F: FnOnce(&mut A),
-        A: Clone,
         K: Ord + Clone,
     {
         let (head, tail) = keys.split_first();
@@ -241,12 +239,9 @@ impl<K, A> Tree<K, A> {
                     let sub_tree = self.0.get_mut(index).unwrap();
                     match sub_tree {
                         // Our sub-tree was a node.
-                        SubTree::Node { value, .. } => {
+                        SubTree::Node { key, value } => {
+                            std::mem::replace(key, head.clone());
                             f(value);
-                            *sub_tree = SubTree::Node {
-                                key: head.clone(),
-                                value: value.clone(),
-                            }
                         }
                         SubTree::Branch { .. } => {
                             *sub_tree = SubTree::Node {
@@ -407,7 +402,6 @@ impl<K, A> Forest<K, A> {
     pub fn insert_with<F>(&mut self, keys: &NonEmpty<K>, node: A, f: F)
     where
         F: FnOnce(&mut A),
-        A: Clone,
         K: Ord + Clone,
     {
         let (prefix, node_key) = split_last(&keys);
