@@ -163,7 +163,7 @@ impl Path {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::file_system::{Path;
+    /// use radicle_surf::file_system::Path;
     /// use radicle_surf::file_system::unsound;
     /// use std::convert::TryFrom;
     ///
