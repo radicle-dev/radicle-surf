@@ -1,4 +1,4 @@
-#![allow(dead_code, unused_variables)]
+#![allow(dead_code, unused_variables, missing_docs)]
 
 use crate::file_system::{Directory, DirectoryContents, Label, Path};
 use std::cell::RefCell;
@@ -222,7 +222,7 @@ impl Diff {
     where
         F: Fn(&Label, &Path) -> T + Copy,
     {
-        parent_path.borrow_mut().push(dir.current().clone());
+        parent_path.borrow_mut().push(dir.current());
         for entry in dir.iter() {
             match entry {
                 DirectoryContents::Directory(subdir) => {

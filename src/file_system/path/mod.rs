@@ -8,10 +8,12 @@ use std::str::FromStr;
 
 pub mod unsound;
 
-/// A label for [`Directory`](struct.Directory.html)
-/// and [`File`](struct.File.html) to allow for search.
+/// `Label` is a special case of a `String` identifier for
+/// `Directory` and `File` names, and is used in [`Path`](struct.Path.html)
+/// as the component parts of a path.
 ///
-/// These are essentially directory and file names.
+/// A `Label` should not be empty or contain `/`s. It is encouraged to use
+/// the `TryFrom` instance to create a `Label`.
 ///
 /// # Examples
 ///
@@ -28,7 +30,7 @@ pub mod unsound;
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Label {
-    pub label: String,
+    pub(crate) label: String,
     pub(crate) hidden: bool,
 }
 
@@ -89,7 +91,9 @@ impl FromStr for Label {
     }
 }
 /// A non-empty set of [`Label`](struct.Label.html)s to define a path
-/// in a directory or file search.
+/// to a directory or file.
+///
+/// `Path` tends to be used for insertion or find operations.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Path(pub NonEmpty<Label>);
 
@@ -159,7 +163,7 @@ impl Path {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::file_system::{Label, Path};
+    /// use radicle_surf::file_system::{Path;
     /// use radicle_surf::file_system::unsound;
     /// use std::convert::TryFrom;
     ///

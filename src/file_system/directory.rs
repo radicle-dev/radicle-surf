@@ -1,3 +1,13 @@
+//! Definition for a file system consisting of `Directory` and `File`.
+//!
+//! A `Directory` is expected to be a non-empty tree of directories and files.
+//! See [`Directory`](struct.Directory.html) for more information.
+//!
+//! As well as this, this module contains [`DirectoryContents`](enum.DirectoryContents.html)
+//! which is the output of iterating over a `Directory`, and also `SystemType` which is an
+//! identifier of what type of `DirectoryContents` one is viewing when
+//! [listing](struct.Directory.html#method.list_directory) a directory.
+
 use crate::file_system::path::*;
 use crate::tree::*;
 use nonempty::NonEmpty;
@@ -14,7 +24,9 @@ use std::hash::{Hash, Hasher};
 /// [`SystemType::directory`](struct.SystemType.html#method.directory).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SystemType {
+    /// The `File` type in a directory system.
     File,
+    /// The `Directory` type in a directory system.
     Directory,
 }
 
@@ -36,6 +48,7 @@ impl SystemType {
 /// the file and its [`size`](struct.File.html#method.size).
 #[derive(Clone, PartialEq, Eq)]
 pub struct File {
+    /// The contents of a `File` as a vector of bytes.
     pub contents: Vec<u8>,
     pub(crate) size: usize,
 }
@@ -120,16 +133,22 @@ pub struct Directory {
 
 /// `DirectoryContents` is an enumeration of what a [`Directory`](struct.Directory.html) can contain
 /// and is used for when we are [`iter`](struct.Directory.html#method.iter)ating through a `Directory`.
-///
-/// The `File` variant contains the file's name and the [`File`](struct.File.html) itself.
-/// The `Directory` variant contains a sub-directory to the current one.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DirectoryContents {
-    File { name: Label, file: File },
+    /// The `File` variant contains the file's name and the [`File`](struct.File.html) itself.
+    File {
+        /// The name of the file.
+        name: Label,
+        /// The file data.
+        file: File,
+    },
+    /// The `Directory` variant contains a sub-directory to the current one.
     Directory(Directory),
 }
 
 impl DirectoryContents {
+    /// Get a label for the `DirectoryContents`, either the name of the `File`
+    /// or the name of the `Directory`.
     pub fn label(&self) -> Label {
         match self {
             DirectoryContents::File { name, .. } => name.clone(),

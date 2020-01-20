@@ -58,7 +58,7 @@ use std::str;
 pub struct Signature {
     pub name: String,
     pub email: String,
-    pub time: git2::Time,
+    pub time: Time,
 }
 
 impl std::fmt::Debug for Signature {
@@ -85,7 +85,7 @@ impl<'repo> TryFrom<git2::Signature<'repo>> for Signature {
 
 #[derive(Debug, Clone)]
 pub struct Commit {
-    pub id: git2::Oid,
+    pub id: Oid,
     pub author: Signature,
     pub committer: Signature,
     pub message: String,
@@ -179,7 +179,7 @@ impl<'repo> Repository {
             .map_err(Error::from)
     }
 
-    pub fn list_branches(&self, filter: Option<git2::BranchType>) -> Result<Vec<Branch>, Error> {
+    pub fn list_branches(&self, filter: Option<BranchType>) -> Result<Vec<Branch>, Error> {
         self.0
             .branches(filter)
             .map_err(Error::from)
@@ -234,7 +234,7 @@ impl<'repo> Repository {
         for commit_result_id in revwalk {
             // The revwalk iter returns results so
             // we unpack these and push them to the history
-            let commit_id: git2::Oid = commit_result_id?;
+            let commit_id: Oid = commit_result_id?;
             let commit = Commit::try_from(self.0.find_commit(commit_id)?)?;
             commits.push(commit);
         }
@@ -255,7 +255,7 @@ impl<'repo> Repository {
 
     fn collect_file_history(
         &'repo self,
-        commit_id: &git2::Oid,
+        commit_id: &Oid,
         file_histories: &mut Forest<file_system::Label, NonEmpty<OrderedCommit>>,
     ) -> Result<(), Error> {
         let mut revwalk = self.0.revwalk()?;
@@ -363,7 +363,7 @@ impl From<git2::Repository> for Repository {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Branch {
     pub name: BranchName,
-    pub locality: git2::BranchType,
+    pub locality: BranchType,
 }
 
 impl PartialOrd for Branch {
@@ -466,9 +466,9 @@ impl Object {
     }
 }
 
-impl vcs::VCS<Commit, Error> for Repository {
+impl VCS<Commit, Error> for Repository {
     type HistoryId = Object;
-    type ArtefactId = git2::Oid;
+    type ArtefactId = Oid;
 
     fn get_history(&self, history_id: Self::HistoryId) -> Result<History, Error> {
         let reference = self
@@ -771,7 +771,7 @@ impl Browser {
     ///     Branch::remote(BranchName::new("origin/master")),
     /// ]);
     /// ```
-    pub fn list_branches(&self, filter: Option<git2::BranchType>) -> Result<Vec<Branch>, Error> {
+    pub fn list_branches(&self, filter: Option<BranchType>) -> Result<Vec<Branch>, Error> {
         self.repository.list_branches(filter)
     }
 

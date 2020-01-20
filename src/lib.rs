@@ -1,3 +1,5 @@
+#![deny(unused_import_braces, unused_qualifications, warnings)]
+
 //! Welcome to `radicle-surf`!
 //!
 //! `radicle-surf` is a system to describe a file-system in a VCS world.
