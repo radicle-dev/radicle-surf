@@ -461,6 +461,7 @@ impl<K, A> Forest<K, A> {
         self.0.iter().flat_map(|trees| trees.iter())
     }
 
+    #[allow(dead_code)]
     pub fn iter_keys<'a>(&'a self) -> impl Iterator<Item = &K> + 'a {
         self.0.iter().flat_map(|trees| trees.iter_keys())
     }
