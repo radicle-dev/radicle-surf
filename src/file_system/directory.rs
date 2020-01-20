@@ -554,7 +554,6 @@ pub mod tests {
     use crate::file_system::unsound;
     use crate::file_system::*;
     use nonempty::NonEmpty;
-    use pretty_assertions::assert_eq;
     use proptest::collection;
     use proptest::prelude::*;
     use std::collections::HashMap;
