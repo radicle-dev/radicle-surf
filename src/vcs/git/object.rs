@@ -239,7 +239,7 @@ pub enum RevObject {
 }
 
 impl RevObject {
-    pub fn from_revparse(repo: git2::Repository, spec: &str) -> Result<Self, Error> {
+    pub fn from_revparse(repo: &git2::Repository, spec: &str) -> Result<Self, Error> {
         let (object, optional_ref) = repo.revparse_ext(spec)?;
 
         match optional_ref {
