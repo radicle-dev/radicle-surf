@@ -48,7 +48,7 @@ use crate::file_system::directory;
 use crate::tree::*;
 use crate::vcs;
 use crate::vcs::git::error::*;
-use crate::vcs::git::object::*;
+pub use crate::vcs::git::object::*;
 use crate::vcs::VCS;
 use nonempty::NonEmpty;
 use std::cmp::Ordering;
@@ -555,14 +555,18 @@ impl Browser {
     /// use radicle_surf::file_system::{Label, SystemType};
     /// use radicle_surf::vcs::git::{Browser, Repository, Sha1};
     /// use radicle_surf::file_system::unsound;
+    /// use std::str::FromStr;
     ///
     /// let repo = Repository::new("./data/git-platinum")
     ///     .expect("Could not retrieve ./data/git-platinum as git repository");
     /// let mut browser = Browser::new(repo).expect("Could not initialise Browser");
     ///
+    /// let commit = Sha1::from_str(
+    ///     "e24124b7538658220b5aaf3b6ef53758f0a106dc").expect("Failed to
+    /// parse SHA");
     /// // Set to the initial commit
     /// browser
-    ///     .commit(Sha1::new("e24124b7538658220b5aaf3b6ef53758f0a106dc"))
+    ///     .commit(commit)
     ///     .expect("Missing commit");
     ///
     /// let directory = browser.get_directory().unwrap();
@@ -662,6 +666,7 @@ impl Browser {
     /// use radicle_surf::vcs::git::{Browser, Repository, Sha1};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     /// use radicle_surf::file_system::unsound;
+    /// use std::str::FromStr;
     ///
     /// use git2;
     ///
@@ -670,7 +675,10 @@ impl Browser {
     /// let mut browser = Browser::new(repo).expect("Could not initialise Browser");
     ///
     /// // Clamp the Browser to a particular commit
-    /// browser.commit(Sha1::new("d6880352fc7fda8f521ae9b7357668b17bb5bad5")).expect("Failed to set
+    /// let commit = Sha1::from_str(
+    ///     "d6880352fc7fda8f521ae9b7357668b17bb5bad5"
+    /// ).expect("Failed to parse SHA");
+    /// browser.commit(commit).expect("Failed to set
     /// commit");
     ///
     /// let head_commit = browser.get_history().0.first().clone();
@@ -699,13 +707,17 @@ impl Browser {
     /// use radicle_surf::vcs::git::{Browser, Repository, Sha1};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     /// use radicle_surf::file_system::unsound;
+    /// use std::str::FromStr;
     ///
     /// let repo = Repository::new("./data/git-platinum")
     ///     .expect("Could not retrieve ./data/git-platinum as git repository");
     /// let mut browser = Browser::new(repo).expect("Could not initialise Browser");
     ///
     /// // Set the browser history to the initial commit
-    /// browser.commit(Sha1::new("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3")).unwrap();
+    /// let commit = Sha1::from_str(
+    ///     "d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3"
+    /// ).expect("Failed to parse SHA");
+    /// browser.commit(commit).unwrap();
     ///
     /// let head_commit = browser.get_history().0.first().clone();
     ///
@@ -730,13 +742,17 @@ impl Browser {
     /// use radicle_surf::vcs::git::{BranchName, Browser, Oid, Repository, Sha1};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     /// use radicle_surf::file_system::unsound;
+    /// use std::str::FromStr;
     ///
     /// let repo = Repository::new("./data/git-platinum")
     ///     .expect("Could not retrieve ./data/git-platinum as git repository");
     /// let mut browser = Browser::new(repo).expect("Could not initialise Browser");
     ///
     /// // Check that last commit is the actual last commit even if head commit differs.
-    /// browser.commit(Sha1::new("19bec071db6474af89c866a1bd0e4b1ff76e2b97")).unwrap();
+    /// let commit = Sha1::from_str(
+    ///     "19bec071db6474af89c866a1bd0e4b1ff76e2b97"
+    /// ).expect("Could not parse SHA");
+    /// browser.commit(commit).unwrap();
     ///
     /// let expected_commit_id =
     ///     Oid::from_str("f3a089488f4cfd1a240a9c01b3fcc4c34a4e97b2").unwrap();
@@ -754,13 +770,17 @@ impl Browser {
     /// use radicle_surf::vcs::git::git2::{Oid};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     /// use radicle_surf::file_system::unsound;
+    /// use std::str::FromStr;
     ///
     /// let repo = Repository::new("./data/git-platinum")
     ///     .expect("Could not retrieve ./data/git-platinum as git repository");
     /// let mut browser = Browser::new(repo).expect("Could not initialise Browser");
     ///
     /// // Check that last commit is the actual last commit even if head commit differs.
-    /// browser.commit(Sha1::new("19bec071db6474af89c866a1bd0e4b1ff76e2b97")).unwrap();
+    /// let commit = Sha1::from_str(
+    ///     "19bec071db6474af89c866a1bd0e4b1ff76e2b97"
+    /// ).expect("Failed to parse SHA");
+    /// browser.commit(commit).unwrap();
     ///
     /// let expected_commit_id =
     ///     Oid::from_str("2429f097664f9af0c5b7b389ab998b2199ffa977").unwrap();

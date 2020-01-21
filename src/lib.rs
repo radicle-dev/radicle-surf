@@ -14,6 +14,7 @@
 //! use radicle_surf::file_system::{Label, Path, SystemType};
 //! use radicle_surf::file_system::unsound;
 //! use pretty_assertions::assert_eq;
+//! use std::str::FromStr;
 //!
 //! // We're going to point to this repo.
 //! let repo = git::Repository::new("./data/git-platinum").expect("Failed to initialise repo");
@@ -22,8 +23,10 @@
 //! let mut browser = git::Browser::new(repo).expect("Failed to initialise browser");
 //!
 //! // Set the history to a particular commit
-//! browser.commit(git::Sha1::new("80ded66281a4de2889cc07293a8f10947c6d57fe"))
-//!        .expect("Failed to set commit");
+//! let commit = git::Sha1::from_str(
+//!     "80ded66281a4de2889cc07293a8f10947c6d57fe"
+//! ).expect("Failed to parse SHA");
+//! browser.commit(commit).expect("Failed to set commit");
 //!
 //! // Get the snapshot of the directory for our current
 //! // HEAD of history.

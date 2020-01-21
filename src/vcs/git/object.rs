@@ -207,6 +207,15 @@ impl Sha1 {
     }
 }
 
+impl str::FromStr for Sha1 {
+    type Err = git2::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let oid = git2::Oid::from_str(s)?;
+        Ok(Sha1(oid))
+    }
+}
+
 /// An enumeration of git objects we can fetch and turn
 /// into a [`History`](struct.History.html).
 #[derive(Debug, Clone)]
