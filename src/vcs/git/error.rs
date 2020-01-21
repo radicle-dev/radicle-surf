@@ -6,6 +6,7 @@ pub enum Error {
     EmptyCommitHistory,
     NotBranch,
     NotTag,
+    RevParseFailure,
     Utf8Error(str::Utf8Error),
     FileSystem(file_error::Error),
     FileDiffException,
