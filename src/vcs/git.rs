@@ -41,78 +41,20 @@ pub use git2;
 pub use git2::{BranchType, Error as Git2Error, Oid, Time};
 
 pub mod error;
+pub mod object;
 
 use crate::file_system;
 use crate::file_system::directory;
 use crate::tree::*;
 use crate::vcs;
 use crate::vcs::git::error::*;
+use crate::vcs::git::object::*;
 use crate::vcs::VCS;
 use nonempty::NonEmpty;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::str;
-
-#[derive(Clone)]
-pub struct Signature {
-    pub name: String,
-    pub email: String,
-    pub time: Time,
-}
-
-impl std::fmt::Debug for Signature {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Signature {{ name: {}, email: {} }}",
-            self.name, self.email
-        )
-    }
-}
-
-impl<'repo> TryFrom<git2::Signature<'repo>> for Signature {
-    type Error = Error;
-
-    fn try_from(signature: git2::Signature) -> Result<Self, Self::Error> {
-        let name = str::from_utf8(signature.name_bytes())?.into();
-        let email = str::from_utf8(signature.email_bytes())?.into();
-        let time = signature.when();
-
-        Ok(Signature { name, email, time })
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Commit {
-    pub id: Oid,
-    pub author: Signature,
-    pub committer: Signature,
-    pub message: String,
-    pub summary: String,
-}
-
-impl<'repo> TryFrom<git2::Commit<'repo>> for Commit {
-    type Error = Error;
-
-    fn try_from(commit: git2::Commit) -> Result<Self, Self::Error> {
-        let id = commit.id();
-        let author = Signature::try_from(commit.author())?;
-        let committer = Signature::try_from(commit.committer())?;
-        let message_raw = commit.message_bytes();
-        let message = str::from_utf8(message_raw)?.into();
-        let summary_raw = commit.summary_bytes().expect("TODO");
-        let summary = str::from_utf8(summary_raw)?.into();
-
-        Ok(Commit {
-            id,
-            author,
-            committer,
-            message,
-            summary,
-        })
-    }
-}
 
 /// A `History` that uses `git2::Commit` as the underlying artifact.
 pub type History = vcs::History<Commit>;
@@ -186,9 +128,9 @@ impl<'repo> Repository {
             .and_then(|mut branches| {
                 branches.try_fold(vec![], |mut acc, branch| {
                     let (branch, branch_type) = branch?;
-                    let name = str::from_utf8(branch.name_bytes()?)?;
+                    let name = BranchName::try_from(branch.name_bytes()?)?;
                     let branch = Branch {
-                        name: BranchName(name.to_string()),
+                        name,
                         locality: branch_type,
                     };
                     acc.push(branch);
@@ -207,8 +149,7 @@ impl<'repo> Repository {
 
     /// Get a particular `Commit`.
     pub(crate) fn get_commit(&'repo self, sha: Sha1) -> Result<git2::Commit<'repo>, Error> {
-        let oid = git2::Oid::from_str(&sha.0)?;
-        let commit = self.0.find_commit(oid)?;
+        let commit = self.0.find_commit(sha.value().clone())?;
         Ok(commit)
     }
 
@@ -225,6 +166,15 @@ impl<'repo> Repository {
         history: &git2::Reference<'repo>,
     ) -> Result<History, Error> {
         let head = history.peel_to_commit()?;
+        self.commit_to_history(&head)
+    }
+
+    /// Turn a `git2::Reference` into a `History` by completing
+    /// a revwalk over the first commit in the reference.
+    pub(crate) fn commit_to_history(
+        &'repo self,
+        head: &'repo git2::Commit,
+    ) -> Result<History, Error> {
         let mut commits = Vec::new();
         let mut revwalk = self.0.revwalk()?;
 
@@ -356,116 +306,6 @@ impl From<git2::Repository> for Repository {
     }
 }
 
-/// The combination of a branch's name and where its locality (remote or local).
-///
-/// **Note**: The `PartialOrd` and `Ord` implementations compare on `BranchName`
-/// only.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Branch {
-    pub name: BranchName,
-    pub locality: BranchType,
-}
-
-impl PartialOrd for Branch {
-    fn partial_cmp(&self, other: &Branch) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Branch {
-    fn cmp(&self, other: &Branch) -> Ordering {
-        self.name.cmp(&other.name)
-    }
-}
-
-impl Branch {
-    /// Helper to create a remote `Branch` with a name
-    pub fn remote(name: BranchName) -> Self {
-        Branch {
-            name,
-            locality: git2::BranchType::Remote,
-        }
-    }
-
-    /// Helper to create a remote `Branch` with a name
-    pub fn local(name: BranchName) -> Self {
-        Branch {
-            name,
-            locality: git2::BranchType::Local,
-        }
-    }
-}
-
-/// A newtype wrapper over `String` to separate out
-/// the fact that a caller wants to fetch a branch.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct BranchName(String);
-
-impl BranchName {
-    pub fn new(name: &str) -> Self {
-        BranchName(name.into())
-    }
-
-    pub fn name(&self) -> String {
-        self.0.clone()
-    }
-}
-
-/// A newtype wrapper over `String` to separate out
-/// the fact that a caller wants to fetch a tag.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct TagName(String);
-
-impl TagName {
-    pub fn new(name: &str) -> Self {
-        TagName(name.into())
-    }
-
-    pub fn name(&self) -> String {
-        self.0.clone()
-    }
-}
-
-/// A newtype wrapper over `String` to separate out
-/// the fact that a caller wants to fetch a commit.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Sha1(String);
-
-impl Sha1 {
-    pub fn new(name: &str) -> Self {
-        Sha1(name.into())
-    }
-
-    pub fn name(&self) -> String {
-        self.0.clone()
-    }
-}
-
-/// An enumeration of git objects we can fetch and turn
-/// into a [`History`](struct.History.html).
-#[derive(Debug, Clone)]
-pub enum Object {
-    Branch(BranchName),
-    Tag(TagName),
-}
-
-impl Object {
-    pub fn branch(name: &str) -> Self {
-        Object::Branch(BranchName::new(name))
-    }
-
-    pub fn tag(name: &str) -> Self {
-        Object::Tag(TagName::new(name))
-    }
-
-    fn get_name(&self) -> String {
-        match self {
-            Object::Branch(name) => name.0.clone(),
-            Object::Tag(name) => name.0.clone(),
-        }
-    }
-}
-
 impl VCS<Commit, Error> for Repository {
     type HistoryId = Object;
     type ArtefactId = Oid;
@@ -473,7 +313,7 @@ impl VCS<Commit, Error> for Repository {
     fn get_history(&self, history_id: Self::HistoryId) -> Result<History, Error> {
         let reference = self
             .0
-            .resolve_reference_from_short_name(&history_id.get_name())?;
+            .resolve_reference_from_short_name(&history_id.name())?;
         let to_history = |pred, err| {
             if pred {
                 self.to_history(&reference)
