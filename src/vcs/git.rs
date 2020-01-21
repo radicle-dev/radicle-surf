@@ -147,6 +147,10 @@ impl<'repo> Repository {
             .collect())
     }
 
+    pub fn from_revparse(&self, spec: &str) -> Result<RevObject, Error> {
+        RevObject::from_revparse(&self.0, spec)
+    }
+
     /// Get a particular `Commit`.
     pub(crate) fn get_commit(&'repo self, sha: Sha1) -> Result<git2::Commit<'repo>, Error> {
         let commit = self.0.find_commit(sha.value().clone())?;
@@ -643,6 +647,10 @@ impl Browser {
     /// ```
     pub fn list_tags(&self) -> Result<Vec<TagName>, Error> {
         self.repository.list_tags()
+    }
+
+    pub fn from_revparse(&self, spec: &str) -> Result<RevObject, Error> {
+        self.repository.from_revparse(spec)
     }
 
     /// Given a [`Path`](../../file_system/struct.Path.html) to a file, return the last `Commit`
