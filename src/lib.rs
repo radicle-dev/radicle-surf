@@ -23,7 +23,7 @@
 //! let mut browser = git::Browser::new(repo).expect("Failed to initialise browser");
 //!
 //! // Set the history to a particular commit
-//! let commit = git::Sha1::from_str(
+//! let commit = git::Oid::from_str(
 //!     "80ded66281a4de2889cc07293a8f10947c6d57fe"
 //! ).expect("Failed to parse SHA");
 //! browser.commit(commit).expect("Failed to set commit");
