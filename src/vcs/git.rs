@@ -437,7 +437,7 @@ impl Browser {
     /// ```
     pub fn head(&mut self) -> Result<(), Error> {
         let history = self.repository.head()?;
-        self.set_history(history);
+        self.set(history);
         Ok(())
     }
 
@@ -506,8 +506,7 @@ impl Browser {
     /// );
     /// ```
     pub fn branch(&mut self, branch_name: BranchName) -> Result<(), Error> {
-        let branch = self.repository.get_history(Object::Branch(branch_name))?;
-        self.set_history(branch);
+        self.set(branch);
         Ok(())
     }
 
@@ -535,14 +534,14 @@ impl Browser {
     ///     ]
     /// ).into());
     ///
-    /// let history_ids = browser.get_history().map(|commit| commit.id);
+    /// let history_ids = browser.get().map(|commit| commit.id);
     ///
     /// // We are able to render the directory
     /// assert_eq!(history_ids, expected_history);
     /// ```
     pub fn tag(&mut self, tag_name: TagName) -> Result<(), Error> {
         let branch = self.repository.get_history(Object::Tag(tag_name))?;
-        self.set_history(branch);
+        self.set(branch);
         Ok(())
     }
 
@@ -583,13 +582,11 @@ impl Browser {
     ///         SystemType::directory(unsound::label::new("this")),
     ///     ]
     /// );
-    ///
-    /// // We have the single commit
-    /// assert!(browser.get_history().0.len() == 1);
     /// ```
-    pub fn commit(&mut self, sha: Sha1) -> Result<(), Error> {
-        let commit = Commit::try_from(self.repository.get_commit(sha)?)?;
-        self.set_history(vcs::History(NonEmpty::new(commit)));
+    pub fn commit(&mut self, oid: Oid) -> Result<(), Error> {
+        let commit = self.repository.get_commit(oid)?;
+        let history = self.repository.commit_to_history(commit)?;
+        self.set(history);
         Ok(())
     }
 
@@ -681,7 +678,7 @@ impl Browser {
     /// browser.commit(commit).expect("Failed to set
     /// commit");
     ///
-    /// let head_commit = browser.get_history().0.first().clone();
+    /// let head_commit = browser.get().first().clone();
     /// let expected_commit = git2::Oid::from_str("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3")
     ///     .expect("Failed to create Oid");
     ///
@@ -719,7 +716,7 @@ impl Browser {
     /// ).expect("Failed to parse SHA");
     /// browser.commit(commit).unwrap();
     ///
-    /// let head_commit = browser.get_history().0.first().clone();
+    /// let head_commit = browser.get().0.first().clone();
     ///
     /// // memory.rs is commited later so it should not exist here.
     /// let memory_last_commit = browser
@@ -812,9 +809,7 @@ impl Browser {
     ///
     /// assert_eq!(root_last_commit_id, Some(expected_commit_id));
     pub fn last_commit(&self, path: &file_system::Path) -> Result<Option<Commit>, Error> {
-        let file_history = self
-            .repository
-            .file_history(self.get_history().first().clone())?;
+        let file_history = self.repository.file_history(self.get().first().clone())?;
 
         Ok(file_history.find(&path.0).map(|tree| {
             tree.maximum_by(&|c: &NonEmpty<OrderedCommit>, d| c.first().compare_by_id(&d.first()))
