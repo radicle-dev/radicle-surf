@@ -604,9 +604,47 @@ impl Browser {
         Ok(())
     }
 
+    /// Set a `Browser`'s `History` based on a
+    /// [revspec](https://git-scm.com/docs/git-rev-parse.html#_specifying_revisions).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use radicle_surf::file_system::{Label, SystemType};
+    /// use radicle_surf::file_system::unsound;
+    /// use radicle_surf::vcs::git::{Browser, Oid, Repository};
+    /// use std::str::FromStr;
+    ///
+    /// let repo = Repository::new("./data/git-platinum")
+    ///     .expect("Could not retrieve ./data/git-platinum as git repository");
+    /// let mut browser = Browser::new(repo).expect("Could not initialise Browser");
+    ///
+    /// browser
+    ///     .revspec("refs/remotes/origin/dev")
+    ///     .expect("Missing dev");
+    ///
+    /// let directory = browser.get_directory().unwrap();
+    /// let mut directory_contents = directory.list_directory();
+    /// directory_contents.sort();
+    ///
+    /// // We should only have src in our root
+    /// assert_eq!(
+    ///     directory_contents,
+    ///     vec![
+    ///         SystemType::file(unsound::label::new(".i-am-well-hidden")),
+    ///         SystemType::file(unsound::label::new(".i-too-am-hidden")),
+    ///         SystemType::file(unsound::label::new("README.md")),
+    ///         SystemType::directory(unsound::label::new("bin")),
+    ///         SystemType::file(unsound::label::new("here-we-are-on-a-dev-branch.lol")),
+    ///         SystemType::directory(unsound::label::new("src")),
+    ///         SystemType::directory(unsound::label::new("text")),
+    ///         SystemType::directory(unsound::label::new("this")),
+    ///     ]
+    /// );
+    /// ```
     pub fn revspec(&mut self, spec: &str) -> Result<(), Error> {
-        let rev = RevObject::from_revparse(&self.repository.0, spec)?;
-        self.rev(rev)?;
+        let history = self.get_history(spec.to_string())?;
+        self.set(history);
         Ok(())
     }
 
