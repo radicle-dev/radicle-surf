@@ -225,50 +225,6 @@ impl<'repo> TryFrom<git2::Tag<'repo>> for Tag {
     }
 }
 
-/// A newtype wrapper over `String` to separate out
-/// the fact that a caller wants to fetch a commit.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Sha1(git2::Oid);
-
-impl Sha1 {
-    pub fn value(&self) -> &git2::Oid {
-        &self.0
-    }
-}
-
-impl str::FromStr for Sha1 {
-    type Err = git2::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let oid = git2::Oid::from_str(s)?;
-        Ok(Sha1(oid))
-    }
-}
-
-/// An enumeration of git objects we can fetch and turn
-/// into a [`History`](struct.History.html).
-#[derive(Debug, Clone)]
-pub enum Object {
-    Branch(BranchName),
-    Tag(TagName),
-}
-
-impl Object {
-    pub fn branch(name: &str) -> Self {
-        Object::Branch(BranchName::new(name))
-    }
-
-    pub fn tag(name: &str) -> Self {
-        Object::Tag(TagName::new(name))
-    }
-
-    pub fn name(&self) -> String {
-        match self {
-            Object::Branch(name) => name.0.clone(),
-            Object::Tag(name) => name.0.clone(),
-        }
-    }
-}
 
 pub enum RevObject {
     Branch(Branch),
