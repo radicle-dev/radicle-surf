@@ -90,22 +90,26 @@ impl TryFrom<&[u8]> for BranchName {
 }
 
 impl BranchName {
+    /// Create a new `BranchName`.
     pub fn new(name: &str) -> Self {
         BranchName(name.into())
     }
 
-    pub fn name(&self) -> String {
-        self.0.clone()
+    /// Access the string value of the `BranchName`.
+    pub fn name(&self) -> &str {
+        &self.0
     }
 }
 
-/// The combination of a branch's name and where its locality (remote or local).
+/// The static information of a `git2::Branch`.
 ///
 /// **Note**: The `PartialOrd` and `Ord` implementations compare on `BranchName`
 /// only.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Branch {
+    /// Name identifier of the `Branch`.
     pub name: BranchName,
+    /// Whether the `Branch` is `Remote` or `Local`.
     pub locality: git2::BranchType,
 }
 
@@ -137,19 +141,24 @@ impl Branch {
             locality: git2::BranchType::Local,
         }
     }
+}
 
-    fn from_reference(reference: &git2::Reference) -> Option<Result<Branch, str::Utf8Error>> {
+impl<'repo> TryFrom<git2::Reference<'repo>> for Branch {
+    type Error = Error;
+
+    fn try_from(reference: git2::Reference) -> Result<Self, Self::Error> {
         if !reference.is_branch() {
-            return None;
+            return Err(Error::NotBranch);
         }
 
-        let name = BranchName::try_from(reference.name_bytes());
+        let name = BranchName::try_from(reference.name_bytes())?;
         let locality = if reference.is_remote() {
             git2::BranchType::Remote
         } else {
             git2::BranchType::Local
         };
-        Some(name.map(|name| Branch { name, locality }))
+
+        Ok(Branch { name, locality })
     }
 }
 
@@ -167,17 +176,23 @@ impl TryFrom<&[u8]> for TagName {
 }
 
 impl TagName {
+    /// Create a new `TagName`.
     pub fn new(name: &str) -> Self {
         TagName(name.into())
     }
 
-    pub fn name(&self) -> String {
-        self.0.clone()
+    /// Access the string value of the `TagName`.
+    pub fn name(&self) -> &str {
+        &self.0
     }
 }
 
+/// The static information of a `git2::Tag`.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Tag {
+    /// The Object ID for the `Tag`, i.e the SHA1 digest.
     pub id: git2::Oid,
+    /// The name that references this `Tag`.
     pub name: TagName,
     /// The named author of this `Tag`, if the `Tag` was annotated.
     pub tagger: Option<Author>,
