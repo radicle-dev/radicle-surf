@@ -4,14 +4,19 @@ use std::cmp::Ordering;
 use std::convert::TryFrom;
 use std::str;
 
-#[derive(Clone)]
-pub struct Signature {
+/// `Author` is the static information of a
+/// [`git2::Signature`](https://docs.rs/git2/0.11.0/git2/struct.Signature.html).
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Author {
+    /// Name of the author.
     pub name: String,
+    /// Email of the author.
     pub email: String,
+    /// Time the action was taken, e.g. time of commit.
     pub time: git2::Time,
 }
 
-impl std::fmt::Debug for Signature {
+impl std::fmt::Debug for Author {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -21,7 +26,7 @@ impl std::fmt::Debug for Signature {
     }
 }
 
-impl<'repo> TryFrom<git2::Signature<'repo>> for Signature {
+impl<'repo> TryFrom<git2::Signature<'repo>> for Author {
     type Error = str::Utf8Error;
 
     fn try_from(signature: git2::Signature) -> Result<Self, Self::Error> {
@@ -29,26 +34,33 @@ impl<'repo> TryFrom<git2::Signature<'repo>> for Signature {
         let email = str::from_utf8(signature.email_bytes())?.into();
         let time = signature.when();
 
-        Ok(Signature { name, email, time })
+        Ok(Author { name, email, time })
     }
 }
 
-#[derive(Debug, Clone)]
+/// `Commit` is the static information of a [`git2::Commit`](https://docs.rs/git2/0.11.0/git2/struct.Commit.html).
+/// To get back the original `Commit` in the repository we can use the `git2::Oid` to retrieve it.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Commit {
+    /// Object ID of the Commit, i.e. the SHA1 digest.
     pub id: git2::Oid,
-    pub author: Signature,
-    pub committer: Signature,
+    /// The author of the commit.
+    pub author: Author,
+    /// The actor who committed this commit.
+    pub committer: Author,
+    /// The long form message of the commit.
     pub message: String,
+    /// The summary message of the commit.
     pub summary: String,
 }
 
 impl<'repo> TryFrom<git2::Commit<'repo>> for Commit {
-    type Error = Error;
+    type Error = str::Utf8Error;
 
     fn try_from(commit: git2::Commit) -> Result<Self, Self::Error> {
         let id = commit.id();
-        let author = Signature::try_from(commit.author())?;
-        let committer = Signature::try_from(commit.committer())?;
+        let author = Author::try_from(commit.author())?;
+        let committer = Author::try_from(commit.committer())?;
         let message_raw = commit.message_bytes();
         let message = str::from_utf8(message_raw)?.into();
         let summary_raw = commit.summary_bytes().expect("TODO");
@@ -167,7 +179,9 @@ impl TagName {
 pub struct Tag {
     pub id: git2::Oid,
     pub name: TagName,
-    pub tagger: Option<Signature>,
+    /// The named author of this `Tag`, if the `Tag` was annotated.
+    pub tagger: Option<Author>,
+    /// The message with this `Tag`, if the `Tag` was annotated.
     pub message: Option<String>,
 }
 
@@ -179,7 +193,7 @@ impl<'repo> TryFrom<git2::Tag<'repo>> for Tag {
 
         let name = TagName::try_from(tag.name_bytes())?;
 
-        let tagger = tag.tagger().map(Signature::try_from).transpose()?;
+        let tagger = tag.tagger().map(Author::try_from).transpose()?;
 
         let message = tag
             .message_bytes()
