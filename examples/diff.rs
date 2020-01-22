@@ -93,14 +93,11 @@ fn set_browser_history(browser: &mut git::Browser, commit_id: &str) -> Result<()
         Ok(oid) => oid,
         Err(e) => return Err(format!("{}", e)),
     };
-    let commit = match browser
-        .get_history()
-        .find_in_history(&oid, |artifact| artifact.id)
-    {
+    let commit = match browser.get().find_in_history(&oid, |artifact| artifact.id) {
         Some(commit) => commit,
         None => return Err(format!("Git commit not found: {}", commit_id)),
     };
-    browser.set_history(History(NonEmpty::new(commit)));
+    browser.set(History(NonEmpty::new(commit)));
     Ok(())
 }
 
