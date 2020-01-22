@@ -112,7 +112,7 @@ pub struct Browser<Repo, A, Error> {
 
 impl<Repo, A, Error> Browser<Repo, A, Error> {
     /// Get the current `History` the `Browser` is viewing.
-    pub fn get_history(&self) -> History<A>
+    pub fn get(&self) -> History<A>
     where
         A: Clone,
     {
@@ -120,7 +120,7 @@ impl<Repo, A, Error> Browser<Repo, A, Error> {
     }
 
     /// Set the `History` the `Browser` should view.
-    pub fn set_history(&mut self, history: History<A>) {
+    pub fn set(&mut self, history: History<A>) {
         self.history = history;
     }
 
@@ -130,7 +130,7 @@ impl<Repo, A, Error> Browser<Repo, A, Error> {
     }
 
     /// Modify the `History` in this `Browser`.
-    pub fn modify_history<F>(&mut self, f: F)
+    pub fn modify<F>(&mut self, f: F)
     where
         F: Fn(&History<A>) -> History<A>,
     {
@@ -144,7 +144,7 @@ impl<Repo, A, Error> Browser<Repo, A, Error> {
         A: Clone,
         F: Fn(&History<A>) -> Option<History<A>>,
     {
-        self.modify_history(|history| f(history).unwrap_or_else(|| default_history.clone()))
+        self.modify(|history| f(history).unwrap_or_else(|| default_history.clone()))
     }
 }
 
