@@ -3,6 +3,7 @@ use crate::nonempty::split_last;
 use nonempty::NonEmpty;
 use std::convert::TryFrom;
 use std::fmt;
+use std::ops::Deref;
 use std::path;
 use std::str::FromStr;
 
@@ -32,6 +33,14 @@ pub mod unsound;
 pub struct Label {
     pub(crate) label: String,
     pub(crate) hidden: bool,
+}
+
+impl Deref for Label {
+    type Target = String;
+
+    fn deref(&self) -> &Self::Target {
+        &self.label
+    }
 }
 
 impl Label {
