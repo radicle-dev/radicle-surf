@@ -6,6 +6,7 @@ steps:
 - label: "Tests"
   command:
   # Ensure we have fetched the remote info in submodule
+  - git submodule update --init --recursive
   - git submodule foreach "git fetch origin"
   - git submodule update --remote
   - "cargo test --all"
