@@ -1033,35 +1033,6 @@ mod tests {
     }
 
     #[test]
-    fn test_rev_master_with_date() -> Result<(), Error> {
-        let repo = Repository::new("./data/git-platinum")?;
-        let mut browser = Browser::new(repo)?;
-        browser.revspec("master@{yesterday}")?;
-
-        let commit1 = git2::Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
-        assert!(browser
-            .history
-            .find(|commit| if commit.id == commit1 {
-                Some(commit.clone())
-            } else {
-                None
-            })
-            .is_some());
-
-        let commit2 = git2::Oid::from_str("d6880352fc7fda8f521ae9b7357668b17bb5bad5")?;
-        assert!(browser
-            .history
-            .find(|commit| if commit.id == commit2 {
-                Some(commit.clone())
-            } else {
-                None
-            })
-            .is_some());
-
-        Ok(())
-    }
-
-    #[test]
     fn test_rev_commit() -> Result<(), Error> {
         let repo = Repository::new("./data/git-platinum")?;
         let mut browser = Browser::new(repo)?;
