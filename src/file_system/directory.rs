@@ -1,12 +1,11 @@
 //! Definition for a file system consisting of `Directory` and `File`.
 //!
-//! A `Directory` is expected to be a non-empty tree of directories and files.
-//! See [`Directory`](struct.Directory.html) for more information.
+//! A `Directory` is expected to be a non-empty tree of directories and files. See [`Directory`] for
+//! more information.
 //!
-//! As well as this, this module contains [`DirectoryContents`](enum.DirectoryContents.html)
-//! which is the output of iterating over a `Directory`, and also `SystemType` which is an
-//! identifier of what type of `DirectoryContents` one is viewing when
-//! [listing](struct.Directory.html#method.list_directory) a directory.
+//! As well as this, this module contains [`DirectoryContents`] which is the output of iterating
+//! over a [`Directory`], and also [`SystemType`] which is an identifier of what type of
+//! [`DirectoryContents`] one is viewing when [listing](#method.list_directory) a directory.
 
 use crate::file_system::path::*;
 use crate::tree::*;
@@ -15,13 +14,10 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
-/// `SystemType` is an enumeration over what can be
-/// found in a [`Directory`](struct.Directory.html)
-/// so we can report back to the caller a [`Label`](struct.Label)
-/// and its type.
+/// `SystemType` is an enumeration over what can be found in a [`Directory`] so we can report back
+/// to the caller a [`Label`] and its type.
 ///
-/// See [`SystemType::file`](struct.SystemType.html#method.file) and
-/// [`SystemType::directory`](struct.SystemType.html#method.directory).
+/// See [`SystemType::file`](#method.file) and [`SystemType::directory`](#method.directory).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SystemType {
     /// The `File` type in a directory system.
@@ -31,21 +27,21 @@ pub enum SystemType {
 }
 
 impl SystemType {
-    /// A file name and [`SystemType::File`](enum.SystemType.html#variant.File).
+    /// A file name and [`SystemType::File`].
     pub fn file(label: Label) -> (Label, Self) {
         (label, SystemType::File)
     }
 
-    /// A directory name and [`SystemType::Directory`](enum.SystemType.html#variant.Directory).
+    /// A directory name and [`SystemType::Directory`].
     pub fn directory(label: Label) -> (Label, Self) {
         (label, SystemType::Directory)
     }
 }
 
-/// A `File` consists of its file contents (a `Vec` of bytes).
+/// A `File` consists of its file contents (a [`Vec`] of bytes).
 ///
-/// The `Debug` instance of `File` will show the first few bytes of
-/// the file and its [`size`](struct.File.html#method.size).
+/// The `Debug` instance of `File` will show the first few bytes of the file and its
+/// [`size`](#method.size).
 #[derive(Clone, PartialEq, Eq)]
 pub struct File {
     /// The contents of a `File` as a vector of bytes.
@@ -82,9 +78,7 @@ impl File {
     /// ```
     /// use radicle_surf::file_system::File;
     ///
-    /// let file = File::new(
-    ///     b"pub mod diff;\npub mod file_system;\npub mod vcs;\npub use crate::vcs::git;\n",
-    /// );
+    /// let file = File::new(b"pub mod diff;\npub mod file_system;\npub mod vcs;\npub use crate::vcs::git;\n");
     ///
     /// assert_eq!(file.size(), 73);
     /// ```
@@ -118,10 +112,9 @@ enum Location {
     SubDirectory(Label),
 }
 
-/// A `Directory` can be thought of as a non-empty set of entries of sub-directories
-/// and files. The reason for the non-empty property is that a VCS directory would have
-/// at least one artifact as a sub-directory which tracks the VCS work, e.g. git using the
-/// `.git` folder.
+/// A `Directory` can be thought of as a non-empty set of entries of sub-directories and files. The
+/// reason for the non-empty property is that a VCS directory would have at least one artifact as a
+/// sub-directory which tracks the VCS work, e.g. git using the `.git` folder.
 ///
 /// On top of that, some VCSes, such as git, will not track an empty directory, and so when
 /// creating a new directory to track it will have to contain at least one file.
@@ -131,12 +124,12 @@ pub struct Directory {
     sub_directories: Forest<Label, File>,
 }
 
-/// `DirectoryContents` is an enumeration of what a [`Directory`](struct.Directory.html) can contain
+/// `DirectoryContents` is an enumeration of what a [`Directory`] can contain
 /// and is used for when we are [`iter`](struct.Directory.html#method.iter)ating through a
-/// `Directory`.
+/// [`Directory`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DirectoryContents {
-    /// The `File` variant contains the file's name and the [`File`](struct.File.html) itself.
+    /// The `File` variant contains the file's name and the [`File`] itself.
     File {
         /// The name of the file.
         name: Label,
@@ -148,8 +141,8 @@ pub enum DirectoryContents {
 }
 
 impl DirectoryContents {
-    /// Get a label for the `DirectoryContents`, either the name of the `File`
-    /// or the name of the `Directory`.
+    /// Get a label for the `DirectoryContents`, either the name of the [`File`]
+    /// or the name of the [`Directory`].
     pub fn label(&self) -> Label {
         match self {
             DirectoryContents::File { name, .. } => name.clone(),
@@ -196,34 +189,8 @@ impl Directory {
 
     /// List the current `Directory`'s files and sub-directories.
     ///
-    /// ```
-    /// use nonempty::NonEmpty;
-    /// use radicle_surf::file_system::{Directory, File, SystemType};
-    /// use radicle_surf::file_system::unsound;
-    ///
-    /// let mut directory = Directory::root();
-    /// directory.insert_file(
-    ///     &unsound::path::new("foo.hs"),
-    ///     File::new(b"module BananaFoo ..."),
-    /// );
-    /// directory.insert_file(
-    ///     &unsound::path::new("bar.hs"),
-    ///     File::new(b"module BananaBar ..."),
-    /// );
-    /// directory.insert_file(
-    ///     &unsound::path::new("baz.hs"),
-    ///     File::new(b"module BananaBaz ..."),
-    /// );
-    ///
-    /// assert_eq!(
-    ///     directory.list_directory(),
-    ///     vec![
-    ///         SystemType::file(unsound::label::new("bar.hs")),
-    ///         SystemType::file(unsound::label::new("baz.hs")),
-    ///         SystemType::file(unsound::label::new("foo.hs")),
-    ///     ]
-    /// );
-    /// ```
+    /// The listings are a pair of [`Label`] and [`SystemType`], where the [`Label`] represents the
+    /// name of the file or directory.
     ///
     /// ```
     /// use nonempty::NonEmpty;
@@ -283,7 +250,7 @@ impl Directory {
         }
     }
 
-    /// Get the `Label` of the current directory.
+    /// Get the [`Label`] of the current directory.
     ///
     /// # Examples
     ///
@@ -340,70 +307,76 @@ impl Directory {
             .chain(trees_iter.into_iter().flatten())
     }
 
-    /// Find a `File` in the directory given the `Path` to the `File`.
+    /// Find a [`File`] in the directory given the [`Path`] to the [`File`].
     ///
     /// # Failures
-    /// This operation fails if the path does not lead to a `File`. If
-    /// the search is for a `Directory` then use `find_directory`.
+    ///
+    /// This operation fails if the path does not lead to a [`File`].
+    /// If the search is for a `Directory` then use `find_directory`.
     ///
     /// # Examples
     ///
-    /// Search for a file in the path: `foo.hs`.
+    /// Search for a file in the path:
+    ///     * `foo/bar/baz.hs`
+    ///     * `foo`
+    ///     * `foo/bar/qux.rs`
     ///
     /// ```
     /// use radicle_surf::file_system::{Directory, File};
     /// use radicle_surf::file_system::unsound;
-    ///
-    /// let file = File::new(b"module Banana ...");
-    /// let mut directory = Directory::root();
-    /// directory.insert_file(&unsound::path::new("foo.hs"), file.clone());
-    ///
-    /// assert_eq!(
-    ///     directory.find_file(&unsound::path::new("foo.hs")),
-    ///     Some(file)
-    /// )
-    /// ```
-    ///
-    /// Search for a file in the path: `foo/bar/baz.hs`.
-    ///
-    /// ```
-    /// use radicle_surf::file_system::{Directory, File};
-    /// use radicle_surf::file_system::unsound;
-    ///
-    /// let file_path = unsound::path::new("foo/bar/baz.rs");
     ///
     /// let file = File::new(b"module Banana ...");
     ///
     /// let mut directory = Directory::root();
     /// directory.insert_file(&unsound::path::new("foo/bar/baz.rs"), file.clone());
     ///
-    /// assert_eq!(directory.find_file(&file_path), Some(file))
-    /// ```
+    /// // The file is succesfully found
+    /// assert_eq!(directory.find_file(&unsound::path::new("foo/bar/baz.rs")), Some(file));
     ///
-    /// Search for a file in the path: `bar.hs`, which does not exist.
+    /// // We shouldn't be able to find a directory
+    /// assert_eq!(directory.find_file(&unsound::path::new("foo")), None);
     ///
-    /// ```
-    /// use radicle_surf::file_system::{Directory, File};
-    /// use radicle_surf::file_system::unsound;
-    ///
-    /// let file_path = unsound::path::new("bar.hs");
-    ///
-    /// let file = File::new(b"module Banana ...");
-    ///
-    /// let mut directory = Directory::root();
-    /// directory.insert_file(&unsound::path::new("foo.hs"), file);
-    ///
-    /// assert_eq!(directory.find_file(&file_path), None)
+    /// // We shouldn't be able to find a file that doesn't exist
+    /// assert_eq!(directory.find_file(&unsound::path::new("foo/bar/qux.rs")), None);
     /// ```
     pub fn find_file(&self, path: &Path) -> Option<File> {
         self.sub_directories.find_node(&path.0).cloned()
     }
 
-    /// Find a `Directory` in the directory given the `Path` to
-    /// the `Directory`.
+    /// Find a `Directory` in the directory given the [`Path`] to the `Directory`.
     ///
-    /// This operation fails if the path does not lead to
-    /// the `Directory`.
+    /// # Failures
+    ///
+    /// This operation fails if the path does not lead to the `Directory`.
+    ///
+    /// # Examples
+    ///
+    /// Search for directories in the path:
+    ///     * `foo`
+    ///     * `foo/bar`
+    ///     * `foo/baz`
+    ///
+    /// ```
+    /// use radicle_surf::file_system::{Directory, File};
+    /// use radicle_surf::file_system::unsound;
+    ///
+    /// let file = File::new(b"module Banana ...");
+    ///
+    /// let mut directory = Directory::root();
+    /// directory.insert_file(&unsound::path::new("foo/bar/baz.rs"), file.clone());
+    ///
+    /// // Can find the first level
+    /// assert!(directory.find_directory(&unsound::path::new("foo")).is_some());
+    ///
+    /// // Can find the second level
+    /// assert!(directory.find_directory(&unsound::path::new("foo/bar")).is_some());
+    ///
+    /// // Cannot find 'baz' since it does not exist
+    /// assert!(directory.find_directory(&unsound::path::new("foo/baz")).is_none());
+    ///
+    /// // 'baz.rs' is a file and not a directory
+    /// assert!(directory.find_directory(&unsound::path::new("foo/bar/baz.rs")).is_none());
+    /// ```
     pub fn find_directory(&self, path: &Path) -> Option<Self> {
         self.sub_directories
             .find_branch(&path.0)
@@ -456,31 +429,6 @@ impl Directory {
     /// # Examples
     ///
     /// ```
-    /// use nonempty::NonEmpty;
-    /// use radicle_surf::file_system::{Directory, File};
-    /// use radicle_surf::file_system::unsound;
-    ///
-    /// let mut root = Directory::root();
-    /// root.insert_files(
-    ///     &[],
-    ///     NonEmpty::from((
-    ///         (
-    ///             unsound::label::new("main.rs"),
-    ///             File::new(b"println!(\"Hello, world!\")"),
-    ///         ),
-    ///         vec![
-    ///             (
-    ///                 unsound::label::new("lib.rs"),
-    ///                 File::new(b"struct Hello(String)"),
-    ///             ),
-    ///         ],
-    ///     )),
-    /// );
-    ///
-    /// assert_eq!(root.size(), 45);
-    /// ```
-    ///
-    /// ```
     /// use radicle_surf::file_system::{Directory, File};
     /// use radicle_surf::file_system::unsound;
     ///
@@ -507,10 +455,10 @@ impl Directory {
 
     /// Insert files into a shared directory path.
     ///
-    /// `directory_path` is used as the prefix to where the files should go. If empty the
-    /// files will be placed in the current `Directory`.
+    /// `directory_path` is used as the prefix to where the files should go. If empty the files will
+    /// be placed in the current `Directory`.
     ///
-    /// `files` are pairs of file name and the `File` itself.
+    /// `files` are pairs of file name and the [`File`] itself.
     ///
     /// This function is usually used for testing and demonstation purposes.
     pub fn insert_files(&mut self, directory_path: &[Label], files: NonEmpty<(Label, File)>) {
@@ -552,105 +500,197 @@ impl Directory {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::file_system::unsound;
-    use crate::file_system::*;
-    use nonempty::NonEmpty;
-    use proptest::collection;
-    use proptest::prelude::*;
-    use std::collections::HashMap;
+    #[cfg(test)]
+    mod list_directory {
+        use crate::file_system::unsound;
+        use crate::file_system::{Directory, File, SystemType};
 
-    #[test]
-    fn test_all_directories_and_files() {
-        let mut directory_map = HashMap::new();
-
-        let path1 = unsound::path::new("foo/bar/baz");
-        let file1 = (unsound::label::new("monadic.rs"), File::new(&[]));
-        let file2 = (unsound::label::new("oscoin.rs"), File::new(&[]));
-        directory_map.insert(path1, NonEmpty::from((file1, vec![file2])));
-
-        let path2 = unsound::path::new("foor/bar/quuz");
-        let file3 = (unsound::label::new("radicle.rs"), File::new(&[]));
-
-        directory_map.insert(path2, NonEmpty::new(file3));
-
-        assert!(prop_all_directories_and_files(directory_map))
-    }
-
-    fn label_strategy() -> impl Strategy<Value = Label> {
-        // ASCII regex, excluding '/' because of posix file paths
-        "[ -.|0-~]+".prop_map(|label| unsound::label::new(&label))
-    }
-
-    fn path_strategy(max_size: usize) -> impl Strategy<Value = Path> {
-        (
-            label_strategy(),
-            collection::vec(label_strategy(), 0..max_size),
-        )
-            .prop_map(|(label, labels)| Path((label, labels).into()))
-    }
-
-    fn file_strategy() -> impl Strategy<Value = (Label, File)> {
-        // ASCII regex, see: https://catonmat.net/my-favorite-regex
-        (label_strategy(), "[ -~]*")
-            .prop_map(|(name, contents)| (name, File::new(contents.as_bytes())))
-    }
-
-    fn directory_map_strategy(
-        path_size: usize,
-        n_files: usize,
-        map_size: usize,
-    ) -> impl Strategy<Value = HashMap<Path, NonEmpty<(Label, File)>>> {
-        collection::hash_map(
-            path_strategy(path_size),
-            collection::vec(file_strategy(), 1..n_files).prop_map(|files| {
-                NonEmpty::from_slice(&files).expect("Strategy generated files of length 0")
-            }),
-            0..map_size,
-        )
-    }
-
-    // TODO(fintan): This is a bit slow. Could be time to benchmark some functions.
-    proptest! {
         #[test]
-        fn prop_test_all_directories_and_files(directory_map in directory_map_strategy(10, 10, 10)) {
-            prop_all_directories_and_files(directory_map);
+        fn root_files() {
+            let mut directory = Directory::root();
+            directory.insert_file(
+                &unsound::path::new("foo.hs"),
+                File::new(b"module BananaFoo ..."),
+            );
+            directory.insert_file(
+                &unsound::path::new("bar.hs"),
+                File::new(b"module BananaBar ..."),
+            );
+            directory.insert_file(
+                &unsound::path::new("baz.hs"),
+                File::new(b"module BananaBaz ..."),
+            );
+
+            assert_eq!(
+                directory.list_directory(),
+                vec![
+                    SystemType::file(unsound::label::new("bar.hs")),
+                    SystemType::file(unsound::label::new("baz.hs")),
+                    SystemType::file(unsound::label::new("foo.hs")),
+                ]
+            );
         }
     }
 
-    fn prop_all_directories_and_files(
-        directory_map: HashMap<Path, NonEmpty<(Label, File)>>,
-    ) -> bool {
-        let mut new_directory_map = HashMap::new();
-        for (path, files) in directory_map {
-            new_directory_map.insert(path.clone(), files.into());
+    #[cfg(test)]
+    mod find_file {
+        use crate::file_system::unsound;
+        use crate::file_system::*;
+
+        #[test]
+        fn in_root() {
+            let file = File::new(b"module Banana ...");
+            let mut directory = Directory::root();
+            directory.insert_file(&unsound::path::new("foo.hs"), file.clone());
+
+            assert_eq!(
+                directory.find_file(&unsound::path::new("foo.hs")),
+                Some(file)
+            );
         }
 
-        let directory = Directory::from_hash_map(new_directory_map.clone());
+        #[test]
+        fn file_does_not_exist() {
+            let file_path = unsound::path::new("bar.hs");
 
-        for (directory_path, files) in new_directory_map {
-            for (file_name, _) in files.iter() {
-                let mut path = directory_path.clone();
-                if directory.find_directory(&path).is_none() {
-                    return false;
-                }
+            let file = File::new(b"module Banana ...");
 
-                path.push(file_name.clone());
-                if directory.find_file(&path).is_none() {
-                    return false;
-                }
+            let mut directory = Directory::root();
+            directory.insert_file(&unsound::path::new("foo.hs"), file);
+
+            assert_eq!(directory.find_file(&file_path), None)
+        }
+    }
+
+    #[cfg(test)]
+    mod directory_size {
+        use crate::file_system::unsound;
+        use crate::file_system::{Directory, File};
+        use nonempty::NonEmpty;
+
+        #[test]
+        fn root_directory_files() {
+            let mut root = Directory::root();
+            root.insert_files(
+                &[],
+                NonEmpty::from((
+                    (
+                        unsound::label::new("main.rs"),
+                        File::new(b"println!(\"Hello, world!\")"),
+                    ),
+                    vec![(
+                        unsound::label::new("lib.rs"),
+                        File::new(b"struct Hello(String)"),
+                    )],
+                )),
+            );
+
+            assert_eq!(root.size(), 45);
+        }
+    }
+
+    #[cfg(test)]
+    mod properties {
+        use crate::file_system::unsound;
+        use crate::file_system::*;
+        use nonempty::NonEmpty;
+        use proptest::collection;
+        use proptest::prelude::*;
+        use std::collections::HashMap;
+
+        #[test]
+        fn test_all_directories_and_files() {
+            let mut directory_map = HashMap::new();
+
+            let path1 = unsound::path::new("foo/bar/baz");
+            let file1 = (unsound::label::new("monadic.rs"), File::new(&[]));
+            let file2 = (unsound::label::new("oscoin.rs"), File::new(&[]));
+            directory_map.insert(path1, NonEmpty::from((file1, vec![file2])));
+
+            let path2 = unsound::path::new("foor/bar/quuz");
+            let file3 = (unsound::label::new("radicle.rs"), File::new(&[]));
+
+            directory_map.insert(path2, NonEmpty::new(file3));
+
+            assert!(prop_all_directories_and_files(directory_map))
+        }
+
+        fn label_strategy() -> impl Strategy<Value = Label> {
+            // ASCII regex, excluding '/' because of posix file paths
+            "[ -.|0-~]+".prop_map(|label| unsound::label::new(&label))
+        }
+
+        fn path_strategy(max_size: usize) -> impl Strategy<Value = Path> {
+            (
+                label_strategy(),
+                collection::vec(label_strategy(), 0..max_size),
+            )
+                .prop_map(|(label, labels)| Path((label, labels).into()))
+        }
+
+        fn file_strategy() -> impl Strategy<Value = (Label, File)> {
+            // ASCII regex, see: https://catonmat.net/my-favorite-regex
+            (label_strategy(), "[ -~]*")
+                .prop_map(|(name, contents)| (name, File::new(contents.as_bytes())))
+        }
+
+        fn directory_map_strategy(
+            path_size: usize,
+            n_files: usize,
+            map_size: usize,
+        ) -> impl Strategy<Value = HashMap<Path, NonEmpty<(Label, File)>>> {
+            collection::hash_map(
+                path_strategy(path_size),
+                collection::vec(file_strategy(), 1..n_files).prop_map(|files| {
+                    NonEmpty::from_slice(&files).expect("Strategy generated files of length 0")
+                }),
+                0..map_size,
+            )
+        }
+
+        // TODO(fintan): This is a bit slow. Could be time to benchmark some functions.
+        proptest! {
+            #[test]
+            fn prop_test_all_directories_and_files(directory_map in directory_map_strategy(10, 10, 10)) {
+                prop_all_directories_and_files(directory_map);
             }
         }
-        true
-    }
 
-    #[test]
-    fn test_file_name_is_same_as_root() {
-        // This test ensures that if the name is the same the root of the
-        // directory, that search_path.split_last() doesn't toss away the prefix.
-        let path = unsound::path::new("foo/bar/~");
-        let mut directory_map = HashMap::new();
-        directory_map.insert(path, NonEmpty::new((Label::root(), File::new(b"root"))));
+        fn prop_all_directories_and_files(
+            directory_map: HashMap<Path, NonEmpty<(Label, File)>>,
+        ) -> bool {
+            let mut new_directory_map = HashMap::new();
+            for (path, files) in directory_map {
+                new_directory_map.insert(path.clone(), files.into());
+            }
 
-        assert!(prop_all_directories_and_files(directory_map));
+            let directory = Directory::from_hash_map(new_directory_map.clone());
+
+            for (directory_path, files) in new_directory_map {
+                for (file_name, _) in files.iter() {
+                    let mut path = directory_path.clone();
+                    if directory.find_directory(&path).is_none() {
+                        return false;
+                    }
+
+                    path.push(file_name.clone());
+                    if directory.find_file(&path).is_none() {
+                        return false;
+                    }
+                }
+            }
+            true
+        }
+
+        #[test]
+        fn test_file_name_is_same_as_root() {
+            // This test ensures that if the name is the same the root of the
+            // directory, that search_path.split_last() doesn't toss away the prefix.
+            let path = unsound::path::new("foo/bar/~");
+            let mut directory_map = HashMap::new();
+            directory_map.insert(path, NonEmpty::new((Label::root(), File::new(b"root"))));
+
+            assert!(prop_all_directories_and_files(directory_map));
+        }
     }
 }
