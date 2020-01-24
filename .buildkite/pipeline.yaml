@@ -5,8 +5,6 @@ env:
 steps:
 - label: "Tests"
   command:
-  # Ensure we have fetched the remote info in submodule
-  - git submodule foreach "git fetch origin"
   - "cargo test --all"
   agents:
     production: "true"
