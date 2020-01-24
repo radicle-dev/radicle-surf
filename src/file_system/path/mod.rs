@@ -64,6 +64,17 @@ impl Label {
         }
     }
 
+    /// Check that the label is equivalent to [`Label::root`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use radicle_surf::file_system::Label;
+    /// use radicle_surf::file_system::unsound;
+    ///
+    /// let root = unsound::label::new("~");
+    /// assert!(root.is_root());
+    /// ```
     pub fn is_root(&self) -> bool {
         *self == Self::root()
     }
@@ -148,6 +159,7 @@ impl From<Path> for Vec<Label> {
 }
 
 impl Path {
+    /// Create a new `Path` with a single [`Label`].
     pub fn new(label: Label) -> Path {
         Path(NonEmpty::new(label))
     }
@@ -224,6 +236,19 @@ impl Path {
         self.0.push(label)
     }
 
+    /// Pop the [`Label`] from the end of the tail.
+    /// # Examples
+    ///
+    /// ```
+    /// use radicle_surf::file_system::{Label, Path};
+    /// use radicle_surf::file_system::unsound;
+    ///
+    /// let mut root = Path::root();
+    /// root.push(unsound::label::new("src"));
+    /// root.push(unsound::label::new("lib.rs"));
+    ///
+    /// assert_eq!(root.pop(), Some(unsound::label::new("lib.rs")));
+    /// ```
     pub fn pop(&mut self) -> Option<Label> {
         self.0.pop()
     }

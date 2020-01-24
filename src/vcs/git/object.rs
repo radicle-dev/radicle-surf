@@ -148,7 +148,8 @@ impl<'repo> TryFrom<git2::Reference<'repo>> for Branch {
 
     fn try_from(reference: git2::Reference) -> Result<Self, Self::Error> {
         if !reference.is_branch() {
-            return Err(Error::NotBranch);
+            let branch_name = BranchName::try_from(reference.name_bytes())?;
+            return Err(Error::NotBranch(branch_name));
         }
 
         let name = BranchName::try_from(reference.name_bytes())?;
@@ -263,10 +264,10 @@ impl RevObject {
                     Ok(commit) => Ok(RevObject::Commit(commit?)),
                     Err(_object) => match optional_ref {
                         Some(reference) => Branch::try_from(reference).map(RevObject::Branch),
-                        None => Err(Error::RevParseFailure),
+                        None => Err(Error::RevParseFailure(spec.to_string())),
                     },
                 }
-            }
+            },
         }
     }
 
@@ -283,12 +284,12 @@ impl RevObject {
                     .into_reference();
                 let commit = reference.peel_to_commit()?;
                 Ok(commit)
-            }
+            },
             RevObject::Tag(tag) => {
                 let object = repo.find_tag(tag.id)?.into_object();
                 let commit = object.peel_to_commit()?;
                 Ok(commit)
-            }
+            },
             RevObject::Commit(commit) => Ok(repo.find_commit(commit.id)?),
         }
     }

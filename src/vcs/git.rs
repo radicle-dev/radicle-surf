@@ -41,7 +41,7 @@ pub use git2;
 pub use git2::{BranchType, Error as Git2Error, Oid, Time};
 
 pub mod error;
-pub mod object;
+mod object;
 
 use crate::file_system;
 use crate::file_system::directory;
@@ -121,6 +121,11 @@ impl<'repo> Repository {
             .map_err(Error::from)
     }
 
+    /// List the branches within a repository, filtering out ones that do not parse correctly.
+    ///
+    /// # Errors
+    ///
+    /// An internal [`error::Error::Git`] error can occur.
     pub fn list_branches(&self, filter: Option<BranchType>) -> Result<Vec<Branch>, Error> {
         self.0
             .branches(filter)
@@ -139,16 +144,17 @@ impl<'repo> Repository {
             })
     }
 
+    /// List the tags within a repository, filtering out ones that do not parse correctly.
+    ///
+    /// # Errors
+    ///
+    /// An internal [`error::Error::Git`] error can occur.
     pub fn list_tags(&self) -> Result<Vec<TagName>, Error> {
         let tags = self.0.tag_names(None)?;
         Ok(tags
             .into_iter()
             .filter_map(|tag| tag.map(TagName::new))
             .collect())
-    }
-
-    pub fn from_revparse(&self, spec: &str) -> Result<RevObject, Error> {
-        RevObject::from_revparse(&self.0, spec)
     }
 
     /// Get a particular `Commit`.
@@ -163,10 +169,14 @@ impl<'repo> Repository {
         self.to_history(&head)
     }
 
+    /// Create a [`RevObject`] given a
+    /// [`revspec`](https://git-scm.com/docs/git-rev-parse#_specifying_revisions) string.
     pub fn rev(&self, spec: &str) -> Result<RevObject, Error> {
         RevObject::from_revparse(&self.0, spec)
     }
 
+    /// Create a [`History`] given a
+    /// [`revspec`](https://git-scm.com/docs/git-rev-parse#_specifying_revisions) string.
     pub fn revspec(&self, spec: &str) -> Result<History, Error> {
         let rev = self.rev(spec)?;
         let commit = rev.into_commit(&self.0)?;
@@ -258,7 +268,7 @@ impl<'repo> Repository {
             let deltas = diff.deltas();
 
             for delta in deltas {
-                let new = delta.new_file().path().ok_or(Error::FileDiffException)?;
+                let new = delta.new_file().path().ok_or(Error::LastCommitException)?;
                 let path = file_system::Path::try_from(new.to_path_buf())?;
                 touched_files.push(path);
             }
@@ -505,7 +515,7 @@ impl Browser {
             .map(|reference| reference.is_branch() || reference.is_remote())?;
 
         if !is_branch {
-            return Err(Error::NotBranch);
+            return Err(Error::NotBranch(branch_name));
         }
 
         let branch = self.get_history(name.to_string())?;
@@ -551,7 +561,7 @@ impl Browser {
             .resolve_reference_from_short_name(name)?
             .is_tag()
         {
-            return Err(Error::NotTag);
+            return Err(Error::NotTag(tag_name));
         }
 
         let tag = self.get_history(name.to_string())?;
@@ -604,8 +614,7 @@ impl Browser {
         Ok(())
     }
 
-    /// Set a `Browser`'s `History` based on a
-    /// [revspec](https://git-scm.com/docs/git-rev-parse.html#_specifying_revisions).
+    /// Set a `Browser`'s `History` based on a [revspec](https://git-scm.com/docs/git-rev-parse.html#_specifying_revisions).
     ///
     /// # Examples
     ///
@@ -648,6 +657,10 @@ impl Browser {
         Ok(())
     }
 
+    /// Set a `Browser`'s `History` based on a [`RevObject`].
+    ///
+    /// This is useful if you already have a [`RevObject`], but
+    /// [`revspec`](#method.revspec) would be a more common function to use.
     pub fn rev(&mut self, rev: RevObject) -> Result<(), Error> {
         let repository = &self.repository;
         let commit = rev.into_commit(&repository.0)?;
@@ -714,10 +727,6 @@ impl Browser {
     /// ```
     pub fn list_tags(&self) -> Result<Vec<TagName>, Error> {
         self.repository.list_tags()
-    }
-
-    pub fn from_revparse(&self, spec: &str) -> Result<RevObject, Error> {
-        self.repository.from_revparse(spec)
     }
 
     /// Given a [`Path`](../../file_system/struct.Path.html) to a file, return the last `Commit`
