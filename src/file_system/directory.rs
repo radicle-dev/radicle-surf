@@ -132,7 +132,8 @@ pub struct Directory {
 }
 
 /// `DirectoryContents` is an enumeration of what a [`Directory`](struct.Directory.html) can contain
-/// and is used for when we are [`iter`](struct.Directory.html#method.iter)ating through a `Directory`.
+/// and is used for when we are [`iter`](struct.Directory.html#method.iter)ating through a
+/// `Directory`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DirectoryContents {
     /// The `File` variant contains the file's name and the [`File`](struct.File.html) itself.
@@ -330,7 +331,7 @@ impl Directory {
                         .cloned()
                         .map(|sub_tree| sub_tree.into()),
                 )
-            }
+            },
         }
 
         empty_iter
@@ -518,7 +519,7 @@ impl Directory {
                 for (file_name, file) in files.iter() {
                     self.insert_file(&Path::new(file_name.clone()), file.clone())
                 }
-            }
+            },
             Some(directory_path) => {
                 for (file_name, file) in files.iter() {
                     let mut file_path = Path(directory_path.clone());
@@ -526,7 +527,7 @@ impl Directory {
 
                     self.insert_file(&file_path, file.clone())
                 }
-            }
+            },
         }
     }
 

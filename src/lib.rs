@@ -1,11 +1,12 @@
-#![deny(unused_import_braces, unused_qualifications, warnings)]
+#![deny(missing_docs, unused_import_braces, unused_qualifications, warnings)]
 
 //! Welcome to `radicle-surf`!
 //!
 //! `radicle-surf` is a system to describe a file-system in a VCS world.
-//! We have the concept of files and directories, but these objects can change over time while people iterate on them.
-//! Thus, it is a file-system within history and we, the user, are viewing the file-system at a particular snapshot.
-//! Alongside this, we will wish to take two snapshots and view their differences.
+//! We have the concept of files and directories, but these objects can change over time while
+//! people iterate on them. Thus, it is a file-system within history and we, the user, are viewing
+//! the file-system at a particular snapshot. Alongside this, we will wish to take two snapshots and
+//! view their differences.
 //!
 //! Let's start surfing (and apologies for the `unwrap`s):
 //!

@@ -19,10 +19,10 @@ fn main() {
     match options.head_revision {
         HeadRevision::HEAD => {
             reset_browser_to_head_or_exit(&mut browser);
-        }
+        },
         HeadRevision::Commit(id) => {
             set_browser_history_or_exit(&mut browser, &id);
-        }
+        },
     }
     let head_directory = get_directory_or_exit(&browser);
 
@@ -34,11 +34,11 @@ fn main() {
         Ok(diff) => {
             let elapsed_nanos = now.elapsed().as_nanos();
             print_diff_summary(&diff, elapsed_nanos);
-        }
+        },
         Err(e) => {
             println!("Failed to build diff: {:?}", e);
             std::process::exit(1);
-        }
+        },
     };
 }
 
@@ -48,7 +48,7 @@ fn get_options_or_exit() -> Options {
         Err(message) => {
             println!("{}", message);
             std::process::exit(1);
-        }
+        },
     };
 }
 
@@ -58,7 +58,7 @@ fn init_repository_or_exit(path_to_repo: &str) -> git::Repository {
         Err(e) => {
             println!("Failed to create repository: {:?}", e);
             std::process::exit(1);
-        }
+        },
     };
 }
 
@@ -68,7 +68,7 @@ fn init_browser_or_exit(repo: git::Repository) -> git::Browser {
         Err(e) => {
             println!("Failed to create browser: {:?}", e);
             std::process::exit(1);
-        }
+        },
     };
 }
 
@@ -110,7 +110,7 @@ fn get_directory_or_exit(browser: &git::Browser) -> Directory {
         Err(e) => {
             println!("Failed to get directory: {:?}", e);
             std::process::exit(1)
-        }
+        },
     };
 }
 

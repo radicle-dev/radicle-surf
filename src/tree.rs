@@ -77,11 +77,11 @@ impl<K, A> SubTree<K, A> {
             (SubTree::Branch { forest, .. }, SubTree::Node { value, .. }) => {
                 let max_forest = forest.maximum_by(f);
                 f(&max_forest, &value)
-            }
+            },
             (SubTree::Node { value, .. }, SubTree::Branch { forest, .. }) => {
                 let max_forest = &forest.maximum_by(f);
                 f(&value, &max_forest)
-            }
+            },
             (
                 SubTree::Branch { forest, .. },
                 SubTree::Branch {
@@ -92,7 +92,7 @@ impl<K, A> SubTree<K, A> {
                 let max_forest = forest.maximum_by(f);
                 let max_other_forest = other_forest.maximum_by(f);
                 f(&max_forest, &max_other_forest)
-            }
+            },
         }
     }
 
@@ -205,7 +205,7 @@ impl<K, A> Tree<K, A> {
                     SubTree::Node { value: old, .. } => f(old),
                     SubTree::Branch { .. } => *old_node = SubTree::Node { key, value },
                 }
-            }
+            },
             Err(index) => self.0.insert(index, SubTree::Node { key, value }),
         }
     }
@@ -242,15 +242,15 @@ impl<K, A> Tree<K, A> {
                         SubTree::Node { key, value } => {
                             std::mem::replace(key, head.clone());
                             f(value);
-                        }
+                        },
                         SubTree::Branch { .. } => {
                             *sub_tree = SubTree::Node {
                                 key: head.clone(),
                                 value,
                             }
-                        }
+                        },
                     }
-                }
+                },
                 Some(ref keys) => {
                     let sub_tree = self.0.get_mut(index).unwrap();
                     match sub_tree {
@@ -258,11 +258,11 @@ impl<K, A> Tree<K, A> {
                         SubTree::Node { .. } => {
                             let new_tree = SubTree::branch(head.clone(), Tree::new(keys, value));
                             *sub_tree = new_tree
-                        }
+                        },
                         // We keep moving down the set of keys to find where to insert this node.
                         SubTree::Branch { forest, .. } => forest.insert_with(keys, value, f),
                     }
-                }
+                },
             },
             // The label was not found and we have an index for insertion.
             Err(index) => match maybe_keys {
@@ -342,7 +342,7 @@ impl<K, A> Tree<K, A> {
                     },
                     Some(_) => sub_tree.find(&keys),
                 }
-            }
+            },
         }
     }
 
@@ -410,7 +410,7 @@ impl<K, A> Forest<K, A> {
                 None => {
                     // Insert the node at the root
                     forest.insert_node_with(node_key, node, f)
-                }
+                },
                 Some(_) => forest.insert_with(keys, node, f),
             },
             None => match NonEmpty::from_slice(&prefix) {

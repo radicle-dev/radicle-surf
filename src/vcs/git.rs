@@ -309,7 +309,7 @@ impl<'repo> Repository {
             None => {
                 let diff = self.diff_commits(&commit, None)?;
                 add_deltas(diff)?;
-            }
+            },
             Some(parent) => {
                 let diff = self.diff_commits(&commit, Some(&parent))?;
                 add_deltas(diff)?;
@@ -318,7 +318,7 @@ impl<'repo> Repository {
                     let diff = self.diff_commits(&commit, Some(&parent))?;
                     add_deltas(diff)?;
                 }
-            }
+            },
         }
 
         Ok(touched_files)
@@ -516,8 +516,8 @@ impl std::fmt::Debug for Repository {
     }
 }
 
-/// A `Browser` that uses [`Repository`](struct.Repository.html) as the underlying repository backend,
-/// `git2::Commit` as the artifact, and [`Error`](enum.Error.html) for error reporting.
+/// A `Browser` that uses [`Repository`](struct.Repository.html) as the underlying repository
+/// backend, `git2::Commit` as the artifact, and [`Error`](enum.Error.html) for error reporting.
 pub type Browser = vcs::Browser<Repository, Commit, Error>;
 
 impl Browser {
@@ -980,10 +980,10 @@ impl Browser {
                         Ok(mut files) => Self::update_file_map(path, name, file, &mut files),
 
                         // We don't need to update, we want to keep the error.
-                        Err(_err) => {}
+                        Err(_err) => {},
                     }
                     git2::TreeWalkResult::Ok
-                }
+                },
                 Err(err) => match err {
                     // We want to continue if the entry was not a Blob.
                     TreeWalkError::NotBlob => git2::TreeWalkResult::Ok,
@@ -996,7 +996,7 @@ impl Browser {
                     TreeWalkError::Git(err) => {
                         file_paths_or_error = Err(err);
                         git2::TreeWalkResult::Abort
-                    }
+                    },
                 },
             },
         )?;
