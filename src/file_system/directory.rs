@@ -390,7 +390,7 @@ impl Directory {
             })
     }
 
-    /// Get the `Label` of the current directory.
+    /// Get the [`Label`] of the current directory.
     ///
     /// # Examples
     ///
