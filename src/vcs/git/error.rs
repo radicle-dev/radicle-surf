@@ -8,10 +8,6 @@ use std::str;
 /// Enumeration of errors that can occur in operations from [`crate::vcs::git`].
 #[derive(Debug, PartialEq)]
 pub enum Error {
-    /// Tried to create a commit history that ended up being empty.
-    /// This is quite an unlikely case since `revwalk`s are used,
-    /// and the walk is initialised with first commit.
-    EmptyCommitHistory,
     /// The user tried to fetch a branch, but the name provided does not
     /// exist as a branch. This could mean that the branch does not exist
     /// or that a tag or commit was provided by accident.

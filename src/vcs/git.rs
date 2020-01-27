@@ -196,23 +196,28 @@ impl<'repo> Repository {
     /// Turn a `git2::Reference` into a `History` by completing
     /// a revwalk over the first commit in the reference.
     pub(crate) fn commit_to_history(&'repo self, head: git2::Commit) -> Result<History, Error> {
-        let mut commits = Vec::new();
+        let head_id = head.id();
+        let mut commits = NonEmpty::new(Commit::try_from(head)?);
         let mut revwalk = self.0.revwalk()?;
 
         // Set the revwalk to the head commit
-        revwalk.push(head.id())?;
+        revwalk.push(head_id)?;
 
         for commit_result_id in revwalk {
             // The revwalk iter returns results so
             // we unpack these and push them to the history
             let commit_id: Oid = commit_result_id?;
+
+            // Skip the head commit since we have processed it
+            if commit_id == head_id {
+                continue;
+            }
+
             let commit = Commit::try_from(self.0.find_commit(commit_id)?)?;
             commits.push(commit);
         }
 
-        NonEmpty::from_slice(&commits)
-            .map(vcs::History)
-            .ok_or(Error::EmptyCommitHistory)
+        Ok(vcs::History(commits))
     }
 
     fn file_history(
