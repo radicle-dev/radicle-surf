@@ -624,7 +624,7 @@ mod tests {
 
         let c_node = TestNode { id: 1 };
 
-        tree.insert(&c_path.clone(), c_node.clone());
+        tree.insert(&c_path.clone(), c_node);
 
         let new_c_node = TestNode { id: 3 };
 
@@ -653,7 +653,7 @@ mod tests {
 
         let c_node = TestNode { id: 1 };
 
-        tree.insert(&NonEmpty::new(c_label.clone()), c_node.clone());
+        tree.insert(&NonEmpty::new(c_label.clone()), c_node);
 
         let new_c_node = TestNode { id: 3 };
 
@@ -669,13 +669,13 @@ mod tests {
     fn test_insert_replaces_branch_node() {
         let a_label = String::from("a");
         let c_label = String::from("c");
-        let c_path = NonEmpty::from((a_label.clone(), vec![c_label.clone()]));
+        let c_path = NonEmpty::from((a_label, vec![c_label]));
 
         let mut tree = Forest::root();
 
         let c_node = TestNode { id: 1 };
 
-        tree.insert(&c_path.clone(), c_node.clone());
+        tree.insert(&c_path.clone(), c_node);
 
         let new_c_node = TestNode { id: 3 };
 
@@ -701,7 +701,7 @@ mod tests {
 
         let c_node = TestNode { id: 1 };
 
-        tree.insert(&c_path, c_node.clone());
+        tree.insert(&c_path, c_node);
 
         let new_c_node = TestNode { id: 3 };
 
@@ -725,7 +725,7 @@ mod tests {
         let b_label = String::from("b");
         let c_label = String::from("c");
         let b_path = NonEmpty::from((a_label.clone(), vec![b_label.clone()]));
-        let c_path = NonEmpty::from((a_label.clone(), vec![b_label.clone(), c_label]));
+        let c_path = NonEmpty::from((a_label, vec![b_label, c_label]));
 
         let mut tree = Forest::root();
 
@@ -759,10 +759,7 @@ mod tests {
         let c_label = String::from("c");
         let d_label = String::from("d");
         let b_path = NonEmpty::from((a_label.clone(), vec![b_label.clone()]));
-        let d_path = NonEmpty::from((
-            a_label.clone(),
-            vec![b_label.clone(), c_label.clone(), d_label],
-        ));
+        let d_path = NonEmpty::from((a_label, vec![b_label, c_label, d_label]));
 
         let mut tree = Forest::root();
 
@@ -799,7 +796,7 @@ mod tests {
 
         let d_node = TestNode { id: 3 };
 
-        tree.insert(&d_path.clone(), d_node.clone());
+        tree.insert(&d_path, d_node.clone());
 
         let c_node = TestNode { id: 1 };
 
@@ -836,7 +833,7 @@ mod tests {
         let f_label = String::from("f");
 
         let c_path = NonEmpty::from((a_label.clone(), vec![b_label.clone(), c_label]));
-        let d_path = NonEmpty::from((a_label.clone(), vec![b_label.clone(), d_label]));
+        let d_path = NonEmpty::from((a_label.clone(), vec![b_label, d_label]));
         let f_path = NonEmpty::from((a_label, vec![e_label, f_label]));
 
         let mut tree = Forest::root();
@@ -847,7 +844,7 @@ mod tests {
 
         let f_node = TestNode { id: 2 };
 
-        tree.insert(&d_path.clone(), d_node.clone());
+        tree.insert(&d_path, d_node.clone());
         tree.insert(&c_path, c_node.clone());
         tree.insert(&f_path, f_node.clone());
 
@@ -887,7 +884,7 @@ mod tests {
         let e_label = String::from("e");
         let f_label = String::from("f");
 
-        let c_path = NonEmpty::from((a_label.clone(), vec![b_label, c_label]));
+        let c_path = NonEmpty::from((a_label, vec![b_label, c_label]));
         let f_path = NonEmpty::from((d_label, vec![e_label, f_label]));
 
         let mut tree = Forest::root();
@@ -896,7 +893,7 @@ mod tests {
 
         let f_node = TestNode { id: 2 };
 
-        tree.insert(&c_path.clone(), c_node.clone());
+        tree.insert(&c_path, c_node.clone());
         tree.insert(&f_path, f_node.clone());
 
         assert_eq!(
@@ -933,7 +930,7 @@ mod tests {
         let c_path = NonEmpty::from((a_label.clone(), vec![b_label.clone(), c_label]));
         let d_path = NonEmpty::from((a_label.clone(), vec![b_label, d_label]));
         let e_path = NonEmpty::from((a_label.clone(), vec![e_label]));
-        let g_path = NonEmpty::from((a_label.clone(), vec![f_label.clone(), g_label]));
+        let g_path = NonEmpty::from((a_label, vec![f_label, g_label]));
 
         let mut tree = Forest::root();
 
@@ -1156,8 +1153,8 @@ mod tests {
 
         let b_node = TestNode { id: 3 };
 
-        tree.insert(&NonEmpty::new(String::from("a")), a_node.clone());
-        tree.insert(&NonEmpty::new(String::from("b")), b_node.clone());
+        tree.insert(&NonEmpty::new(String::from("a")), a_node);
+        tree.insert(&NonEmpty::new(String::from("b")), b_node);
 
         assert_eq!(tree.iter().fold(0, |b, a| a.id + b), 4);
     }

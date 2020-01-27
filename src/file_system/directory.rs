@@ -661,7 +661,7 @@ pub mod tests {
         ) -> bool {
             let mut new_directory_map = HashMap::new();
             for (path, files) in directory_map {
-                new_directory_map.insert(path.clone(), files.into());
+                new_directory_map.insert(path.clone(), files);
             }
 
             let directory = Directory::from_hash_map(new_directory_map.clone());

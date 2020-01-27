@@ -44,32 +44,32 @@ fn main() {
 
 fn get_options_or_exit() -> Options {
     match Options::parse(std::env::args()) {
-        Ok(options) => return options,
+        Ok(options) => options,
         Err(message) => {
             println!("{}", message);
             std::process::exit(1);
         },
-    };
+    }
 }
 
 fn init_repository_or_exit(path_to_repo: &str) -> git::Repository {
     match git::Repository::new(path_to_repo) {
-        Ok(repo) => return repo,
+        Ok(repo) => repo,
         Err(e) => {
             println!("Failed to create repository: {:?}", e);
             std::process::exit(1);
         },
-    };
+    }
 }
 
 fn init_browser_or_exit(repo: git::Repository) -> git::Browser {
     match git::Browser::new(repo) {
-        Ok(browser) => return browser,
+        Ok(browser) => browser,
         Err(e) => {
             println!("Failed to create browser: {:?}", e);
             std::process::exit(1);
         },
-    };
+    }
 }
 
 fn reset_browser_to_head_or_exit(browser: &mut git::Browser) {
@@ -103,12 +103,12 @@ fn set_browser_history(browser: &mut git::Browser, commit_id: &str) -> Result<()
 
 fn get_directory_or_exit(browser: &git::Browser) -> Directory {
     match browser.get_directory() {
-        Ok(dir) => return dir,
+        Ok(dir) => dir,
         Err(e) => {
             println!("Failed to get directory: {:?}", e);
             std::process::exit(1)
         },
-    };
+    }
 }
 
 fn print_diff_summary(diff: &Diff, elapsed_nanos: u128) {
@@ -145,7 +145,7 @@ enum HeadRevision {
 
 impl Options {
     fn parse(args: Args) -> Result<Self, String> {
-        let args: Vec<String> = args.into_iter().collect();
+        let args: Vec<String> = args.collect();
         if args.len() != 4 {
             return Err(format!(
                 "Usage: {} <path-to-repo> <base-revision> <head-revision>\n\

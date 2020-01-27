@@ -344,6 +344,7 @@ mod tests {
         assert_eq!(diff, expected_diff)
     }
 
+    /* TODO(fintan): Move is not detected yet
     #[test]
     fn test_moved_file() {
         let mut directory = Directory::root();
@@ -354,10 +355,9 @@ mod tests {
 
         let diff = Diff::diff(directory, new_directory).expect("diff failed");
 
-        // TODO(fintan): Move is not detected yet
-        // assert_eq!(diff, Diff::new())
-        assert!(true)
+        assert_eq!(diff, Diff::new())
     }
+    */
 
     #[test]
     fn test_modify_file() {
@@ -464,6 +464,7 @@ mod tests {
         assert_eq!(diff, expected_diff)
     }
 
+    /* TODO(fintan): Tricky stuff
     #[test]
     fn test_disjoint_directories() {
         let mut directory = Directory::root();
@@ -496,8 +497,7 @@ mod tests {
             modified: vec![],
         };
 
-        // TODO(fintan): Tricky stuff
-        // assert_eq!(diff, expected_diff)
-        assert!(true)
+        assert_eq!(diff, expected_diff)
     }
+    */
 }

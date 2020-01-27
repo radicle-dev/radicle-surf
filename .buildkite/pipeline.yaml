@@ -1,6 +1,6 @@
 env:
-  DOCKER_IMAGE: "gcr.io/opensourcecoin/radicle-surf-build:8c5e5e90064cb89f5faeedfe2874cbc3efbe260c"
-  DOCKER_FILE: .docker/build/Dockerfile
+  DOCKER_IMAGE: "gcr.io/opensourcecoin/radicle-surf-build:78144addd6d07d366580623c60274bc0e40b1a31"
+  DOCKER_FILE: .buildkite/docker/rust-nightly/Dockerfile
 
 steps:
 - label: "Build, lint, test"
