@@ -388,7 +388,6 @@ mod tests {
     #[cfg(test)]
     mod path {
         use crate::file_system::unsound;
-        use crate::file_system::{Label, Path};
 
         #[test]
         fn split_last_root_and_foo() {
