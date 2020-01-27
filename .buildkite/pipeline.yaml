@@ -3,8 +3,15 @@ env:
   DOCKER_FILE: .docker/build/Dockerfile
 
 steps:
-- label: "Tests"
-  command:
+- label: "Build, lint, test"
+  commands:
+  - "echo '--- Formatting'"
+  - "cargo fmt -- --check"
+  - "echo '--- Bestest Practices'"
+  - "cargo clippy --all-targets --all-features -- -D warnings"
+  - "echo '--- Documentationz'"
+  - "cargo doc"
+  - "echo '--- Tests'"
   - "cargo test --all"
   agents:
     production: "true"
