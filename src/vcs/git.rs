@@ -64,6 +64,8 @@ pub type History = vcs::History<Commit>;
 /// on the underlying object.
 pub struct Repository(pub(crate) git2::Repository);
 
+/// OrderedCommit is to allow for us to identify an ordering of commit history as we enumerate over
+/// a revwalk of commits, by assigning each commit an identifier.
 #[derive(Clone)]
 struct OrderedCommit {
     id: usize,
@@ -95,26 +97,9 @@ impl From<OrderedCommit> for Commit {
 impl<'repo> Repository {
     /// Open a git repository given its URI.
     ///
-    /// # Examples
-    /// ```
-    /// use radicle_surf::vcs::git::{Branch, BranchName, Browser, Repository};
+    /// # Errors
     ///
-    /// let repo = Repository::new("./data/git-platinum").unwrap();
-    /// let browser = Browser::new(repo).unwrap();
-    ///
-    /// let mut branches = browser.list_branches(None).unwrap();
-    /// branches.sort();
-    ///
-    /// assert_eq!(
-    ///     branches,
-    ///     vec![
-    ///         Branch::local(BranchName::new("master")),
-    ///         Branch::remote(BranchName::new("origin/HEAD")),
-    ///         Branch::remote(BranchName::new("origin/dev")),
-    ///         Branch::remote(BranchName::new("origin/master")),
-    ///     ]
-    /// );
-    /// ```
+    /// * [`error::Error::Git`]
     pub fn new(repo_uri: &str) -> Result<Self, Error> {
         git2::Repository::open(repo_uri)
             .map(Repository)
@@ -125,7 +110,7 @@ impl<'repo> Repository {
     ///
     /// # Errors
     ///
-    /// An internal [`error::Error::Git`] error can occur.
+    /// * [`error::Error::Git`]
     pub fn list_branches(&self, filter: Option<BranchType>) -> Result<Vec<Branch>, Error> {
         self.0
             .branches(filter)
@@ -148,7 +133,7 @@ impl<'repo> Repository {
     ///
     /// # Errors
     ///
-    /// An internal [`error::Error::Git`] error can occur.
+    /// * [`error::Error::Git`]
     pub fn list_tags(&self) -> Result<Vec<TagName>, Error> {
         let tags = self.0.tag_names(None)?;
         Ok(tags
@@ -157,33 +142,43 @@ impl<'repo> Repository {
             .collect())
     }
 
-    /// Get a particular `Commit`.
-    pub(crate) fn get_commit(&'repo self, oid: Oid) -> Result<git2::Commit<'repo>, Error> {
-        let commit = self.0.find_commit(oid)?;
-        Ok(commit)
-    }
-
-    /// Build a `History` using the `head` reference.
-    pub(crate) fn head(&'repo self) -> Result<History, Error> {
-        let head = self.0.head()?;
-        self.to_history(&head)
-    }
-
     /// Create a [`RevObject`] given a
     /// [`revspec`](https://git-scm.com/docs/git-rev-parse#_specifying_revisions) string.
+    ///
+    /// # Errors
+    ///
+    /// * [`error::Error::Git`]
+    /// * [`error::Error::RevParseFailure`]
     pub fn rev(&self, spec: &str) -> Result<RevObject, Error> {
         RevObject::from_revparse(&self.0, spec)
     }
 
     /// Create a [`History`] given a
     /// [`revspec`](https://git-scm.com/docs/git-rev-parse#_specifying_revisions) string.
+    ///
+    /// # Errors
+    ///
+    /// * [`error::Error::Git`]
+    /// * [`error::Error::RevParseFailure`]
     pub fn revspec(&self, spec: &str) -> Result<History, Error> {
         let rev = self.rev(spec)?;
         let commit = rev.into_commit(&self.0)?;
         self.commit_to_history(commit)
     }
 
-    /// Turn a `git2::Reference` into a `History` by completing
+    /// Get a particular `Commit`.
+    pub(crate) fn get_commit(&'repo self, oid: Oid) -> Result<git2::Commit<'repo>, Error> {
+        let commit = self.0.find_commit(oid)?;
+        Ok(commit)
+    }
+
+    /// Build a [`History`] using the `head` reference.
+    pub(crate) fn head(&'repo self) -> Result<History, Error> {
+        let head = self.0.head()?;
+        self.to_history(&head)
+    }
+
+    /// Turn a [`git2::Reference`] into a [`History`] by completing
     /// a revwalk over the first commit in the reference.
     pub(crate) fn to_history(
         &'repo self,
@@ -193,7 +188,7 @@ impl<'repo> Repository {
         self.commit_to_history(head)
     }
 
-    /// Turn a `git2::Reference` into a `History` by completing
+    /// Turn a [`git2::Reference`] into a [`History`] by completing
     /// a revwalk over the first commit in the reference.
     pub(crate) fn commit_to_history(&'repo self, head: git2::Commit) -> Result<History, Error> {
         let head_id = head.id();
@@ -220,6 +215,7 @@ impl<'repo> Repository {
         Ok(vcs::History(commits))
     }
 
+    /// Get the history of the file system where the head of the [`NonEmpty`] is the latest commit.
     fn file_history(
         &'repo self,
         commit: Commit,
@@ -366,14 +362,18 @@ impl std::fmt::Debug for Repository {
     }
 }
 
-/// A `Browser` that uses [`Repository`](struct.Repository.html) as the underlying repository
-/// backend, `git2::Commit` as the artifact, and [`Error`](enum.Error.html) for error reporting.
+/// A [`crate::vcs::Browser`] that uses [`Repository`] as the underlying repository backend,
+/// [`git2::Commit`] as the artifact, and [`Error`] for error reporting.
 pub type Browser = vcs::Browser<Repository, Commit, Error>;
 
 impl Browser {
     /// Create a new browser to interact with.
     ///
-    /// It uses the current HEAD as the starting `History`.
+    /// It uses the current `HEAD` as the starting [`History`].
+    ///
+    /// # Errors
+    ///
+    /// * [`error::Error::Git`]
     ///
     /// # Examples
     ///
@@ -401,6 +401,10 @@ impl Browser {
     /// It uses the branch supplied as the starting `History`.
     /// If the branch does not exist an error will be returned.
     ///
+    /// # Errors
+    ///
+    /// * [`error::Error::Git`]
+    ///
     /// # Examples
     ///
     /// ```
@@ -425,6 +429,10 @@ impl Browser {
 
     /// Set the current `Browser` history to the `HEAD` commit of the underlying repository.
     ///
+    /// # Errors
+    ///
+    /// * [`error::Error::Git`]
+    ///
     /// # Examples
     ///
     /// ```
@@ -447,8 +455,12 @@ impl Browser {
         Ok(())
     }
 
-    /// Set the current `Browser` history to the [`BranchName`](struct.BranchName.html)
-    /// provided.
+    /// Set the current `Browser`'s [`History`] to the given [`BranchName`] provided.
+    ///
+    /// # Errors
+    ///
+    /// * [`error::Error::Git`]
+    /// * [`error::Error::NotBranch`]
     ///
     /// # Examples
     ///
@@ -482,34 +494,9 @@ impl Browser {
     /// let mut directory_contents = directory.list_directory();
     /// directory_contents.sort();
     ///
-    /// assert_eq!(
-    ///     directory_contents,
-    ///     vec![
-    ///         SystemType::file(unsound::label::new(".i-am-well-hidden")),
-    ///         SystemType::file(unsound::label::new(".i-too-am-hidden")),
-    ///         SystemType::file(unsound::label::new("README.md")),
-    ///         SystemType::directory(unsound::label::new("bin")),
-    ///         SystemType::file(unsound::label::new("here-we-are-on-a-dev-branch.lol")),
-    ///         SystemType::directory(unsound::label::new("src")),
-    ///         SystemType::directory(unsound::label::new("text")),
-    ///         SystemType::directory(unsound::label::new("this")),
-    ///     ]
-    /// );
-    ///
-    /// let tests = directory
-    ///     .find_directory(&Path::new(unsound::label::new("bin")))
-    ///     .expect("bin not found");
-    /// let mut tests_contents = tests.list_directory();
-    /// tests_contents.sort();
-    ///
-    /// assert_eq!(
-    ///     tests_contents,
-    ///     vec![
-    ///         SystemType::file(unsound::label::new("cat")),
-    ///         SystemType::file(unsound::label::new("ls")),
-    ///         SystemType::file(unsound::label::new("test")),
-    ///     ]
-    /// );
+    /// assert!(directory_contents.contains(
+    ///     &SystemType::file(unsound::label::new("here-we-are-on-a-dev-branch.lol"))
+    /// ));
     /// ```
     pub fn branch(&mut self, branch_name: BranchName) -> Result<(), Error> {
         let name = branch_name.name();
@@ -528,12 +515,17 @@ impl Browser {
         Ok(())
     }
 
-    /// Set the current `Browser` history to the [`TagName`](struct.TagName.html)
-    /// provided.
+    /// Set the current `Browser`'s [`History`] to the [`TagName`] provided.
+    ///
+    /// # Errors
+    ///
+    /// * [`error::Error::Git`]
+    /// * [`error::Error::NotTag`]
     ///
     /// # Examples
     ///
     /// ```
+    /// use nonempty::NonEmpty;
     /// use radicle_surf::vcs::History;
     /// use radicle_surf::vcs::git::{TagName, Browser, Oid, Repository};
     ///
@@ -543,14 +535,14 @@ impl Browser {
     /// // Switch to "v0.3.0"
     /// browser.tag(TagName::new("v0.3.0")).expect("Failed to switch tag");
     ///
-    /// let expected_history = History((
+    /// let expected_history = History(NonEmpty::from((
     ///     Oid::from_str("19bec071db6474af89c866a1bd0e4b1ff76e2b97").unwrap(),
     ///     vec![
     ///         Oid::from_str("f3a089488f4cfd1a240a9c01b3fcc4c34a4e97b2").unwrap(),
     ///         Oid::from_str("2429f097664f9af0c5b7b389ab998b2199ffa977").unwrap(),
     ///         Oid::from_str("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3").unwrap(),
     ///     ]
-    /// ).into());
+    /// )));
     ///
     /// let history_ids = browser.get().map(|commit| commit.id);
     ///
@@ -574,8 +566,11 @@ impl Browser {
         Ok(())
     }
 
-    /// Set the current `Browser` history to the `Oid` (SHA digest)
-    /// provided. The history will consist of a single [`Commit`](struct.Commit.html).
+    /// Set the current `Browser`'s [`History`] to the [`Oid`] (SHA digest) provided.
+    ///
+    /// # Errors
+    ///
+    /// * [`error::Error::Git`]
     ///
     /// # Examples
     ///
@@ -589,19 +584,16 @@ impl Browser {
     ///     .expect("Could not retrieve ./data/git-platinum as git repository");
     /// let mut browser = Browser::new(repo).expect("Could not initialise Browser");
     ///
-    /// let commit = Oid::from_str(
-    ///     "e24124b7538658220b5aaf3b6ef53758f0a106dc").expect("Failed to
-    /// parse SHA");
     /// // Set to the initial commit
-    /// browser
-    ///     .commit(commit)
-    ///     .expect("Missing commit");
+    /// let commit = Oid::from_str(
+    ///     "e24124b7538658220b5aaf3b6ef53758f0a106dc"
+    /// ).expect("Failed to parse SHA");
+    ///
+    /// browser.commit(commit).expect("Missing commit");
     ///
     /// let directory = browser.get_directory().unwrap();
     /// let mut directory_contents = directory.list_directory();
-    /// directory_contents.sort();
     ///
-    /// // We should only have src in our root
     /// assert_eq!(
     ///     directory_contents,
     ///     vec![
@@ -619,7 +611,12 @@ impl Browser {
         Ok(())
     }
 
-    /// Set a `Browser`'s `History` based on a [revspec](https://git-scm.com/docs/git-rev-parse.html#_specifying_revisions).
+    /// Set a `Browser`'s [`History`] based on a [revspec](https://git-scm.com/docs/git-rev-parse.html#_specifying_revisions).
+    ///
+    /// # Errors
+    ///
+    /// * [`error::Error::Git`]
+    /// * [`error::Error::RevParseFailure`]
     ///
     /// # Examples
     ///
@@ -641,20 +638,9 @@ impl Browser {
     /// let mut directory_contents = directory.list_directory();
     /// directory_contents.sort();
     ///
-    /// // We should only have src in our root
-    /// assert_eq!(
-    ///     directory_contents,
-    ///     vec![
-    ///         SystemType::file(unsound::label::new(".i-am-well-hidden")),
-    ///         SystemType::file(unsound::label::new(".i-too-am-hidden")),
-    ///         SystemType::file(unsound::label::new("README.md")),
-    ///         SystemType::directory(unsound::label::new("bin")),
-    ///         SystemType::file(unsound::label::new("here-we-are-on-a-dev-branch.lol")),
-    ///         SystemType::directory(unsound::label::new("src")),
-    ///         SystemType::directory(unsound::label::new("text")),
-    ///         SystemType::directory(unsound::label::new("this")),
-    ///     ]
-    /// );
+    /// assert!(directory_contents.contains(
+    ///     &SystemType::file(unsound::label::new("here-we-are-on-a-dev-branch.lol"))
+    /// ));
     /// ```
     pub fn revspec(&mut self, spec: &str) -> Result<(), Error> {
         let history = self.get_history(spec.to_string())?;
@@ -663,6 +649,10 @@ impl Browser {
     }
 
     /// Set a `Browser`'s `History` based on a [`RevObject`].
+    ///
+    /// # Errors
+    ///
+    /// * [`error::Error::Git`]
     ///
     /// This is useful if you already have a [`RevObject`], but
     /// [`revspec`](#method.revspec) would be a more common function to use.
@@ -674,8 +664,11 @@ impl Browser {
         Ok(())
     }
 
-    /// List the names of the branches that are contained in the
-    /// underlying [`Repository`](struct.Repository.hmtl).
+    /// List the names of the _branches_ that are contained in the underlying [`Repository`].
+    ///
+    /// # Errors
+    ///
+    /// * [`error::Error::Git`]
     ///
     /// # Examples
     ///
@@ -704,8 +697,11 @@ impl Browser {
         self.repository.list_branches(filter)
     }
 
-    /// List the names of the tags that are contained in the
-    /// underlying [`Repository`](struct.Repository.hmtl).
+    /// List the names of the _tags_ that are contained in the underlying [`Repository`].
+    ///
+    /// # Errors
+    ///
+    /// * [`error::Error::Git`]
     ///
     /// # Examples
     ///
@@ -716,8 +712,6 @@ impl Browser {
     /// let mut browser = Browser::new(repo).unwrap();
     ///
     /// let tags = browser.list_tags().unwrap();
-    ///
-    /// // We currently have no tags :(
     ///
     /// assert_eq!(
     ///     tags,
@@ -734,8 +728,13 @@ impl Browser {
         self.repository.list_tags()
     }
 
-    /// Given a [`Path`](../../file_system/struct.Path.html) to a file, return the last `Commit`
-    /// that touched that file.
+    /// Given a [`crate::file_system::Path`] to a file, return the last [`Commit`] that touched that
+    /// file or directory.
+    ///
+    /// # Errors
+    ///
+    /// * [`error::Error::Git`]
+    /// * [`error::Error::LastCommitException`]
     ///
     /// # Examples
     ///
@@ -745,8 +744,6 @@ impl Browser {
     /// use radicle_surf::file_system::unsound;
     /// use std::str::FromStr;
     ///
-    /// use git2;
-    ///
     /// let repo = Repository::new("./data/git-platinum")
     ///     .expect("Could not retrieve ./data/git-test as git repository");
     /// let mut browser = Browser::new(repo).expect("Could not initialise Browser");
@@ -755,11 +752,10 @@ impl Browser {
     /// let commit = Oid::from_str(
     ///     "d6880352fc7fda8f521ae9b7357668b17bb5bad5"
     /// ).expect("Failed to parse SHA");
-    /// browser.commit(commit).expect("Failed to set
-    /// commit");
+    /// browser.commit(commit).expect("Failed to set commit");
     ///
     /// let head_commit = browser.get().first().clone();
-    /// let expected_commit = git2::Oid::from_str("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3")
+    /// let expected_commit = Oid::from_str("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3")
     ///     .expect("Failed to create Oid");
     ///
     /// let readme_last_commit = browser
@@ -769,7 +765,7 @@ impl Browser {
     ///
     /// assert_eq!(readme_last_commit, Some(expected_commit));
     ///
-    /// let expected_commit = git2::Oid::from_str("e24124b7538658220b5aaf3b6ef53758f0a106dc")
+    /// let expected_commit = Oid::from_str("e24124b7538658220b5aaf3b6ef53758f0a106dc")
     ///     .expect("Failed to create Oid");
     ///
     /// let memory_last_commit = browser
@@ -779,115 +775,6 @@ impl Browser {
     ///
     /// assert_eq!(memory_last_commit, Some(expected_commit));
     /// ```
-    ///
-    /// ```
-    /// use radicle_surf::vcs::git::{Browser, Oid, Repository};
-    /// use radicle_surf::file_system::{Label, Path, SystemType};
-    /// use radicle_surf::file_system::unsound;
-    /// use std::str::FromStr;
-    ///
-    /// let repo = Repository::new("./data/git-platinum")
-    ///     .expect("Could not retrieve ./data/git-platinum as git repository");
-    /// let mut browser = Browser::new(repo).expect("Could not initialise Browser");
-    ///
-    /// // Set the browser history to the initial commit
-    /// let commit = Oid::from_str(
-    ///     "d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3"
-    /// ).expect("Failed to parse SHA");
-    /// browser.commit(commit).unwrap();
-    ///
-    /// let head_commit = browser.get().0.first().clone();
-    ///
-    /// // memory.rs is commited later so it should not exist here.
-    /// let memory_last_commit = browser
-    ///     .last_commit(&Path::with_root(&[unsound::label::new("src"), unsound::label::new("memory.rs")]))
-    ///     .expect("Failed to get last commit")
-    ///     .map(|commit| commit.id);
-    ///
-    /// assert_eq!(memory_last_commit, None);
-    ///
-    /// // README.md exists in this commit.
-    /// let readme_last_commit = browser
-    ///     .last_commit(&Path::with_root(&[unsound::label::new("README.md")]))
-    ///     .expect("Failed to get last commit")
-    ///     .map(|commit| commit.id);
-    ///
-    /// assert_eq!(readme_last_commit, Some(head_commit.id));
-    /// ```
-    ///
-    /// ```
-    /// use radicle_surf::vcs::git::{BranchName, Browser, Oid, Repository};
-    /// use radicle_surf::file_system::{Label, Path, SystemType};
-    /// use radicle_surf::file_system::unsound;
-    /// use std::str::FromStr;
-    ///
-    /// let repo = Repository::new("./data/git-platinum")
-    ///     .expect("Could not retrieve ./data/git-platinum as git repository");
-    /// let mut browser = Browser::new(repo).expect("Could not initialise Browser");
-    ///
-    /// // Check that last commit is the actual last commit even if head commit differs.
-    /// let commit = Oid::from_str(
-    ///     "19bec071db6474af89c866a1bd0e4b1ff76e2b97"
-    /// ).expect("Could not parse SHA");
-    /// browser.commit(commit).unwrap();
-    ///
-    /// let expected_commit_id =
-    ///     Oid::from_str("f3a089488f4cfd1a240a9c01b3fcc4c34a4e97b2").unwrap();
-    ///
-    /// let gitignore_last_commit_id = browser
-    ///     .last_commit(&unsound::path::new("~/examples/Folder.svelte"))
-    ///     .expect("Failed to get last commit")
-    ///     .map(|commit| commit.id);
-    ///
-    /// assert_eq!(gitignore_last_commit_id, Some(expected_commit_id));
-    /// ```
-    ///
-    /// ```
-    /// use radicle_surf::vcs::git::{BranchName, Browser, Repository};
-    /// use radicle_surf::vcs::git::git2::{Oid};
-    /// use radicle_surf::file_system::{Label, Path, SystemType};
-    /// use radicle_surf::file_system::unsound;
-    /// use std::str::FromStr;
-    ///
-    /// let repo = Repository::new("./data/git-platinum")
-    ///     .expect("Could not retrieve ./data/git-platinum as git repository");
-    /// let mut browser = Browser::new(repo).expect("Could not initialise Browser");
-    ///
-    /// // Check that last commit is the actual last commit even if head commit differs.
-    /// let commit = Oid::from_str(
-    ///     "19bec071db6474af89c866a1bd0e4b1ff76e2b97"
-    /// ).expect("Failed to parse SHA");
-    /// browser.commit(commit).unwrap();
-    ///
-    /// let expected_commit_id =
-    ///     Oid::from_str("2429f097664f9af0c5b7b389ab998b2199ffa977").unwrap();
-    ///
-    /// let nested_directory_tree_commit_id = browser
-    ///     .last_commit(&unsound::path::new("~/this/is/a/really/deeply/nested/directory/tree"))
-    ///     .expect("Failed to get last commit")
-    ///     .map(|commit| commit.id);
-    ///
-    /// assert_eq!(nested_directory_tree_commit_id, Some(expected_commit_id));
-    /// ```
-    ///
-    /// ```
-    /// use radicle_surf::vcs::git::{BranchName, Browser, Repository, Oid};
-    /// use radicle_surf::file_system::{Label, Path, SystemType};
-    /// use radicle_surf::file_system::unsound;
-    ///
-    /// let repo = Repository::new("./data/git-platinum")
-    ///     .expect("Could not retrieve ./data/git-platinum as git repository");
-    /// let mut browser = Browser::new(repo).expect("Could not initialise Browser");
-    ///
-    /// let expected_commit_id =
-    ///     Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95").unwrap();
-    ///
-    /// let root_last_commit_id = browser
-    ///     .last_commit(&Path::root())
-    ///     .expect("Failed to get last commit")
-    ///     .map(|commit| commit.id);
-    ///
-    /// assert_eq!(root_last_commit_id, Some(expected_commit_id));
     pub fn last_commit(&self, path: &file_system::Path) -> Result<Option<Commit>, Error> {
         let file_history = self.repository.file_history(self.get().first().clone())?;
 
@@ -1007,92 +894,200 @@ mod tests {
         browser.get_directory().unwrap();
     }
 
-    #[test]
-    fn test_rev_master() -> Result<(), Error> {
-        let repo = Repository::new("./data/git-platinum")?;
-        let mut browser = Browser::new(repo)?;
-        browser.revspec("master")?;
+    #[cfg(test)]
+    mod rev {
+        use super::{Browser, Error, Oid, Repository};
 
-        let commit1 = git2::Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
-        assert!(
-            browser
+        #[test]
+        fn _master() -> Result<(), Error> {
+            let repo = Repository::new("./data/git-platinum")?;
+            let mut browser = Browser::new(repo)?;
+            browser.revspec("master")?;
+
+            let commit1 = Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
+            assert!(
+                browser
+                    .history
+                    .find(|commit| if commit.id == commit1 {
+                        Some(commit.clone())
+                    } else {
+                        None
+                    })
+                    .is_some(),
+                "commit_id={}, history =\n{:#?}",
+                commit1,
+                browser.history
+            );
+
+            let commit2 = Oid::from_str("d6880352fc7fda8f521ae9b7357668b17bb5bad5")?;
+            assert!(
+                browser
+                    .history
+                    .find(|commit| if commit.id == commit2 {
+                        Some(commit.clone())
+                    } else {
+                        None
+                    })
+                    .is_some(),
+                "commit_id={}, history =\n{:#?}",
+                commit2,
+                browser.history
+            );
+
+            Ok(())
+        }
+
+        #[test]
+        fn commit() -> Result<(), Error> {
+            let repo = Repository::new("./data/git-platinum")?;
+            let mut browser = Browser::new(repo)?;
+            browser.revspec("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
+
+            let commit1 = Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
+            assert!(browser
                 .history
                 .find(|commit| if commit.id == commit1 {
                     Some(commit.clone())
                 } else {
                     None
                 })
-                .is_some(),
-            "commit_id={}, history =\n{:#?}",
-            commit1,
-            browser.history
-        );
+                .is_some());
 
-        let commit2 = git2::Oid::from_str("d6880352fc7fda8f521ae9b7357668b17bb5bad5")?;
-        assert!(
-            browser
+            Ok(())
+        }
+
+        #[test]
+        fn commit_short() -> Result<(), Error> {
+            let repo = Repository::new("./data/git-platinum")?;
+            let mut browser = Browser::new(repo)?;
+            browser.revspec("3873745c8")?;
+
+            let commit1 = Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
+            assert!(browser
                 .history
-                .find(|commit| if commit.id == commit2 {
+                .find(|commit| if commit.id == commit1 {
                     Some(commit.clone())
                 } else {
                     None
                 })
-                .is_some(),
-            "commit_id={}, history =\n{:#?}",
-            commit2,
-            browser.history
-        );
+                .is_some());
 
-        Ok(())
+            Ok(())
+        }
+
+        #[test]
+        fn tag() -> Result<(), Error> {
+            let repo = Repository::new("./data/git-platinum")?;
+            let mut browser = Browser::new(repo)?;
+            browser.revspec("v0.2.0")?;
+
+            let commit1 = Oid::from_str("2429f097664f9af0c5b7b389ab998b2199ffa977")?;
+            assert_eq!(browser.history.first().id, commit1);
+
+            Ok(())
+        }
     }
 
-    #[test]
-    fn test_rev_commit() -> Result<(), Error> {
-        let repo = Repository::new("./data/git-platinum")?;
-        let mut browser = Browser::new(repo)?;
-        browser.revspec("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
+    #[cfg(test)]
+    mod last_commit {
+        use crate::file_system::unsound;
+        use crate::file_system::Path;
+        use crate::vcs::git::{Browser, Oid, Repository};
 
-        let commit1 = git2::Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
-        assert!(browser
-            .history
-            .find(|commit| if commit.id == commit1 {
-                Some(commit.clone())
-            } else {
-                None
-            })
-            .is_some());
+        #[test]
+        fn readme_missing_and_memory() {
+            let repo = Repository::new("./data/git-platinum")
+                .expect("Could not retrieve ./data/git-platinum as git repository");
+            let mut browser = Browser::new(repo).expect("Could not initialise Browser");
 
-        Ok(())
-    }
+            // Set the browser history to the initial commit
+            let commit = Oid::from_str("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3")
+                .expect("Failed to parse SHA");
+            browser.commit(commit).unwrap();
 
-    #[test]
-    fn test_rev_commit_short() -> Result<(), Error> {
-        let repo = Repository::new("./data/git-platinum")?;
-        let mut browser = Browser::new(repo)?;
-        browser.revspec("3873745c8")?;
+            let head_commit = browser.get().0.first().clone();
 
-        let commit1 = git2::Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
-        assert!(browser
-            .history
-            .find(|commit| if commit.id == commit1 {
-                Some(commit.clone())
-            } else {
-                None
-            })
-            .is_some());
+            // memory.rs is commited later so it should not exist here.
+            let memory_last_commit = browser
+                .last_commit(&Path::with_root(&[
+                    unsound::label::new("src"),
+                    unsound::label::new("memory.rs"),
+                ]))
+                .expect("Failed to get last commit")
+                .map(|commit| commit.id);
 
-        Ok(())
-    }
+            assert_eq!(memory_last_commit, None);
 
-    #[test]
-    fn test_rev_tag() -> Result<(), Error> {
-        let repo = Repository::new("./data/git-platinum")?;
-        let mut browser = Browser::new(repo)?;
-        browser.revspec("v0.2.0")?;
+            // README.md exists in this commit.
+            let readme_last_commit = browser
+                .last_commit(&Path::with_root(&[unsound::label::new("README.md")]))
+                .expect("Failed to get last commit")
+                .map(|commit| commit.id);
 
-        let commit1 = git2::Oid::from_str("2429f097664f9af0c5b7b389ab998b2199ffa977")?;
-        assert_eq!(browser.history.first().id, commit1);
+            assert_eq!(readme_last_commit, Some(head_commit.id));
+        }
 
-        Ok(())
+        #[test]
+        fn folder_svelte() {
+            let repo = Repository::new("./data/git-platinum")
+                .expect("Could not retrieve ./data/git-platinum as git repository");
+            let mut browser = Browser::new(repo).expect("Could not initialise Browser");
+
+            // Check that last commit is the actual last commit even if head commit differs.
+            let commit = Oid::from_str("19bec071db6474af89c866a1bd0e4b1ff76e2b97")
+                .expect("Could not parse SHA");
+            browser.commit(commit).unwrap();
+
+            let expected_commit_id =
+                Oid::from_str("f3a089488f4cfd1a240a9c01b3fcc4c34a4e97b2").unwrap();
+
+            let folder_svelte = browser
+                .last_commit(&unsound::path::new("~/examples/Folder.svelte"))
+                .expect("Failed to get last commit")
+                .map(|commit| commit.id);
+
+            assert_eq!(folder_svelte, Some(expected_commit_id));
+        }
+
+        #[test]
+        fn nest_directory() {
+            let repo = Repository::new("./data/git-platinum")
+                .expect("Could not retrieve ./data/git-platinum as git repository");
+            let mut browser = Browser::new(repo).expect("Could not initialise Browser");
+
+            // Check that last commit is the actual last commit even if head commit differs.
+            let commit = Oid::from_str("19bec071db6474af89c866a1bd0e4b1ff76e2b97")
+                .expect("Failed to parse SHA");
+            browser.commit(commit).unwrap();
+
+            let expected_commit_id =
+                Oid::from_str("2429f097664f9af0c5b7b389ab998b2199ffa977").unwrap();
+
+            let nested_directory_tree_commit_id = browser
+                .last_commit(&unsound::path::new(
+                    "~/this/is/a/really/deeply/nested/directory/tree",
+                ))
+                .expect("Failed to get last commit")
+                .map(|commit| commit.id);
+
+            assert_eq!(nested_directory_tree_commit_id, Some(expected_commit_id));
+        }
+
+        #[test]
+        fn root() {
+            let repo = Repository::new("./data/git-platinum")
+                .expect("Could not retrieve ./data/git-platinum as git repository");
+            let browser = Browser::new(repo).expect("Could not initialise Browser");
+
+            let expected_commit_id =
+                Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95").unwrap();
+
+            let root_last_commit_id = browser
+                .last_commit(&Path::root())
+                .expect("Failed to get last commit")
+                .map(|commit| commit.id);
+
+            assert_eq!(root_last_commit_id, Some(expected_commit_id));
+        }
     }
 }
