@@ -18,7 +18,7 @@ use radicle_surf::file_system::{Label, Path, SystemType};
 // We're going to point to this repo.
 let repo = git::Repository::new(".").unwrap();
 
-// Here we initialise a new Broswer for a the git repo.
+// Here we initialise a new Browser for the git repo.
 let browser = git::Browser::new(&repo).unwrap();
 
 // Get the snapshot of the directory for our current
