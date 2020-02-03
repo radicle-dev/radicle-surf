@@ -584,6 +584,9 @@ impl Browser {
     ///     .expect("Could not retrieve ./data/git-platinum as git repository");
     /// let mut browser = Browser::new(repo).expect("Could not initialise Browser");
     ///
+    /// let commit = Oid::from_str(
+    ///     "e24124b7538658220b5aaf3b6ef53758f0a106dc").expect("Failed to
+    /// parse SHA");
     /// // Set to the initial commit
     /// let commit = Oid::from_str(
     ///     "e24124b7538658220b5aaf3b6ef53758f0a106dc"
