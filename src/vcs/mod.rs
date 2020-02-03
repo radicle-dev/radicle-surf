@@ -1,19 +1,24 @@
+//! A model of a general VCS. The components consist of a [`History`], a [`Browser`], and a [`VCS`]
+//! trait.
+
 use crate::file_system::directory::Directory;
 use nonempty::NonEmpty;
 
 pub mod git;
 
 /// A non-empty bag of artifacts which are used to
-/// derive a `Directory` view. Examples of artifacts
+/// derive a [`crate::file_system::Directory`] view. Examples of artifacts
 /// would be commits in Git or patches in Pijul.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct History<A>(pub NonEmpty<A>);
 
 impl<A> History<A> {
+    /// Create a new `History` consisting of one artifact.
     pub fn new(a: A) -> Self {
         History(NonEmpty::new(a))
     }
 
+    /// Push an artifact to the end of the `History`.
     pub fn push(&mut self, a: A) {
         self.0.push(a)
     }
@@ -23,6 +28,7 @@ impl<A> History<A> {
         self.0.iter()
     }
 
+    /// Get the firest artifact in the `History`.
     pub fn first(&self) -> &A {
         self.0.first()
     }
@@ -48,6 +54,7 @@ impl<A> History<A> {
         new_history.map(History)
     }
 
+    /// Apply a function from `A` to `B` over the `History`
     pub fn map<F, B>(&self, f: F) -> History<B>
     where
         F: Fn(&A) -> B,
@@ -55,6 +62,10 @@ impl<A> History<A> {
         History(self.0.map(f))
     }
 
+    /// Find an artifact in the `History`.
+    ///
+    /// The function provided should return `Some` if the item is the desired output and `None`
+    /// otherwise.
     pub fn find<F, B>(&self, f: F) -> Option<B>
     where
         F: Fn(&A) -> Option<B>,
@@ -179,10 +190,9 @@ where
     fn get_repo(identifier: Self::RepoId) -> Result<Self, Error>;
 }
 
-pub trait VCS<A, Error>
-where
-    Self: Sized,
-{
+/// The `VCS` trait encapsulates the minimal amount of information for interacting with some notion
+/// of `History` from a given Version-Control-System.
+pub trait VCS<A, Error> {
     /// The way to identify a History.
     type HistoryId;
 

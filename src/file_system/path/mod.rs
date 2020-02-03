@@ -10,25 +10,12 @@ use std::str::FromStr;
 pub mod unsound;
 
 /// `Label` is a special case of a `String` identifier for
-/// `Directory` and `File` names, and is used in [`Path`](struct.Path.html)
-/// as the component parts of a path.
+/// [`Directory`](`crate::file_system::directory::Directory`) and
+/// [`File`](`crate::file_system::directory::File`) names, and is used in [`Path`] as the component
+/// parts of a path.
 ///
-/// A `Label` should not be empty or contain `/`s. It is encouraged to use
-/// the `TryFrom` instance to create a `Label`.
-///
-/// # Examples
-///
-/// ```
-/// use radicle_surf::file_system::error as file_error;
-/// use radicle_surf::file_system::{Label, Path};
-/// use std::convert::TryFrom;
-///
-/// fn build_lib_path() -> Result<Path, file_error::Error> {
-///     let lib_filename = Label::try_from("lib.rs")?;
-///     let src_directory_name = Label::try_from("src")?;
-///     Ok(Path::from_labels(src_directory_name, &[lib_filename]))
-/// }
-/// ```
+/// A `Label` should not be empty or contain `/`s. It is encouraged to use the `TryFrom` instance to
+/// create a `Label`.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Label {
     pub(crate) label: String,
@@ -46,8 +33,7 @@ impl Deref for Label {
 impl Label {
     /// The root label for the root directory, i.e. `"~"`.
     ///
-    /// Prefer creating a root [`Path`](struct.Path.html),
-    /// by using [`Path::root`](struct.Path.html#method.root).
+    /// Prefer creating a root [`Path`], by using [`Path::root`](struct.Path.html#method.root).
     ///
     /// # Examples
     ///
@@ -64,6 +50,17 @@ impl Label {
         }
     }
 
+    /// Check that the label is equivalent to [`Label::root`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use radicle_surf::file_system::Label;
+    /// use radicle_surf::file_system::unsound;
+    ///
+    /// let root = unsound::label::new("~");
+    /// assert!(root.is_root());
+    /// ```
     pub fn is_root(&self) -> bool {
         *self == Self::root()
     }
@@ -99,8 +96,8 @@ impl FromStr for Label {
         Label::try_from(item)
     }
 }
-/// A non-empty set of [`Label`](struct.Label.html)s to define a path
-/// to a directory or file.
+
+/// A non-empty set of [`Label`]s to define a path to a directory or file.
 ///
 /// `Path` tends to be used for insertion or find operations.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -148,12 +145,13 @@ impl From<Path> for Vec<Label> {
 }
 
 impl Path {
+    /// Create a new `Path` with a single [`Label`].
     pub fn new(label: Label) -> Path {
         Path(NonEmpty::new(label))
     }
 
-    /// The root path is a `Path` made up of the single
-    /// root label (see: [`Label::root`](stuct.Label.html#method.root).
+    /// The root path is a `Path` made up of the single root label (see:
+    /// [`Label::root`](#method.root).
     ///
     /// # Examples
     ///
@@ -206,7 +204,7 @@ impl Path {
         self.0.append(&mut other)
     }
 
-    /// Push a new [`Label`](struct.Label.html) onto the `Path`.
+    /// Push a new [`Label`] onto the `Path`.
     ///
     /// # Examples
     ///
@@ -218,17 +216,31 @@ impl Path {
     /// root.push(unsound::label::new("src"));
     /// root.push(unsound::label::new("lib.rs"));
     ///
-    /// assert_eq!(root, Path::with_root(&[unsound::label::new("src"), unsound::label::new("lib.rs")]));
+    /// assert_eq!(root, unsound::path::new("~/src/lib.rs"));
     /// ```
     pub fn push(&mut self, label: Label) {
         self.0.push(label)
     }
 
+    /// Pop the [`Label`] from the end of the tail.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use radicle_surf::file_system::{Label, Path};
+    /// use radicle_surf::file_system::unsound;
+    ///
+    /// let mut root = Path::root();
+    /// root.push(unsound::label::new("src"));
+    /// root.push(unsound::label::new("lib.rs"));
+    ///
+    /// assert_eq!(root.pop(), Some(unsound::label::new("lib.rs")));
+    /// ```
     pub fn pop(&mut self) -> Option<Label> {
         self.0.pop()
     }
 
-    /// Iterator over the [`Label`](struct.Label.html)s in the `Path`.
+    /// Iterator over the [`Label`]s in the `Path`.
     ///
     /// # Examples
     ///
@@ -247,8 +259,7 @@ impl Path {
         self.0.iter()
     }
 
-    /// Get the first [`Label`](struct.Label.html) in the `Path`
-    /// and the rest of the [`Label`](struct.Label.html)s after it.
+    /// Get the first [`Label`] in the `Path` and the rest of the [`Label`]s after it.
     ///
     /// # Examples
     ///
@@ -267,21 +278,11 @@ impl Path {
         self.0.split_first()
     }
 
-    /// Get the prefix of the [`Label`](struct.Label.html)s and
-    /// the last [`Label`](struct.Label.html).
+    /// Get the prefix of the [`Label`]s and the last [`Label`].
     ///
-    /// This is useful when the prefix is a directory path
-    /// and the last label a file name.
+    /// This is useful when the prefix is a directory path and the last label is a file name.
     ///
     /// # Examples
-    ///
-    /// ```
-    /// use radicle_surf::file_system::{Label, Path};
-    /// use radicle_surf::file_system::unsound;
-    ///
-    /// let path = unsound::path::new("foo");
-    /// assert_eq!(path.split_last(), (vec![], unsound::label::new("foo")));
-    /// ```
     ///
     /// ```
     /// use radicle_surf::file_system::{Label, Path};
@@ -301,24 +302,11 @@ impl Path {
     ///     (vec![unsound::label::new("foo"), unsound::label::new("bar")], unsound::label::new("baz"))
     /// );
     /// ```
-    ///
-    /// ```
-    /// use radicle_surf::file_system::{Label, Path};
-    /// use radicle_surf::file_system::unsound;
-    ///
-    /// // An interesting case for when first == last, but doesn't imply a singleton Path.
-    /// let path = unsound::path::new("foo/bar/foo");
-    /// assert_eq!(
-    ///     path.split_last(),
-    ///     (vec![unsound::label::new("foo"), unsound::label::new("bar")], unsound::label::new("foo"))
-    /// );
-    /// ```
     pub fn split_last(&self) -> (Vec<Label>, Label) {
         split_last(&self.0)
     }
 
-    /// Construct a `Path` given at least one [`Label`](struct.Label)
-    /// followed by 0 or more [`Label`](struct.Label)s.
+    /// Construct a `Path` given at least one [`Label`] followed by 0 or more [`Label`]s.
     ///
     /// # Examples
     ///
@@ -327,7 +315,10 @@ impl Path {
     /// use radicle_surf::file_system::{Path, Label};
     /// use radicle_surf::file_system::unsound;
     ///
-    /// let path = unsound::path::new("~/foo/bar/baz.rs");
+    /// let path = Path::from_labels(
+    ///     Label::root(),
+    ///     &[unsound::label::new("foo"), unsound::label::new("bar"), unsound::label::new("baz.rs")]
+    /// );
     ///
     /// let mut expected = Path::root();
     /// expected.push(unsound::label::new("foo"));
@@ -346,8 +337,7 @@ impl Path {
         Path((root, labels.to_vec()).into())
     }
 
-    /// Construct a `Path` using [`Label::root`](struct.Label.html#method.root)
-    /// as the head of the `Path.
+    /// Construct a `Path` using [`Label::root`](#method.root) as the head of the `Path.
     ///
     /// # Examples
     ///
@@ -356,7 +346,9 @@ impl Path {
     /// use radicle_surf::file_system::{Label, Path};
     /// use radicle_surf::file_system::unsound;
     ///
-    /// let path = unsound::path::new("~/foo/bar/baz.rs");
+    /// let path = Path::with_root(
+    ///     &[unsound::label::new("foo"), unsound::label::new("bar"), unsound::label::new("baz.rs")]
+    /// );
     ///
     /// let mut expected = Path::root();
     /// expected.push(unsound::label::new("foo"));
@@ -388,5 +380,32 @@ impl TryFrom<path::PathBuf> for Path {
         }
 
         Ok(path)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[cfg(test)]
+    mod path {
+        use crate::file_system::unsound;
+
+        #[test]
+        fn split_last_root_and_foo() {
+            let path = unsound::path::new("foo");
+            assert_eq!(path.split_last(), (vec![], unsound::label::new("foo")));
+        }
+
+        #[test]
+        fn split_last_same_labels() {
+            // An interesting case for when first == last, but doesn't imply a singleton Path.
+            let path = unsound::path::new("foo/bar/foo");
+            assert_eq!(
+                path.split_last(),
+                (
+                    vec![unsound::label::new("foo"), unsound::label::new("bar")],
+                    unsound::label::new("foo")
+                )
+            );
+        }
     }
 }

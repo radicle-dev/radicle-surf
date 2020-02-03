@@ -1,13 +1,14 @@
-#![deny(unused_import_braces, unused_qualifications, warnings)]
+#![deny(missing_docs, unused_import_braces, unused_qualifications, warnings)]
 
 //! Welcome to `radicle-surf`!
 //!
 //! `radicle-surf` is a system to describe a file-system in a VCS world.
-//! We have the concept of files and directories, but these objects can change over time while people iterate on them.
-//! Thus, it is a file-system within history and we, the user, are viewing the file-system at a particular snapshot.
-//! Alongside this, we will wish to take two snapshots and view their differences.
+//! We have the concept of files and directories, but these objects can change over time while
+//! people iterate on them. Thus, it is a file-system within history and we, the user, are viewing
+//! the file-system at a particular snapshot. Alongside this, we will wish to take two snapshots and
+//! view their differences.
 //!
-//! Let's start surfing (and apologies for the `unwrap`s):
+//! Let's start surfing (and apologies for the `expect`s):
 //!
 //! ```
 //! use radicle_surf::vcs::git;
@@ -23,23 +24,19 @@
 //! let mut browser = git::Browser::new(repo).expect("Failed to initialise browser");
 //!
 //! // Set the history to a particular commit
-//! let commit = git::Oid::from_str(
-//!     "80ded66281a4de2889cc07293a8f10947c6d57fe"
-//! ).expect("Failed to parse SHA");
+//! let commit = git::Oid::from_str("80ded66281a4de2889cc07293a8f10947c6d57fe").expect("Failed to parse SHA");
 //! browser.commit(commit).expect("Failed to set commit");
 //!
-//! // Get the snapshot of the directory for our current
-//! // HEAD of history.
+//! // Get the snapshot of the directory for our current HEAD of history.
 //! let directory = browser.get_directory().expect("Failed to get directory");
 //!
-//! // Let's get a Path to this file
-//! let this_file = Path::from_labels(unsound::label::new("src"), &[unsound::label::new("memory.rs")]);
+//! // Let's get a Path to the memory.rs file
+//! let memory = unsound::path::new("src/memory.rs");
 //!
 //! // And assert that we can find it!
-//! assert!(directory.find_file(&this_file).is_some());
+//! assert!(directory.find_file(&memory).is_some());
 //!
-//! let mut root_contents = directory.list_directory();
-//! root_contents.sort();
+//! let root_contents = directory.list_directory();
 //!
 //! assert_eq!(root_contents, vec![
 //!     SystemType::file(unsound::label::new(".i-am-well-hidden")),
@@ -51,12 +48,8 @@
 //!     SystemType::directory(unsound::label::new("this")),
 //! ]);
 //!
-//! let src = directory.find_directory(
-//!     &Path::new(unsound::label::new("src"))
-//! ).expect("Failed to find src");
-//!
-//! let mut src_contents = src.list_directory();
-//! src_contents.sort();
+//! let src = directory.find_directory(&Path::new(unsound::label::new("src"))).expect("Failed to find src");
+//! let src_contents = src.list_directory();
 //!
 //! assert_eq!(src_contents, vec![
 //!     SystemType::file(unsound::label::new("Eval.hs")),

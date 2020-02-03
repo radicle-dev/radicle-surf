@@ -65,11 +65,12 @@ impl Diff {
         let path = Rc::new(RefCell::new(Path::from_labels(right.current(), &[])));
         Diff::collect_diff(&left, &right, &path, &mut diff)?;
 
-        // TODO: Some of the deleted files may actually be moved (renamed) to one of the created files.
-        // Finding out which of the deleted files were deleted and which were moved will probably require
-        // performing some variant of the longest common substring algorithm for each pair in D x C.
-        // Final decision can be based on heuristics, e.g. the file can be considered moved,
-        // if len(LCS) > 0,25 * min(size(d), size(c)), and deleted otherwise.
+        // TODO: Some of the deleted files may actually be moved (renamed) to one of the created
+        // files. Finding out which of the deleted files were deleted and which were moved
+        // will probably require performing some variant of the longest common substring
+        // algorithm for each pair in D x C. Final decision can be based on heuristics, e.g.
+        // the file can be considered moved, if len(LCS) > 0,25 * min(size(d), size(c)), and
+        // deleted otherwise.
 
         Ok(diff)
     }
@@ -92,11 +93,11 @@ impl Diff {
                         Ordering::Greater => {
                             diff.add_deleted_files(old_entry, parent_path)?;
                             old_entry_opt = old_iter.next();
-                        }
+                        },
                         Ordering::Less => {
                             diff.add_created_files(new_entry, parent_path)?;
                             new_entry_opt = new_iter.next();
-                        }
+                        },
                         Ordering::Equal => match (new_entry, old_entry) {
                             (
                                 DirectoryContents::File {
@@ -118,7 +119,7 @@ impl Diff {
                                 }
                                 old_entry_opt = old_iter.next();
                                 new_entry_opt = new_iter.next();
-                            }
+                            },
                             (
                                 DirectoryContents::File {
                                     name: new_file_name,
@@ -133,7 +134,7 @@ impl Diff {
                                 diff.add_deleted_files(old_entry, parent_path)?;
                                 old_entry_opt = old_iter.next();
                                 new_entry_opt = new_iter.next();
-                            }
+                            },
                             (
                                 DirectoryContents::Directory(new_dir),
                                 DirectoryContents::File {
@@ -148,7 +149,7 @@ impl Diff {
                                 );
                                 old_entry_opt = old_iter.next();
                                 new_entry_opt = new_iter.next();
-                            }
+                            },
                             (
                                 DirectoryContents::Directory(new_dir),
                                 DirectoryContents::Directory(old_dir),
@@ -163,18 +164,18 @@ impl Diff {
                                 parent_path.borrow_mut().pop();
                                 old_entry_opt = old_iter.next();
                                 new_entry_opt = new_iter.next();
-                            }
+                            },
                         },
                     }
-                }
+                },
                 (Some(ref old_entry), None) => {
                     diff.add_deleted_files(old_entry, parent_path)?;
                     old_entry_opt = old_iter.next();
-                }
+                },
                 (None, Some(ref new_entry)) => {
                     diff.add_created_files(new_entry, parent_path)?;
                     new_entry_opt = new_iter.next();
-                }
+                },
                 (None, None) => break,
             }
         }
@@ -196,7 +197,7 @@ impl Diff {
             DirectoryContents::File { name, .. } => {
                 let mapped = mapper(name, &RefCell::borrow(parent_path));
                 Ok(vec![mapped])
-            }
+            },
         }
     }
 
@@ -227,10 +228,10 @@ impl Diff {
             match entry {
                 DirectoryContents::Directory(subdir) => {
                     Diff::collect_files_inner(&subdir, parent_path, mapper, files)?;
-                }
+                },
                 DirectoryContents::File { name, .. } => {
                     files.push(mapper(&name, &RefCell::borrow(parent_path)));
-                }
+                },
             }
         }
         parent_path.borrow_mut().pop();
@@ -343,6 +344,7 @@ mod tests {
         assert_eq!(diff, expected_diff)
     }
 
+    /* TODO(fintan): Move is not detected yet
     #[test]
     fn test_moved_file() {
         let mut directory = Directory::root();
@@ -353,10 +355,9 @@ mod tests {
 
         let diff = Diff::diff(directory, new_directory).expect("diff failed");
 
-        // TODO(fintan): Move is not detected yet
-        // assert_eq!(diff, Diff::new())
-        assert!(true)
+        assert_eq!(diff, Diff::new())
     }
+    */
 
     #[test]
     fn test_modify_file() {
@@ -463,6 +464,7 @@ mod tests {
         assert_eq!(diff, expected_diff)
     }
 
+    /* TODO(fintan): Tricky stuff
     #[test]
     fn test_disjoint_directories() {
         let mut directory = Directory::root();
@@ -495,8 +497,7 @@ mod tests {
             modified: vec![],
         };
 
-        // TODO(fintan): Tricky stuff
-        // assert_eq!(diff, expected_diff)
-        assert!(true)
+        assert_eq!(diff, expected_diff)
     }
+    */
 }
