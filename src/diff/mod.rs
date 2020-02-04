@@ -6,6 +6,8 @@ use std::cmp::Ordering;
 use std::ops::Deref;
 use std::rc::Rc;
 
+pub mod git;
+
 #[derive(Debug)]
 pub struct DiffError {
     reason: String,
