@@ -296,7 +296,7 @@ impl<'repo> Repository {
         Ok(touched_files)
     }
 
-    fn diff_commits(
+    pub(crate) fn diff_commits(
         &'repo self,
         left: &'repo git2::Commit,
         right: Option<&'repo git2::Commit>,
