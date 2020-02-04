@@ -1,4 +1,4 @@
-#![allow(dead_code, unused_variables, missing_docs)]
+#![allow(missing_docs)]
 
 use crate::file_system::{Directory, DirectoryContents, Label, Path};
 use std::cell::RefCell;
@@ -106,10 +106,7 @@ impl Diff {
                                     name: new_file_name,
                                     file: new_file,
                                 },
-                                DirectoryContents::File {
-                                    name: old_file_name,
-                                    file: old_file,
-                                },
+                                DirectoryContents::File { file: old_file, .. },
                             ) => {
                                 if old_file.size != new_file.size
                                     || old_file.checksum() != new_file.checksum()
@@ -123,32 +120,20 @@ impl Diff {
                                 new_entry_opt = new_iter.next();
                             },
                             (
-                                DirectoryContents::File {
-                                    name: new_file_name,
-                                    file: new_file,
-                                },
-                                DirectoryContents::Directory(old_dir),
+                                DirectoryContents::File { name, .. },
+                                DirectoryContents::Directory(_),
                             ) => {
-                                diff.add_created_file(
-                                    &new_file_name,
-                                    &RefCell::borrow(parent_path),
-                                );
+                                diff.add_created_file(&name, &RefCell::borrow(parent_path));
                                 diff.add_deleted_files(old_entry, parent_path)?;
                                 old_entry_opt = old_iter.next();
                                 new_entry_opt = new_iter.next();
                             },
                             (
-                                DirectoryContents::Directory(new_dir),
-                                DirectoryContents::File {
-                                    name: old_file_name,
-                                    file: old_file,
-                                },
+                                DirectoryContents::Directory(_),
+                                DirectoryContents::File { name, .. },
                             ) => {
                                 diff.add_created_files(new_entry, parent_path)?;
-                                diff.add_deleted_file(
-                                    &old_file_name,
-                                    &RefCell::borrow(parent_path),
-                                );
+                                diff.add_deleted_file(&name, &RefCell::borrow(parent_path));
                                 old_entry_opt = old_iter.next();
                                 new_entry_opt = new_iter.next();
                             },
