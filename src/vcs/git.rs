@@ -901,6 +901,16 @@ mod tests {
     mod rev {
         use super::{Browser, Error, Oid, Repository};
 
+        // **FIXME**: This seems to break occasionally on
+        // buildkite. For some reason the commit 3873745c8f6ffb45c990eb23b491d4b4b6182f95,
+        // which is on master (currently HEAD), is not found. It seems to load the history
+        // with d6880352fc7fda8f521ae9b7357668b17bb5bad5 as the HEAD.
+        //
+        // To temporarily fix this, we need to select "New Build" from the build kite build page
+        // that's failing.
+        // * Under "Message" put whatever you want.
+        // * Under "Branch" put in the branch you're working on.
+        // * Expand "Options" and select "clean checkout".
         #[test]
         fn _master() -> Result<(), Error> {
             let repo = Repository::new("./data/git-platinum")?;
