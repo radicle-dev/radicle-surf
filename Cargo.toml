@@ -10,9 +10,9 @@ repository = "https://github.com/radicle-dev/radicle-surf"
 license = "GPL-3.0-only"
 
 [dependencies]
-git2 = "0.10.1"
-nonempty = "0.2.0"
+git2 = "0.12"
+nonempty = "0.2"
 
 [dev-dependencies]
-pretty_assertions = "0.6.1"
-proptest = "0.9.4"
+pretty_assertions = "0.6"
+proptest = "0.9"
