@@ -215,6 +215,34 @@ impl<'repo> Repository {
         Ok(vcs::History(commits))
     }
 
+    /// Extract the signature from a commit
+    ///
+    /// # Arguments
+    ///
+    /// `commit_oid` - The object ID of the commit
+    /// `field` - the name of the header field containing the signature block;
+    ///           pass `None` to extract the default 'gpgsig'
+    pub(crate) fn extract_signature(
+        &'repo self,
+        commit_oid: &Oid,
+        field: Option<&str>,
+    ) -> Result<Option<Signature>, Error> {
+        // Match is necessary here because according to the documentation for
+        // git_commit_extract_signature at
+        // https://libgit2.org/libgit2/#HEAD/group/commit/git_commit_extract_signature
+        // the return value for a commit without a signature will be GIT_ENOTFOUND
+        match self.0.extract_signature(commit_oid, field) {
+            Err(error) => {
+                if error.code() == git2::ErrorCode::NotFound {
+                    Ok(None)
+                } else {
+                    Err(error.into())
+                }
+            },
+            Ok(sig) => Ok(Some(Signature::from_buf(sig.0))),
+        }
+    }
+
     /// Get the history of the file system where the head of the [`NonEmpty`] is the latest commit.
     fn file_history(
         &'repo self,
@@ -787,6 +815,60 @@ impl Browser {
                 .commit
                 .clone()
         }))
+    }
+
+    /// Extract the signature for a commit
+    ///
+    /// # Arguments
+    ///
+    /// * `commit` - The commit to extract the signature for
+    /// * `field` - the name of the header field containing the signature block; pass `None` to
+    ///   extract the default 'gpgsig'
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use radicle_surf::vcs::git::{Browser, Repository, Oid, error};
+    ///
+    /// # use std::error::Error;
+    /// # fn main() -> Result<(), error::Error> {
+    ///
+    /// let repo = Repository::new("./data/git-platinum")?;
+    /// let mut browser = Browser::new(repo)?;
+    ///
+    /// let commit_with_signature_oid = Oid::from_str(
+    ///     "e24124b7538658220b5aaf3b6ef53758f0a106dc"
+    /// )?;
+    ///
+    /// browser.commit(commit_with_signature_oid)?;
+    /// let history = browser.get();
+    /// let commit_with_signature = history.first();
+    /// let signature = browser.extract_signature(commit_with_signature, None)?;
+    ///
+    /// // We have a signature
+    /// assert!(signature.is_some());
+    ///
+    /// let commit_without_signature_oid = Oid::from_str(
+    ///     "80bacafba303bf0cdf6142921f430ff265f25095"
+    /// )?;
+    ///
+    /// browser.commit(commit_without_signature_oid)?;
+    /// let history = browser.get();
+    /// let commit_without_signature = history.first();
+    /// let signature = browser.extract_signature(commit_without_signature, None)?;
+    ///
+    /// // There is no signature
+    /// assert!(signature.is_none());
+    ///
+    /// #     Ok(())
+    /// # }
+    /// ```
+    pub fn extract_signature(
+        &self,
+        commit: &Commit,
+        field: Option<&str>,
+    ) -> Result<Option<Signature>, Error> {
+        self.repository.extract_signature(&commit.id, field)
     }
 
     /// Do a pre-order TreeWalk of the given commit. This turns a Tree
