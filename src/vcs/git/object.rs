@@ -291,3 +291,13 @@ impl RevObject {
         }
     }
 }
+
+/// The signature of a commit
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Signature(Vec<u8>);
+
+impl Signature {
+    pub(super) fn from_buf(buf: git2::Buf) -> Signature {
+        Signature((*buf).into())
+    }
+}
