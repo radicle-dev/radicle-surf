@@ -5,8 +5,10 @@ use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::ops::Deref;
 use std::rc::Rc;
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
+#[error("A diff error occurred: {reason}")]
 pub struct DiffError {
     reason: String,
 }
