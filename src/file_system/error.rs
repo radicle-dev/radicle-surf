@@ -1,45 +1,53 @@
 //! Errors that can occur within the file system logic.
 //!
-//! These errors occur due to [`Label`] and [`Path`] parsing when using their respective `TryFrom`
-//! instances.
+//! These errors occur due to [`Label`](super::path::Label) and [`Path`](super::path::Path) parsing
+//! when using their respective `TryFrom` instances.
 
+use std::ffi::OsStr;
 use thiserror::Error;
 
-pub(crate) const EMPTY_PATH: Error = Error::Path(Path::Empty);
+pub(crate) const EMPTY_PATH: Error = Error::Path(PathError::Empty);
+pub(crate) const EMPTY_LABEL: Error = Error::Label(LabelError::Empty);
 
-pub(crate) const INVALID_UTF8: Error = Error::Label(Label::InvalidUTF8);
-pub(crate) const EMPTY_LABEL: Error = Error::Label(Label::Empty);
-pub(crate) const CONTAINS_SLASH: Error = Error::Label(Label::ContainsSlash);
+/// Build an [`Error::Label(LabelError::InvalidUTF8)`] from an [`OsStr`](std::ffi::OsStr)
+pub(crate) fn label_invalid_utf8(item: &OsStr) -> Error {
+    Error::Label(LabelError::InvalidUTF8(item.to_string_lossy().into()))
+}
+
+/// Build an [`Error::Label(LabelError::ContainsSlash)`] from a [`str`]
+pub(crate) fn label_has_slash(item: &str) -> Error {
+    Error::Label(LabelError::ContainsSlash(item.into()))
+}
 
 /// Error type for all file system errors that can occur.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum Error {
-    /// A `Label` specific error for parsing a [`Label`].
+    /// A `LabelError` specific error for parsing a [`Path`](super::path::Label).
     #[error("Label error: {0}")]
-    Label(#[from] Label),
-    /// A `Path` specific error for parsing a [`Path`].
+    Label(#[from] LabelError),
+    /// A `PathError` specific error for parsing a [`Path`](super::path::Path).
     #[error("Path error: {0}")]
-    Path(#[from] Path),
+    Path(#[from] PathError),
 }
 
-/// Parse errors for when parsing a string to a [`Path`].
+/// Parse errors for when parsing a string to a [`Path`](super::path::Path).
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
-pub enum Path {
-    /// An error signifying that a [`Path`] is empty.
+pub enum PathError {
+    /// An error signifying that a [`Path`](super::path::Path) is empty.
     #[error("Path is empty")]
     Empty,
 }
 
-/// Parse errors for when parsing a string to a [`Label`].
+/// Parse errors for when parsing a string to a [`Label`](super::path::Label).
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
-pub enum Label {
-    /// An error signifying that a [`Label`] is contains invalid UTF-8.
-    #[error("Label contains invalid UTF-8")]
-    InvalidUTF8,
-    /// An error signifying that a [`Label`] contains a `/`.
-    #[error("Label contains a slash")]
-    ContainsSlash,
-    /// An error signifying that a [`Label`] is empty.
+pub enum LabelError {
+    /// An error signifying that a [`Label`](super::path::Label) is contains invalid UTF-8.
+    #[error("Label contains invalid UTF-8: {0}")]
+    InvalidUTF8(String),
+    /// An error signifying that a [`Label`](super::path::Label) contains a `/`.
+    #[error("Label contains a slash: {0}")]
+    ContainsSlash(String),
+    /// An error signifying that a [`Label`](super::path::Label) is empty.
     #[error("Label is empty")]
     Empty,
 }
