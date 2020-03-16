@@ -1,5 +1,6 @@
 use nonempty::NonEmpty;
 
+/// Split the last element out of a `NonEmpty` list.
 pub fn split_last<T>(non_empty: &NonEmpty<T>) -> (Vec<T>, T)
 where
     T: Clone + Eq,
