@@ -11,8 +11,8 @@ license = "GPL-3.0-or-later"
 
 [dependencies]
 git2 = "0.12"
-nonempty = "0.2"
 thiserror = "1.0"
+nonempty = { git = "https://github.com/cloudhead/nonempty.git", rev = "325b1185db258498b156ba9d13417e0588d41357" }
 
 [dev-dependencies]
 pretty_assertions = "0.6"

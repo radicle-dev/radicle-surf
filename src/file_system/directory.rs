@@ -488,16 +488,17 @@ impl Directory {
     pub fn insert_files(&mut self, directory_path: &[Label], files: NonEmpty<(Label, File)>) {
         match NonEmpty::from_slice(directory_path) {
             None => {
-                for (file_name, file) in files.iter() {
-                    self.insert_file(&Path::new(file_name.clone()), file.clone())
+                for (file_name, file) in files.into_iter() {
+                    self.insert_file(&Path::new(file_name), file)
                 }
             },
-            Some(directory_path) => {
-                for (file_name, file) in files.iter() {
-                    let mut file_path = Path(directory_path.clone());
-                    file_path.push(file_name.clone());
+            Some(path) => {
+                for (file_name, file) in files.into_iter() {
+                    // The clone is necessary here because we use it as a prefix.
+                    let mut file_path = Path(path.clone());
+                    file_path.push(file_name);
 
-                    self.insert_file(&file_path, file.clone())
+                    self.insert_file(&file_path, file)
                 }
             },
         }
@@ -507,14 +508,16 @@ impl Directory {
         let mut directory: Self = Directory::root();
 
         for (path, files) in files.into_iter() {
-            for (file_name, file) in files.iter() {
+            for (file_name, file) in files.into_iter() {
                 let mut file_path = path.clone();
-                file_path.push(file_name.clone());
+
                 if path.is_root() {
-                    directory.insert_file(&Path::new(file_name.clone()), file.clone())
+                    file_path.push(file_name);
                 } else {
-                    directory.insert_file(&file_path, file.clone())
+                    file_path = Path::new(file_name);
                 }
+
+                directory.insert_file(&file_path, file)
             }
         }
 
