@@ -207,13 +207,13 @@ impl Path {
     /// use std::convert::TryFrom;
     ///
     /// let mut path1 = unsound::path::new("foo/bar");
-    /// let mut path2 = unsound::path::new("baz/quux");
-    /// path1.append(&mut path2);
+    /// let path2 = unsound::path::new("baz/quux");
+    /// path1.append(path2);
     /// let expected = unsound::path::new("foo/bar/baz/quux");
     /// assert_eq!(path1, expected);
     /// ```
-    pub fn append(&mut self, path: &mut Self) {
-        let mut other = path.0.clone().into();
+    pub fn append(&mut self, path: Self) {
+        let mut other = path.0.into();
         self.0.append(&mut other)
     }
 
