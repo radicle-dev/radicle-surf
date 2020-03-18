@@ -72,9 +72,9 @@ impl<A> History<A> {
     }
 
     /// Apply a function from `A` to `B` over the `History`
-    pub fn map<F, B>(&self, f: F) -> History<B>
+    pub fn map<F, B>(self, f: F) -> History<B>
     where
-        F: Fn(&A) -> B,
+        F: FnMut(A) -> B,
     {
         History(self.0.map(f))
     }

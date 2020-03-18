@@ -54,7 +54,7 @@
 //! let memory = unsound::path::new("src/memory.rs");
 //!
 //! // And assert that we can find it!
-//! assert!(directory.find_file(&memory).is_some());
+//! assert!(directory.find_file(memory).is_some());
 //!
 //! let root_contents = directory.list_directory();
 //!
@@ -69,7 +69,7 @@
 //! ]);
 //!
 //! let src = directory
-//!     .find_directory(&Path::new(unsound::label::new("src")))
+//!     .find_directory(Path::new(unsound::label::new("src")))
 //!     .expect("failed to find src");
 //! let src_contents = src.list_directory();
 //!

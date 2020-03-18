@@ -47,7 +47,7 @@
 //!
 //! // find src directory in the Git directory and the in-memory directory
 //! let src_directory = directory
-//!     .find_directory(&Path::new(unsound::label::new("src")))
+//!     .find_directory(Path::new(unsound::label::new("src")))
 //!     .expect("failed to find src");
 //! let mut src_directory_contents = src_directory.list_directory();
 //! src_directory_contents.sort();
@@ -864,7 +864,7 @@ impl Browser {
     /// let expected_commit = Oid::from_str("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3")?;
     ///
     /// let readme_last_commit = browser
-    ///     .last_commit(&Path::with_root(&[unsound::label::new("README.md")]))?
+    ///     .last_commit(Path::with_root(&[unsound::label::new("README.md")]))?
     ///     .map(|commit| commit.id);
     ///
     /// assert_eq!(readme_last_commit, Some(expected_commit));
@@ -872,7 +872,7 @@ impl Browser {
     /// let expected_commit = Oid::from_str("e24124b7538658220b5aaf3b6ef53758f0a106dc")?;
     ///
     /// let memory_last_commit = browser
-    ///     .last_commit(&Path::with_root(&[unsound::label::new("src"), unsound::label::new("memory.rs")]))?
+    ///     .last_commit(Path::with_root(&[unsound::label::new("src"), unsound::label::new("memory.rs")]))?
     ///     .map(|commit| commit.id);
     ///
     /// assert_eq!(memory_last_commit, Some(expected_commit));
@@ -1179,7 +1179,7 @@ mod tests {
 
             // memory.rs is commited later so it should not exist here.
             let memory_last_commit = browser
-                .last_commit(&Path::with_root(&[
+                .last_commit(Path::with_root(&[
                     unsound::label::new("src"),
                     unsound::label::new("memory.rs"),
                 ]))
@@ -1190,7 +1190,7 @@ mod tests {
 
             // README.md exists in this commit.
             let readme_last_commit = browser
-                .last_commit(&Path::with_root(&[unsound::label::new("README.md")]))
+                .last_commit(Path::with_root(&[unsound::label::new("README.md")]))
                 .expect("Failed to get last commit")
                 .map(|commit| commit.id);
 
@@ -1212,7 +1212,7 @@ mod tests {
                 Oid::from_str("f3a089488f4cfd1a240a9c01b3fcc4c34a4e97b2").unwrap();
 
             let folder_svelte = browser
-                .last_commit(&unsound::path::new("~/examples/Folder.svelte"))
+                .last_commit(unsound::path::new("~/examples/Folder.svelte"))
                 .expect("Failed to get last commit")
                 .map(|commit| commit.id);
 
@@ -1234,7 +1234,7 @@ mod tests {
                 Oid::from_str("2429f097664f9af0c5b7b389ab998b2199ffa977").unwrap();
 
             let nested_directory_tree_commit_id = browser
-                .last_commit(&unsound::path::new(
+                .last_commit(unsound::path::new(
                     "~/this/is/a/really/deeply/nested/directory/tree",
                 ))
                 .expect("Failed to get last commit")
@@ -1250,7 +1250,7 @@ mod tests {
             let browser = Browser::new(repo).expect("Could not initialise Browser");
 
             let root_last_commit_id = browser
-                .last_commit(&Path::root())
+                .last_commit(Path::root())
                 .expect("Failed to get last commit")
                 .map(|commit| commit.id);
 
