@@ -12,7 +12,7 @@ license = "GPL-3.0-or-later"
 [dependencies]
 git2 = "0.12"
 thiserror = "1.0"
-nonempty = { git = "https://github.com/cloudhead/nonempty.git", rev = "fe71f138ed4defc49a93157a1739279ccefad722" }
+nonempty = { git = "https://github.com/cloudhead/nonempty.git", rev = "9c65e9fec82b9089d3a76f867e4cc93ede76a5a9" }
 
 [dev-dependencies]
 log = "0.4"

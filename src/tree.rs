@@ -46,10 +46,10 @@ impl<K, A> SubTree<K, A> {
 
     pub fn find(&self, keys: NonEmpty<K>) -> Option<&Self>
     where
-        K: Ord + Clone,
+        K: Ord,
     {
         let (head, tail) = keys.into();
-        let tail = NonEmpty::from_slice(&tail);
+        let tail = NonEmpty::from_vec(tail);
         match self {
             SubTree::Node { key, .. } => match tail {
                 None if *key == head => Some(self),
@@ -169,22 +169,23 @@ impl<K, A> Tree<K, A> {
     /// will contain the `node`.
     fn new(keys: NonEmpty<K>, node: A) -> Self
     where
-        K: Ord + Clone,
+        K: Ord,
     {
-        // let (start, mut tail) = keys.into();
-        // let last = tail.pop();
-        let (start, middle, last) = keys.split();
+        let (start, mut middle) = keys.into();
+        let last = middle.pop();
+        // let (start, middle, last) = keys.split();
 
-        if start == last && middle.is_empty() {
-            Tree::node(last.clone(), node)
-        } else {
-            let mut branch = Tree::node(last.clone(), node);
+        match last {
+            None => Tree::node(start, node),
+            Some(last) => {
+                let mut branch = Tree::node(last, node);
 
-            for key in middle.iter().rev() {
-                branch = Tree(NonEmpty::new(SubTree::branch(key.clone(), branch)))
-            }
+                for key in middle.into_iter().rev() {
+                    branch = Tree(NonEmpty::new(SubTree::branch(key, branch)))
+                }
 
-            Tree::branch(start.clone(), branch)
+                Tree::branch(start, branch)
+            },
         }
     }
 
@@ -246,10 +247,10 @@ impl<K, A> Tree<K, A> {
     fn insert_with<F>(&mut self, keys: NonEmpty<K>, value: A, f: F)
     where
         F: FnOnce(&mut A),
-        K: Ord + Clone,
+        K: Ord,
     {
         let (head, tail) = keys.into();
-        let maybe_keys = NonEmpty::from_slice(&tail);
+        let maybe_keys = NonEmpty::from_vec(tail);
         match self.search(&head) {
             // Found the label in our set of sub-trees
             Ok(index) => match maybe_keys {
@@ -282,17 +283,11 @@ impl<K, A> Tree<K, A> {
             Err(index) => match maybe_keys {
                 // We create the branch with the head label and node, since there are
                 // no more labels left.
-                None => self.0.insert(
-                    index,
-                    SubTree::Node {
-                        key: head.clone(),
-                        value,
-                    },
-                ),
+                None => self.0.insert(index, SubTree::Node { key: head, value }),
                 // We insert an entirely new branch with the full list of keys.
                 Some(tail) => self
                     .0
-                    .insert(index, SubTree::branch(head.clone(), Tree::new(tail, value))),
+                    .insert(index, SubTree::branch(head, Tree::new(tail, value))),
             },
         }
     }
@@ -300,7 +295,7 @@ impl<K, A> Tree<K, A> {
     pub fn insert(&mut self, keys: NonEmpty<K>, value: A)
     where
         A: Clone,
-        K: Ord + Clone,
+        K: Ord,
     {
         self.insert_with(keys, value.clone(), |old| *old = value)
     }
@@ -319,7 +314,7 @@ impl<K, A> Tree<K, A> {
 
     pub fn find_node(&self, keys: NonEmpty<K>) -> Option<&A>
     where
-        K: Ord + Clone,
+        K: Ord,
     {
         self.find(keys).and_then(|tree| match tree {
             SubTree::Node { value, .. } => Some(value),
@@ -329,7 +324,7 @@ impl<K, A> Tree<K, A> {
 
     pub fn find_branch(&self, keys: NonEmpty<K>) -> Option<&Self>
     where
-        K: Ord + Clone,
+        K: Ord,
     {
         self.find(keys).and_then(|tree| match tree {
             SubTree::Node { .. } => None,
@@ -341,10 +336,10 @@ impl<K, A> Tree<K, A> {
     /// it will return `None`.
     pub fn find(&self, keys: NonEmpty<K>) -> Option<&SubTree<K, A>>
     where
-        K: Ord + Clone,
+        K: Ord,
     {
-        let (head, tail) = keys.clone().into();
-        let tail = NonEmpty::from_slice(&tail);
+        let (head, tail) = keys.into();
+        let tail = NonEmpty::from_vec(tail);
         match self.search(&head) {
             Err(_) => None,
             Ok(index) => {
@@ -354,7 +349,10 @@ impl<K, A> Tree<K, A> {
                         SubTree::Node { .. } => Some(sub_tree),
                         SubTree::Branch { .. } => Some(sub_tree),
                     },
-                    Some(_) => sub_tree.find(keys),
+                    Some(mut tail) => {
+                        tail.insert(0, head);
+                        sub_tree.find(tail)
+                    },
                 }
             },
         }
@@ -410,7 +408,7 @@ impl<K, A> Forest<K, A> {
     pub fn insert(&mut self, keys: NonEmpty<K>, node: A)
     where
         A: Clone,
-        K: Ord + Clone,
+        K: Ord,
     {
         self.insert_with(keys, node.clone(), |old| *old = node)
     }
@@ -418,34 +416,40 @@ impl<K, A> Forest<K, A> {
     pub fn insert_with<F>(&mut self, keys: NonEmpty<K>, node: A, f: F)
     where
         F: FnOnce(&mut A),
-        K: Ord + Clone,
+        K: Ord,
     {
-        let (prefix, node_key) = split_last(&keys);
+        let (prefix, node_key) = split_last(keys);
         match self.0.as_mut() {
-            Some(forest) => match NonEmpty::from_slice(&prefix) {
+            Some(forest) => match NonEmpty::from_vec(prefix) {
                 None => {
                     // Insert the node at the root
                     forest.insert_node_with(node_key, node, f)
                 },
-                Some(_) => forest.insert_with(keys, node, f),
+                Some(mut keys) => {
+                    keys.push(node_key);
+                    forest.insert_with(keys, node, f)
+                },
             },
-            None => match NonEmpty::from_slice(&prefix) {
+            None => match NonEmpty::from_vec(prefix) {
                 None => self.insert_forest(Tree::node(node_key, node)),
-                Some(_) => self.insert_forest(Tree::new(keys, node)),
+                Some(mut keys) => {
+                    keys.push(node_key);
+                    self.insert_forest(Tree::new(keys, node))
+                },
             },
         }
     }
 
     pub fn find_node(&self, keys: NonEmpty<K>) -> Option<&A>
     where
-        K: Ord + Clone,
+        K: Ord,
     {
         self.0.as_ref().and_then(|trees| trees.find_node(keys))
     }
 
     pub fn find_branch(&self, keys: NonEmpty<K>) -> Option<&Tree<K, A>>
     where
-        K: Ord + Clone,
+        K: Ord,
     {
         self.0.as_ref().and_then(|trees| trees.find_branch(keys))
     }
@@ -454,7 +458,7 @@ impl<K, A> Forest<K, A> {
     /// it will return `None`.
     pub fn find(&self, keys: NonEmpty<K>) -> Option<&SubTree<K, A>>
     where
-        K: Ord + Clone,
+        K: Ord,
     {
         self.0.as_ref().and_then(|trees| trees.find(keys))
     }
