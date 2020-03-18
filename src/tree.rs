@@ -123,19 +123,18 @@ impl<K, A> SubTree<K, A> {
         }
     }
 
-    pub fn map<F, B>(&self, f: F) -> SubTree<K, B>
+    pub fn map<F, B>(self, f: &mut F) -> SubTree<K, B>
     where
-        K: Clone,
-        F: Fn(&A) -> B,
+        F: FnMut(A) -> B,
     {
         match self {
             SubTree::Node { key, value } => SubTree::Node {
-                key: key.clone(),
+                key,
                 value: f(value),
             },
-            SubTree::Branch { key, ref forest } => SubTree::Branch {
-                key: key.clone(),
-                forest: Box::new(forest.map(&f)),
+            SubTree::Branch { key, forest } => SubTree::Branch {
+                key,
+                forest: Box::new(forest.map(f)),
             },
         }
     }
@@ -172,6 +171,8 @@ impl<K, A> Tree<K, A> {
     where
         K: Ord + Clone,
     {
+        // let (start, mut tail) = keys.into();
+        // let last = tail.pop();
         let (start, middle, last) = keys.split();
 
         if start == last && middle.is_empty() {
@@ -196,12 +197,11 @@ impl<K, A> Tree<K, A> {
         self.0.binary_search_by(|tree| tree.key().cmp(key))
     }
 
-    pub fn map<F, B>(&self, f: &F) -> Tree<K, B>
+    pub fn map<F, B>(self, mut f: F) -> Tree<K, B>
     where
-        K: Clone,
-        F: Fn(&A) -> B,
+        F: FnMut(A) -> B,
     {
-        Tree(self.0.map(|tree| tree.map(f)))
+        Tree(self.0.map(|tree| tree.map(&mut f)))
     }
 
     /// Insert a `node` into the list of sub-trees.
@@ -494,7 +494,7 @@ mod tests {
 
         let a_node = TestNode { id: 1 };
 
-        tree.insert(&NonEmpty::new(String::from("a")), a_node);
+        tree.insert(NonEmpty::new(String::from("a")), a_node);
         assert!(!tree.is_empty());
     }
 
@@ -506,7 +506,7 @@ mod tests {
 
         let a_node = TestNode { id: 1 };
 
-        tree.insert(&NonEmpty::new(a_label), a_node.clone());
+        tree.insert(NonEmpty::new(a_label), a_node.clone());
 
         assert_eq!(tree, Forest(Some(Tree::node(String::from("a"), a_node))));
     }
@@ -521,12 +521,12 @@ mod tests {
         let b_node = TestNode { id: 2 };
 
         tree.insert_with(
-            &NonEmpty::new(a_label.clone()),
+            NonEmpty::new(a_label.clone()),
             NonEmpty::new(a_node.clone()),
             |nodes| nodes.insert(0, a_node.clone()),
         );
         tree.insert_with(
-            &NonEmpty::new(a_label),
+            NonEmpty::new(a_label),
             NonEmpty::new(b_node.clone()),
             |nodes| nodes.insert(0, b_node.clone()),
         );
@@ -551,10 +551,10 @@ mod tests {
         let a_node = TestNode { id: 1 };
         let b_node = TestNode { id: 2 };
 
-        tree.insert_with(&path.clone(), NonEmpty::new(a_node.clone()), |nodes| {
+        tree.insert_with(path.clone(), NonEmpty::new(a_node.clone()), |nodes| {
             nodes.insert(0, a_node.clone())
         });
-        tree.insert_with(&path, NonEmpty::new(b_node.clone()), |nodes| {
+        tree.insert_with(path, NonEmpty::new(b_node.clone()), |nodes| {
             nodes.insert(0, b_node.clone())
         });
 
@@ -578,7 +578,7 @@ mod tests {
 
         let c_node = TestNode { id: 1 };
 
-        tree.insert(&path, c_node.clone());
+        tree.insert(path, c_node.clone());
 
         assert_eq!(
             tree,
@@ -602,11 +602,11 @@ mod tests {
 
         let c_node = TestNode { id: 1 };
 
-        tree.insert(&c_path, c_node.clone());
+        tree.insert(c_path, c_node.clone());
 
         let d_node = TestNode { id: 3 };
 
-        tree.insert(&d_path, d_node.clone());
+        tree.insert(d_path, d_node.clone());
 
         assert_eq!(
             tree,
@@ -640,11 +640,11 @@ mod tests {
 
         let c_node = TestNode { id: 1 };
 
-        tree.insert(&c_path.clone(), c_node);
+        tree.insert(c_path.clone(), c_node);
 
         let new_c_node = TestNode { id: 3 };
 
-        tree.insert(&c_path, new_c_node.clone());
+        tree.insert(c_path, new_c_node.clone());
 
         assert_eq!(
             tree,
@@ -669,11 +669,11 @@ mod tests {
 
         let c_node = TestNode { id: 1 };
 
-        tree.insert(&NonEmpty::new(c_label.clone()), c_node);
+        tree.insert(NonEmpty::new(c_label.clone()), c_node);
 
         let new_c_node = TestNode { id: 3 };
 
-        tree.insert(&NonEmpty::new(c_label), new_c_node.clone());
+        tree.insert(NonEmpty::new(c_label), new_c_node.clone());
 
         assert_eq!(
             tree,
@@ -691,11 +691,11 @@ mod tests {
 
         let c_node = TestNode { id: 1 };
 
-        tree.insert(&c_path.clone(), c_node);
+        tree.insert(c_path.clone(), c_node);
 
         let new_c_node = TestNode { id: 3 };
 
-        tree.insert(&c_path, new_c_node.clone());
+        tree.insert(c_path, new_c_node.clone());
 
         assert_eq!(
             tree,
@@ -717,14 +717,11 @@ mod tests {
 
         let c_node = TestNode { id: 1 };
 
-        tree.insert(&c_path, c_node);
+        tree.insert(c_path, c_node);
 
         let new_c_node = TestNode { id: 3 };
 
-        tree.insert(
-            &NonEmpty::from((a_label, vec![b_label])),
-            new_c_node.clone(),
-        );
+        tree.insert(NonEmpty::from((a_label, vec![b_label])), new_c_node.clone());
 
         assert_eq!(
             tree,
@@ -747,11 +744,11 @@ mod tests {
 
         let b_node = TestNode { id: 1 };
 
-        tree.insert(&b_path, b_node);
+        tree.insert(b_path, b_node);
 
         let new_c_node = TestNode { id: 3 };
 
-        tree.insert(&c_path, new_c_node.clone());
+        tree.insert(c_path, new_c_node.clone());
 
         assert_eq!(
             tree,
@@ -781,11 +778,11 @@ mod tests {
 
         let b_node = TestNode { id: 1 };
 
-        tree.insert(&b_path, b_node);
+        tree.insert(b_path, b_node);
 
         let d_node = TestNode { id: 3 };
 
-        tree.insert(&d_path, d_node.clone());
+        tree.insert(d_path, d_node.clone());
 
         assert_eq!(
             tree,
@@ -812,11 +809,11 @@ mod tests {
 
         let d_node = TestNode { id: 3 };
 
-        tree.insert(&d_path, d_node.clone());
+        tree.insert(d_path, d_node.clone());
 
         let c_node = TestNode { id: 1 };
 
-        tree.insert(&c_path, c_node.clone());
+        tree.insert(c_path, c_node.clone());
 
         assert_eq!(
             tree,
@@ -860,9 +857,9 @@ mod tests {
 
         let f_node = TestNode { id: 2 };
 
-        tree.insert(&d_path, d_node.clone());
-        tree.insert(&c_path, c_node.clone());
-        tree.insert(&f_path, f_node.clone());
+        tree.insert(d_path, d_node.clone());
+        tree.insert(c_path, c_node.clone());
+        tree.insert(f_path, f_node.clone());
 
         assert_eq!(
             tree,
@@ -909,8 +906,8 @@ mod tests {
 
         let f_node = TestNode { id: 2 };
 
-        tree.insert(&c_path, c_node.clone());
-        tree.insert(&f_path, f_node.clone());
+        tree.insert(c_path, c_node.clone());
+        tree.insert(f_path, f_node.clone());
 
         assert_eq!(
             tree,
@@ -958,10 +955,10 @@ mod tests {
 
         let g_node = TestNode { id: 2 };
 
-        tree.insert(&d_path, d_node.clone());
-        tree.insert(&c_path, c_node.clone());
-        tree.insert(&e_path, e_node.clone());
-        tree.insert(&g_path, g_node.clone());
+        tree.insert(d_path, d_node.clone());
+        tree.insert(c_path, c_node.clone());
+        tree.insert(e_path, e_node.clone());
+        tree.insert(g_path, g_node.clone());
 
         assert_eq!(
             tree,
@@ -1004,17 +1001,17 @@ mod tests {
 
         let a_node = TestNode { id: 1 };
 
-        tree.insert(&NonEmpty::new(a_label), a_node.clone());
+        tree.insert(NonEmpty::new(a_label), a_node.clone());
 
         assert_eq!(
-            tree.find(&NonEmpty::new(String::from("a"))),
+            tree.find(NonEmpty::new(String::from("a"))),
             Some(&SubTree::Node {
                 key: String::from("a"),
                 value: a_node
             })
         );
 
-        assert_eq!(tree.find(&NonEmpty::new(String::from("b"))), None);
+        assert_eq!(tree.find(NonEmpty::new(String::from("b"))), None);
     }
 
     #[test]
@@ -1028,10 +1025,10 @@ mod tests {
 
         let c_node = TestNode { id: 1 };
 
-        tree.insert(&path, c_node.clone());
+        tree.insert(path, c_node.clone());
 
         assert_eq!(
-            tree.find(&NonEmpty::new(String::from("a"))),
+            tree.find(NonEmpty::new(String::from("a"))),
             Some(&SubTree::Branch {
                 key: String::from("a"),
                 forest: Box::new(Tree::branch(
@@ -1042,10 +1039,7 @@ mod tests {
         );
 
         assert_eq!(
-            tree.find(&NonEmpty::from((
-                String::from("a"),
-                vec![String::from("b")]
-            ))),
+            tree.find(NonEmpty::from((String::from("a"), vec![String::from("b")]))),
             Some(&SubTree::Branch {
                 key: String::from("b"),
                 forest: Box::new(Tree::node(String::from("c"), c_node.clone()))
@@ -1053,7 +1047,7 @@ mod tests {
         );
 
         assert_eq!(
-            tree.find(&NonEmpty::from((
+            tree.find(NonEmpty::from((
                 String::from("a"),
                 vec![String::from("b"), String::from("c")]
             ))),
@@ -1063,13 +1057,10 @@ mod tests {
             })
         );
 
-        assert_eq!(tree.find(&NonEmpty::new(String::from("b"))), None);
+        assert_eq!(tree.find(NonEmpty::new(String::from("b"))), None);
 
         assert_eq!(
-            tree.find(&NonEmpty::from((
-                String::from("a"),
-                vec![String::from("c")]
-            ))),
+            tree.find(NonEmpty::from((String::from("a"), vec![String::from("c")]))),
             None
         );
     }
@@ -1082,8 +1073,8 @@ mod tests {
 
         let b_node = TestNode { id: 3 };
 
-        tree.insert(&NonEmpty::new(String::from("a")), a_node.clone());
-        tree.insert(&NonEmpty::new(String::from("b")), b_node.clone());
+        tree.insert(NonEmpty::new(String::from("a")), a_node.clone());
+        tree.insert(NonEmpty::new(String::from("b")), b_node.clone());
 
         assert_eq!(tree.maximum_by(|a, b| a.id.cmp(&b.id)), Some(&b_node));
         assert_eq!(
@@ -1101,10 +1092,10 @@ mod tests {
         let b_node = TestNode { id: 3 };
 
         tree.insert(
-            &NonEmpty::from((String::from("c"), vec![String::from("a")])),
+            NonEmpty::from((String::from("c"), vec![String::from("a")])),
             a_node.clone(),
         );
-        tree.insert(&NonEmpty::new(String::from("b")), b_node.clone());
+        tree.insert(NonEmpty::new(String::from("b")), b_node.clone());
 
         assert_eq!(tree.maximum_by(|a, b| a.id.cmp(&b.id)), Some(&b_node));
         assert_eq!(
@@ -1122,11 +1113,11 @@ mod tests {
         let b_node = TestNode { id: 3 };
 
         tree.insert(
-            &NonEmpty::from((String::from("c"), vec![String::from("a")])),
+            NonEmpty::from((String::from("c"), vec![String::from("a")])),
             a_node.clone(),
         );
         tree.insert(
-            &NonEmpty::from((String::from("d"), vec![String::from("a")])),
+            NonEmpty::from((String::from("d"), vec![String::from("a")])),
             b_node.clone(),
         );
 
@@ -1146,11 +1137,11 @@ mod tests {
         let b_node = TestNode { id: 3 };
 
         tree.insert(
-            &NonEmpty::from((String::from("c"), vec![String::from("a")])),
+            NonEmpty::from((String::from("c"), vec![String::from("a")])),
             a_node.clone(),
         );
         tree.insert(
-            &NonEmpty::from((String::from("c"), vec![String::from("b")])),
+            NonEmpty::from((String::from("c"), vec![String::from("b")])),
             b_node.clone(),
         );
 
@@ -1169,8 +1160,8 @@ mod tests {
 
         let b_node = TestNode { id: 3 };
 
-        tree.insert(&NonEmpty::new(String::from("a")), a_node);
-        tree.insert(&NonEmpty::new(String::from("b")), b_node);
+        tree.insert(NonEmpty::new(String::from("a")), a_node);
+        tree.insert(NonEmpty::new(String::from("b")), b_node);
 
         assert_eq!(tree.iter().fold(0, |b, a| a.id + b), 4);
     }
