@@ -303,7 +303,7 @@ impl<'repo> Repository {
                 };
 
                 file_histories.insert_with(
-                    &path.0,
+                    path.0,
                     NonEmpty::new(parent_commit.clone()),
                     |commits| commits.push(parent_commit),
                 );
@@ -880,10 +880,10 @@ impl Browser {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn last_commit(&self, path: &file_system::Path) -> Result<Option<Commit>, Error> {
+    pub fn last_commit(&self, path: file_system::Path) -> Result<Option<Commit>, Error> {
         let file_history = self.repository.file_history(self.get().first().clone())?;
 
-        Ok(file_history.find(&path.0).map(|tree| {
+        Ok(file_history.find(path.0).map(|tree| {
             tree.maximum_by(&|c: &NonEmpty<OrderedCommit>, d| c.first().compare_by_id(&d.first()))
                 .first()
                 .commit

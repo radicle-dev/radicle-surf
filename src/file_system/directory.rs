@@ -361,8 +361,8 @@ impl Directory {
     /// // We shouldn't be able to find a file that doesn't exist
     /// assert_eq!(directory.find_file(&unsound::path::new("foo/bar/qux.rs")), None);
     /// ```
-    pub fn find_file(&self, path: &Path) -> Option<File> {
-        self.sub_directories.find_node(&path.0).cloned()
+    pub fn find_file(&self, path: Path) -> Option<File> {
+        self.sub_directories.find_node(path.0).cloned()
     }
 
     /// Find a `Directory` in the directory given the [`Path`] to the
@@ -400,9 +400,9 @@ impl Directory {
     /// // 'baz.rs' is a file and not a directory
     /// assert!(directory.find_directory(&unsound::path::new("foo/bar/baz.rs")).is_none());
     /// ```
-    pub fn find_directory(&self, path: &Path) -> Option<Self> {
+    pub fn find_directory(&self, path: Path) -> Option<Self> {
         self.sub_directories
-            .find_branch(&path.0)
+            .find_branch(path.0.clone())
             .cloned()
             .map(|tree| {
                 let (_, current) = path.split_last();
@@ -473,8 +473,8 @@ impl Directory {
     /// inclusive) and the `File` itself.
     ///
     /// This function is usually used for testing and demonstation purposes.
-    pub fn insert_file(&mut self, path: &Path, file: File) {
-        self.sub_directories.insert(&path.0, file)
+    pub fn insert_file(&mut self, path: Path, file: File) {
+        self.sub_directories.insert(path.0, file)
     }
 
     /// Insert files into a shared directory path.
@@ -489,7 +489,7 @@ impl Directory {
         match NonEmpty::from_slice(directory_path) {
             None => {
                 for (file_name, file) in files.into_iter() {
-                    self.insert_file(&Path::new(file_name), file)
+                    self.insert_file(Path::new(file_name), file)
                 }
             },
             Some(path) => {
@@ -498,7 +498,7 @@ impl Directory {
                     let mut file_path = Path(path.clone());
                     file_path.push(file_name);
 
-                    self.insert_file(&file_path, file)
+                    self.insert_file(file_path, file)
                 }
             },
         }
@@ -517,7 +517,7 @@ impl Directory {
                     file_path = Path::new(file_name);
                 }
 
-                directory.insert_file(&file_path, file)
+                directory.insert_file(file_path, file)
             }
         }
 
