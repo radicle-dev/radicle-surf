@@ -7,7 +7,13 @@
 //!
 //! let repo = Repository::new("./data/git-platinum")
 //!     .expect("Could not retrieve ./data/git-platinum as git repository");
-//! let browser = Browser::new(repo).expect("Could not initialise Browser");
+//!
+//! // Pin the browser to a parituclar commit.
+//! let pin_commit =
+//!     Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95").unwrap();
+//! let mut browser = Browser::new(repo).expect("Could not initialise Browser");
+//! browser.commit(pin_commit).expect("Failed to pin the browser to a commit");
+//!
 //! let directory = browser.get_directory().expect("Could not render Directory");
 //! let mut directory_contents = directory.list_directory();
 //! directory_contents.sort();
@@ -1174,15 +1180,12 @@ mod tests {
                 .expect("Could not retrieve ./data/git-platinum as git repository");
             let browser = Browser::new(repo).expect("Could not initialise Browser");
 
-            let expected_commit_id =
-                Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95").unwrap();
-
             let root_last_commit_id = browser
                 .last_commit(&Path::root())
                 .expect("Failed to get last commit")
                 .map(|commit| commit.id);
 
-            assert_eq!(root_last_commit_id, Some(expected_commit_id));
+            assert_eq!(root_last_commit_id, Some(browser.get().first().id));
         }
     }
 }
