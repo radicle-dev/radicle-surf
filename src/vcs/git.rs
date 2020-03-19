@@ -4,17 +4,17 @@
 //! use radicle_surf::file_system::unsound;
 //! use radicle_surf::vcs::git::*;
 //! use std::collections::HashMap;
+//! # use std::error::Error;
 //!
-//! let repo = Repository::new("./data/git-platinum")
-//!     .expect("Could not retrieve ./data/git-platinum as git repository");
+//! # fn main() -> Result<(), Box<dyn Error>> {
+//! let repo = Repository::new("./data/git-platinum")?;
 //!
 //! // Pin the browser to a parituclar commit.
-//! let pin_commit =
-//!     Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95").unwrap();
-//! let mut browser = Browser::new(repo).expect("Could not initialise Browser");
-//! browser.commit(pin_commit).expect("Failed to pin the browser to a commit");
+//! let pin_commit = Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
+//! let mut browser = Browser::new(repo)?;
+//! browser.commit(pin_commit)?;
 //!
-//! let directory = browser.get_directory().expect("Could not render Directory");
+//! let directory = browser.get_directory()?;
 //! let mut directory_contents = directory.list_directory();
 //! directory_contents.sort();
 //!
@@ -31,7 +31,7 @@
 //! // find src directory in the Git directory and the in-memory directory
 //! let src_directory = directory
 //!     .find_directory(&Path::new(unsound::label::new("src")))
-//!     .unwrap();
+//!     .expect("failed to find src");
 //! let mut src_directory_contents = src_directory.list_directory();
 //! src_directory_contents.sort();
 //!
@@ -40,6 +40,9 @@
 //!     SystemType::file(unsound::label::new("Folder.svelte")),
 //!     SystemType::file(unsound::label::new("memory.rs")),
 //! ]);
+//! #
+//! # Ok(())
+//! # }
 //! ```
 
 // Re-export git2 as sub-module
@@ -413,9 +416,14 @@ impl Browser {
     ///
     /// ```
     /// use radicle_surf::vcs::git::{Browser, Repository};
+    /// # use std::error::Error;
     ///
-    /// let repo = Repository::new("./data/git-platinum").unwrap();
-    /// let browser = Browser::new(repo).unwrap();
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let repo = Repository::new("./data/git-platinum")?;
+    /// let browser = Browser::new(repo)?;
+    /// #
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn new(repository: Repository) -> Result<Self, Error> {
         let history = repository.head()?;
@@ -443,10 +451,19 @@ impl Browser {
     ///
     /// ```
     /// use radicle_surf::vcs::git::{Browser, Repository};
+    /// # use std::error::Error;
     ///
-    /// let repo = Repository::new("./data/git-platinum").unwrap();
-    /// let first_branch = repo.list_branches(None).unwrap().first().cloned().unwrap();
-    /// let browser = Browser::new_with_branch(repo, first_branch.name).unwrap();
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let repo = Repository::new("./data/git-platinum")?;
+    /// let first_branch = repo
+    ///     .list_branches(None)?
+    ///     .first()
+    ///     .cloned()
+    ///     .expect("failed to get first branch");
+    /// let browser = Browser::new_with_branch(repo, first_branch.name)?;
+    /// #
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn new_with_branch(repository: Repository, branch_name: BranchName) -> Result<Self, Error> {
         let history = repository.get_history(branch_name.name().to_string())?;
@@ -471,9 +488,11 @@ impl Browser {
     ///
     /// ```
     /// use radicle_surf::vcs::git::{Browser, Repository};
+    /// # use std::error::Error;
     ///
-    /// let repo = Repository::new("./data/git-platinum").unwrap();
-    /// let mut browser = Browser::new(repo).unwrap();
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let repo = Repository::new("./data/git-platinum")?;
+    /// let mut browser = Browser::new(repo)?;
     ///
     /// // ensure we're at HEAD
     /// browser.head();
@@ -482,6 +501,9 @@ impl Browser {
     ///
     /// // We are able to render the directory
     /// assert!(directory.is_ok());
+    /// #
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn head(&mut self) -> Result<(), Error> {
         let history = self.repository.head()?;
@@ -500,9 +522,11 @@ impl Browser {
     ///
     /// ```
     /// use radicle_surf::vcs::git::{BranchName, Browser, Repository};
+    /// # use std::error::Error;
     ///
-    /// let repo = Repository::new("./data/git-platinum").unwrap();
-    /// let mut browser = Browser::new(repo).unwrap();
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let repo = Repository::new("./data/git-platinum")?;
+    /// let mut browser = Browser::new(repo)?;
     ///
     /// // ensure we're on 'master'
     /// browser.branch(BranchName::new("master"));
@@ -511,26 +535,32 @@ impl Browser {
     ///
     /// // We are able to render the directory
     /// assert!(directory.is_ok());
+    /// #
+    /// # Ok(())
+    /// # }
     /// ```
     ///
     /// ```
     /// use radicle_surf::vcs::git::{BranchName, Browser, Repository};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     /// use radicle_surf::file_system::unsound;
+    /// # use std::error::Error;
     ///
-    /// let repo = Repository::new("./data/git-platinum").unwrap();
-    /// let mut browser = Browser::new(repo).unwrap();
-    /// browser
-    ///     .branch(BranchName::new("origin/dev"))
-    ///     .expect("Failed to change branch to dev");
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let repo = Repository::new("./data/git-platinum")?;
+    /// let mut browser = Browser::new(repo)?;
+    /// browser.branch(BranchName::new("origin/dev"))?;
     ///
-    /// let directory = browser.get_directory().expect("Failed to get directory");
+    /// let directory = browser.get_directory()?;
     /// let mut directory_contents = directory.list_directory();
     /// directory_contents.sort();
     ///
     /// assert!(directory_contents.contains(
     ///     &SystemType::file(unsound::label::new("here-we-are-on-a-dev-branch.lol"))
     /// ));
+    /// #
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn branch(&mut self, branch_name: BranchName) -> Result<(), Error> {
         let name = branch_name.name();
@@ -562,19 +592,21 @@ impl Browser {
     /// use nonempty::NonEmpty;
     /// use radicle_surf::vcs::History;
     /// use radicle_surf::vcs::git::{TagName, Browser, Oid, Repository};
+    /// # use std::error::Error;
     ///
-    /// let repo = Repository::new("./data/git-platinum").unwrap();
-    /// let mut browser = Browser::new(repo).unwrap();
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let repo = Repository::new("./data/git-platinum")?;
+    /// let mut browser = Browser::new(repo)?;
     ///
     /// // Switch to "v0.3.0"
-    /// browser.tag(TagName::new("v0.3.0")).expect("Failed to switch tag");
+    /// browser.tag(TagName::new("v0.3.0"))?;
     ///
     /// let expected_history = History(NonEmpty::from((
-    ///     Oid::from_str("19bec071db6474af89c866a1bd0e4b1ff76e2b97").unwrap(),
+    ///     Oid::from_str("19bec071db6474af89c866a1bd0e4b1ff76e2b97")?,
     ///     vec![
-    ///         Oid::from_str("f3a089488f4cfd1a240a9c01b3fcc4c34a4e97b2").unwrap(),
-    ///         Oid::from_str("2429f097664f9af0c5b7b389ab998b2199ffa977").unwrap(),
-    ///         Oid::from_str("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3").unwrap(),
+    ///         Oid::from_str("f3a089488f4cfd1a240a9c01b3fcc4c34a4e97b2")?,
+    ///         Oid::from_str("2429f097664f9af0c5b7b389ab998b2199ffa977")?,
+    ///         Oid::from_str("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3")?,
     ///     ]
     /// )));
     ///
@@ -582,6 +614,9 @@ impl Browser {
     ///
     /// // We are able to render the directory
     /// assert_eq!(history_ids, expected_history);
+    /// #
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn tag(&mut self, tag_name: TagName) -> Result<(), Error> {
         let name = tag_name.name();
@@ -613,22 +648,18 @@ impl Browser {
     /// use radicle_surf::file_system::unsound;
     /// use radicle_surf::vcs::git::{Browser, Oid, Repository};
     /// use std::str::FromStr;
+    /// # use std::error::Error;
     ///
-    /// let repo = Repository::new("./data/git-platinum")
-    ///     .expect("Could not retrieve ./data/git-platinum as git repository");
-    /// let mut browser = Browser::new(repo).expect("Could not initialise Browser");
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let repo = Repository::new("./data/git-platinum")?;
+    /// let mut browser = Browser::new(repo)?;
     ///
-    /// let commit = Oid::from_str(
-    ///     "e24124b7538658220b5aaf3b6ef53758f0a106dc").expect("Failed to
-    /// parse SHA");
     /// // Set to the initial commit
-    /// let commit = Oid::from_str(
-    ///     "e24124b7538658220b5aaf3b6ef53758f0a106dc"
-    /// ).expect("Failed to parse SHA");
+    /// let commit = Oid::from_str("e24124b7538658220b5aaf3b6ef53758f0a106dc")?;
     ///
-    /// browser.commit(commit).expect("Missing commit");
+    /// browser.commit(commit)?;
     ///
-    /// let directory = browser.get_directory().unwrap();
+    /// let directory = browser.get_directory()?;
     /// let mut directory_contents = directory.list_directory();
     ///
     /// assert_eq!(
@@ -640,6 +671,9 @@ impl Browser {
     ///         SystemType::directory(unsound::label::new("this")),
     ///     ]
     /// );
+    /// #
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn commit(&mut self, oid: Oid) -> Result<(), Error> {
         let commit = self.repository.get_commit(oid)?;
@@ -662,22 +696,24 @@ impl Browser {
     /// use radicle_surf::file_system::unsound;
     /// use radicle_surf::vcs::git::{Browser, Oid, Repository};
     /// use std::str::FromStr;
+    /// # use std::error::Error;
     ///
-    /// let repo = Repository::new("./data/git-platinum")
-    ///     .expect("Could not retrieve ./data/git-platinum as git repository");
-    /// let mut browser = Browser::new(repo).expect("Could not initialise Browser");
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let repo = Repository::new("./data/git-platinum")?;
+    /// let mut browser = Browser::new(repo)?;
     ///
-    /// browser
-    ///     .revspec("refs/remotes/origin/dev")
-    ///     .expect("Missing dev");
+    /// browser.revspec("refs/remotes/origin/dev")?;
     ///
-    /// let directory = browser.get_directory().unwrap();
+    /// let directory = browser.get_directory()?;
     /// let mut directory_contents = directory.list_directory();
     /// directory_contents.sort();
     ///
     /// assert!(directory_contents.contains(
     ///     &SystemType::file(unsound::label::new("here-we-are-on-a-dev-branch.lol"))
     /// ));
+    /// #
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn revspec(&mut self, spec: &str) -> Result<(), Error> {
         let history = self.get_history(spec.to_string())?;
@@ -711,17 +747,19 @@ impl Browser {
     ///
     /// ```
     /// use radicle_surf::vcs::git::{Branch, BranchType, BranchName, Browser, Repository};
+    /// # use std::error::Error;
     ///
-    /// let repo = Repository::new("./data/git-platinum").unwrap();
-    /// let mut browser = Browser::new(repo).unwrap();
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let repo = Repository::new("./data/git-platinum")?;
+    /// let mut browser = Browser::new(repo)?;
     ///
-    /// let branches = browser.list_branches(None).unwrap();
+    /// let branches = browser.list_branches(None)?;
     ///
     /// // 'master' exists in the list of branches
     /// assert!(branches.contains(&Branch::local(BranchName::new("master"))));
     ///
     /// // Filter the branches by `Remote`.
-    /// let mut branches = browser.list_branches(Some(BranchType::Remote)).unwrap();
+    /// let mut branches = browser.list_branches(Some(BranchType::Remote))?;
     /// branches.sort();
     ///
     /// assert_eq!(branches, vec![
@@ -729,6 +767,9 @@ impl Browser {
     ///     Branch::remote(BranchName::new("origin/dev")),
     ///     Branch::remote(BranchName::new("origin/master")),
     /// ]);
+    /// #
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn list_branches(&self, filter: Option<BranchType>) -> Result<Vec<Branch>, Error> {
         self.repository.list_branches(filter)
@@ -744,11 +785,13 @@ impl Browser {
     ///
     /// ```
     /// use radicle_surf::vcs::git::{Browser, Repository, TagName};
+    /// # use std::error::Error;
     ///
-    /// let repo = Repository::new("./data/git-platinum").unwrap();
-    /// let mut browser = Browser::new(repo).unwrap();
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let repo = Repository::new("./data/git-platinum")?;
+    /// let mut browser = Browser::new(repo)?;
     ///
-    /// let tags = browser.list_tags().unwrap();
+    /// let tags = browser.list_tags()?;
     ///
     /// assert_eq!(
     ///     tags,
@@ -760,6 +803,9 @@ impl Browser {
     ///         TagName::new("v0.5.0")
     ///     ]
     /// );
+    /// #
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn list_tags(&self) -> Result<Vec<TagName>, Error> {
         self.repository.list_tags()
@@ -780,37 +826,35 @@ impl Browser {
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     /// use radicle_surf::file_system::unsound;
     /// use std::str::FromStr;
+    /// # use std::error::Error;
     ///
-    /// let repo = Repository::new("./data/git-platinum")
-    ///     .expect("Could not retrieve ./data/git-test as git repository");
-    /// let mut browser = Browser::new(repo).expect("Could not initialise Browser");
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let repo = Repository::new("./data/git-platinum")?;
+    /// let mut browser = Browser::new(repo)?;
     ///
     /// // Clamp the Browser to a particular commit
-    /// let commit = Oid::from_str(
-    ///     "d6880352fc7fda8f521ae9b7357668b17bb5bad5"
-    /// ).expect("Failed to parse SHA");
-    /// browser.commit(commit).expect("Failed to set commit");
+    /// let commit = Oid::from_str("d6880352fc7fda8f521ae9b7357668b17bb5bad5")?;
+    /// browser.commit(commit)?;
     ///
     /// let head_commit = browser.get().first().clone();
-    /// let expected_commit = Oid::from_str("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3")
-    ///     .expect("Failed to create Oid");
+    /// let expected_commit = Oid::from_str("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3")?;
     ///
     /// let readme_last_commit = browser
-    ///     .last_commit(&Path::with_root(&[unsound::label::new("README.md")]))
-    ///     .expect("Failed to get last commit")
+    ///     .last_commit(&Path::with_root(&[unsound::label::new("README.md")]))?
     ///     .map(|commit| commit.id);
     ///
     /// assert_eq!(readme_last_commit, Some(expected_commit));
     ///
-    /// let expected_commit = Oid::from_str("e24124b7538658220b5aaf3b6ef53758f0a106dc")
-    ///     .expect("Failed to create Oid");
+    /// let expected_commit = Oid::from_str("e24124b7538658220b5aaf3b6ef53758f0a106dc")?;
     ///
     /// let memory_last_commit = browser
-    ///     .last_commit(&Path::with_root(&[unsound::label::new("src"), unsound::label::new("memory.rs")]))
-    ///     .expect("Failed to get last commit")
+    ///     .last_commit(&Path::with_root(&[unsound::label::new("src"), unsound::label::new("memory.rs")]))?
     ///     .map(|commit| commit.id);
     ///
     /// assert_eq!(memory_last_commit, Some(expected_commit));
+    /// #
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn last_commit(&self, path: &file_system::Path) -> Result<Option<Commit>, Error> {
         let file_history = self.repository.file_history(self.get().first().clone())?;
@@ -835,10 +879,9 @@ impl Browser {
     ///
     /// ```
     /// use radicle_surf::vcs::git::{Browser, Repository, Oid, error};
-    ///
     /// # use std::error::Error;
-    /// # fn main() -> Result<(), error::Error> {
     ///
+    /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
     /// let mut browser = Browser::new(repo)?;
     ///
@@ -865,8 +908,8 @@ impl Browser {
     ///
     /// // There is no signature
     /// assert!(signature.is_none());
-    ///
-    /// #     Ok(())
+    /// #
+    /// # Ok(())
     /// # }
     /// ```
     pub fn extract_signature(

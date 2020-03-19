@@ -16,22 +16,25 @@ use radicle_surf::vcs::git;
 use radicle_surf::file_system::{Label, Path, SystemType};
 
 // We're going to point to this repo.
-let repo = git::Repository::new(".").unwrap();
+let repo = git::Repository::new(".")?;
 
 // Here we initialise a new Browser for the git repo.
-let browser = git::Browser::new(&repo).unwrap();
+let mut browser = git::Browser::new(repo)?;
 
-// Get the snapshot of the directory for our current
-// HEAD of history.
-let directory = browser.get_directory().unwrap();
+// Set the history to a particular commit
+let commit = git::Oid::from_str("80ded66281a4de2889cc07293a8f10947c6d57fe")?;
+browser.commit(commit)?;
 
-// Let's get a Path to this file
-let this_file = Path::with_root(&["src".into(), "lib.rs".into()]);
+// Get the snapshot of the directory for our current HEAD of history.
+let directory = browser.get_directory()?;
+
+// Let's get a Path to the lib.rs file
+let lib = unsound::path::new("src/lib.rs");
 
 // And assert that we can find it!
-assert!(directory.find_file(&this_file).is_some());
+assert!(directory.find_file(&lib).is_some());
 
-let mut root_contents = directory.list_directory();
+let root_contents = directory.list_directory();
 root_contents.sort();
 
 assert_eq!(root_contents, vec![
@@ -39,15 +42,22 @@ assert_eq!(root_contents, vec![
   SystemType::directory(".docker".into()),
   SystemType::directory(".git".into()),
   SystemType::file(".gitignore".into()),
+  SystemType::file(".gitmodules".into()),
+  SystemType::file(".rustfmt.toml".into()),
+  SystemType::file(".rust-toolchain".into()),
   SystemType::file("Cargo.toml".into()),
   SystemType::file("README.md".into()),
   SystemType::directory("data".into()),
   SystemType::directory("docs".into()),
+  SystemType::directory("examples".into()),
   SystemType::directory("src".into()),
 ]);
 
-let src = directory.find_directory(&Path::with_root(&["src".into()])).unwrap();
-let mut src_contents = src.list_directory();
+let src = directory
+  .find_directory(&Path::new(unsound::label::new("src")))
+  .expect("failed to find src");
+
+let src_contents = src.list_directory();
 src_contents.sort();
 
 assert_eq!(src_contents, vec![

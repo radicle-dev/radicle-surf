@@ -16,19 +16,21 @@
 //! use radicle_surf::file_system::unsound;
 //! use pretty_assertions::assert_eq;
 //! use std::str::FromStr;
+//! # use std::error::Error;
 //!
+//! # fn main() -> Result<(), Box<dyn Error>> {
 //! // We're going to point to this repo.
-//! let repo = git::Repository::new("./data/git-platinum").expect("Failed to initialise repo");
+//! let repo = git::Repository::new("./data/git-platinum")?;
 //!
 //! // Here we initialise a new Broswer for a the git repo.
-//! let mut browser = git::Browser::new(repo).expect("Failed to initialise browser");
+//! let mut browser = git::Browser::new(repo)?;
 //!
 //! // Set the history to a particular commit
-//! let commit = git::Oid::from_str("80ded66281a4de2889cc07293a8f10947c6d57fe").expect("Failed to parse SHA");
-//! browser.commit(commit).expect("Failed to set commit");
+//! let commit = git::Oid::from_str("80ded66281a4de2889cc07293a8f10947c6d57fe")?;
+//! browser.commit(commit)?;
 //!
 //! // Get the snapshot of the directory for our current HEAD of history.
-//! let directory = browser.get_directory().expect("Failed to get directory");
+//! let directory = browser.get_directory()?;
 //!
 //! // Let's get a Path to the memory.rs file
 //! let memory = unsound::path::new("src/memory.rs");
@@ -48,7 +50,9 @@
 //!     SystemType::directory(unsound::label::new("this")),
 //! ]);
 //!
-//! let src = directory.find_directory(&Path::new(unsound::label::new("src"))).expect("Failed to find src");
+//! let src = directory
+//!     .find_directory(&Path::new(unsound::label::new("src")))
+//!     .expect("failed to find src");
 //! let src_contents = src.list_directory();
 //!
 //! assert_eq!(src_contents, vec![
@@ -56,6 +60,9 @@
 //!     SystemType::file(unsound::label::new("Folder.svelte")),
 //!     SystemType::file(unsound::label::new("memory.rs")),
 //! ]);
+//! #
+//! # Ok(())
+//! # }
 //! ```
 pub mod diff;
 pub mod file_system;
