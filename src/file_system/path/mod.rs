@@ -79,7 +79,7 @@ impl TryFrom<&str> for Label {
         if item.is_empty() {
             Err(error::EMPTY_LABEL)
         } else if item.contains('/') {
-            Err(error::CONTAINS_SLASH)
+            Err(error::label_has_slash(item))
         } else {
             Ok(Label {
                 label: item.into(),
@@ -374,7 +374,7 @@ impl TryFrom<path::PathBuf> for Path {
     fn try_from(path_buf: path::PathBuf) -> Result<Self, Self::Error> {
         let mut path = Path::root();
         for p in path_buf.iter() {
-            let p = p.to_str().ok_or(error::INVALID_UTF8)?;
+            let p = p.to_str().ok_or_else(|| error::label_invalid_utf8(p))?;
             let l = Label::try_from(p)?;
             path.push(l);
         }

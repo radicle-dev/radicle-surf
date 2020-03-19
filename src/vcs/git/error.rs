@@ -4,48 +4,39 @@
 use crate::file_system::error as file_error;
 use crate::vcs::git::object::{BranchName, TagName};
 use std::str;
+use thiserror::Error;
 
 /// Enumeration of errors that can occur in operations from [`crate::vcs::git`].
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Error)]
 pub enum Error {
     /// The user tried to fetch a branch, but the name provided does not
     /// exist as a branch. This could mean that the branch does not exist
     /// or that a tag or commit was provided by accident.
+    #[error("Provided branch name does not exist: {0}")]
     NotBranch(BranchName),
     /// The user tried to fetch a tag, but the name provided does not
     /// exist as a tag. This could mean that the tag does not exist
     /// or that a branch or commit was provided by accident.
+    #[error("Provided tag name does not exist: {0}")]
     NotTag(TagName),
     /// A `revspec` was provided that could not be parsed into a branch, tag, or commit object.
+    #[error("Provided revspec could not be parsed into a git object: {0}")]
     RevParseFailure(String),
     /// A [`str::Utf8Error`] error, which usually occurs when a git object's name is not in
     /// UTF-8 form and parsing of it as such fails.
-    Utf8Error(str::Utf8Error),
+    #[error("Git object name is invalid UTF-8: {0}")]
+    Utf8Error(#[from] str::Utf8Error),
     /// An error that comes from performing a [`crate::file_system`] operation.
-    FileSystem(file_error::Error),
+    #[error("File system error: {0}")]
+    FileSystem(#[from] file_error::Error),
     /// While attempting to calculate a diff for retrieving the
-    /// [`crate::vcs::git::Browser.last_commit()`], the file path was returned as an `Option`.
+    /// [`crate::vcs::git::Browser.last_commit()`], the file path was returned as an
+    /// `Option::None`.
+    #[error("Last commit has an invalid file path")]
     LastCommitException,
     /// A wrapper around the generic [`git2::Error`].
-    Git(git2::Error),
-}
-
-impl From<str::Utf8Error> for Error {
-    fn from(err: str::Utf8Error) -> Self {
-        Error::Utf8Error(err)
-    }
-}
-
-impl From<file_error::Error> for Error {
-    fn from(err: file_error::Error) -> Self {
-        Error::FileSystem(err)
-    }
-}
-
-impl From<git2::Error> for Error {
-    fn from(err: git2::Error) -> Self {
-        Error::Git(err)
-    }
+    #[error(transparent)]
+    Git(#[from] git2::Error),
 }
 
 /// A private enum that captures a recoverable and
@@ -55,10 +46,13 @@ impl From<git2::Error> for Error {
 /// a check for it and recover.
 ///
 /// In the of `Git` we abort both computations.
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub(crate) enum TreeWalkError {
+    #[error("Entry is not a blob")]
     NotBlob,
+    #[error("Git object is a commit")]
     Commit,
+    #[error("Git error: {0}")]
     Git(Error),
 }
 

@@ -2,6 +2,7 @@ use crate::vcs::git::error::*;
 use git2;
 use std::cmp::Ordering;
 use std::convert::TryFrom;
+use std::fmt;
 use std::str;
 
 /// `Author` is the static information of a [`git2::Signature`].
@@ -78,6 +79,12 @@ impl<'repo> TryFrom<git2::Commit<'repo>> for Commit {
 /// A newtype wrapper over `String` to separate out the fact that a caller wants to fetch a branch.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BranchName(String);
+
+impl fmt::Display for BranchName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
 
 impl TryFrom<&[u8]> for BranchName {
     type Error = str::Utf8Error;
@@ -164,6 +171,12 @@ impl<'repo> TryFrom<git2::Reference<'repo>> for Branch {
 /// A newtype wrapper over `String` to separate out the fact that a caller wants to fetch a tag.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TagName(String);
+
+impl fmt::Display for TagName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
 
 impl TryFrom<&[u8]> for TagName {
     type Error = str::Utf8Error;
