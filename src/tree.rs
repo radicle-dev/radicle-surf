@@ -1,3 +1,20 @@
+// This file is part of radicle-surf
+// <https://github.com/radicle-dev/radicle-surf>
+//
+// Copyright (C) 2019-2020 The Radicle Team <dev@radicle.xyz>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License version 3 or
+// later as published by the Free Software Foundation.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 use crate::nonempty::split_last;
 use nonempty::NonEmpty;
 use std::cmp::Ordering;
@@ -212,18 +229,20 @@ impl<K, A> Tree<K, A> {
 
     /// Insert the `node` in the position given by `keys`.
     ///
-    /// If the same path to a node is provided the `node` will replace the old one,
-    /// i.e. if `a/b/c` exists in the tree and `a/b/c` is the full path to
-    /// the node, then `c` will be replaced.
+    /// If the same path to a node is provided the `node` will replace the old
+    /// one, i.e. if `a/b/c` exists in the tree and `a/b/c` is the full path
+    /// to the node, then `c` will be replaced.
     ///
     /// If the path points to a branch, then the `node` will be inserted in this
     /// branch.
     ///
-    /// If a portion of the path points to a node then a branch will be created in
-    /// its place, i.e. if `a/b/c` exists in the tree and the provided path is `a/b/c/d`,
-    /// then the node `c` will be replaced by a branch `c/d`.
+    /// If a portion of the path points to a node then a branch will be created
+    /// in its place, i.e. if `a/b/c` exists in the tree and the provided
+    /// path is `a/b/c/d`, then the node `c` will be replaced by a branch
+    /// `c/d`.
     ///
-    /// If the path does not exist it will be inserted into the set of sub-trees.
+    /// If the path does not exist it will be inserted into the set of
+    /// sub-trees.
     fn insert_with<F>(&mut self, keys: &NonEmpty<K>, value: A, f: F)
     where
         F: FnOnce(&mut A),
@@ -378,18 +397,20 @@ impl<K, A> Forest<K, A> {
 
     /// Insert the `node` in the position given by `keys`.
     ///
-    /// If the same path to a node is provided the `node` will replace the old one,
-    /// i.e. if `a/b/c` exists in the tree and `a/b/c` is the full path to
-    /// the node, then `c` will be replaced.
+    /// If the same path to a node is provided the `node` will replace the old
+    /// one, i.e. if `a/b/c` exists in the tree and `a/b/c` is the full path
+    /// to the node, then `c` will be replaced.
     ///
     /// If the path points to a branch, then the `node` will be inserted in this
     /// branch.
     ///
-    /// If a portion of the path points to a node then a branch will be created in
-    /// its place, i.e. if `a/b/c` exists in the tree and the provided path is `a/b/c/d`,
-    /// then the node `c` will be replaced by a branch `c/d`.
+    /// If a portion of the path points to a node then a branch will be created
+    /// in its place, i.e. if `a/b/c` exists in the tree and the provided
+    /// path is `a/b/c/d`, then the node `c` will be replaced by a branch
+    /// `c/d`.
     ///
-    /// If the path does not exist it will be inserted into the set of sub-trees.
+    /// If the path does not exist it will be inserted into the set of
+    /// sub-trees.
     #[allow(dead_code)]
     pub fn insert(&mut self, keys: &NonEmpty<K>, node: A)
     where

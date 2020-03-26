@@ -1,9 +1,23 @@
+// This file is part of radicle-surf
+// <https://github.com/radicle-dev/radicle-surf>
+//
+// Copyright (C) 2019-2020 The Radicle Team <dev@radicle.xyz>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License version 3 or
+// later as published by the Free Software Foundation.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 use crate::vcs::git::error::*;
 use git2;
-use std::cmp::Ordering;
-use std::convert::TryFrom;
-use std::fmt;
-use std::str;
+use std::{cmp::Ordering, convert::TryFrom, fmt, str};
 
 /// `Author` is the static information of a [`git2::Signature`].
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -38,8 +52,9 @@ impl<'repo> TryFrom<git2::Signature<'repo>> for Author {
     }
 }
 
-/// `Commit` is the static information of a [`git2::Commit`]. To get back the original `Commit` in
-/// the repository we can use the [`git2::Oid`] to retrieve it.
+/// `Commit` is the static information of a [`git2::Commit`]. To get back the
+/// original `Commit` in the repository we can use the [`git2::Oid`] to retrieve
+/// it.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Commit {
     /// Object ID of the Commit, i.e. the SHA1 digest.
@@ -76,7 +91,8 @@ impl<'repo> TryFrom<git2::Commit<'repo>> for Commit {
     }
 }
 
-/// A newtype wrapper over `String` to separate out the fact that a caller wants to fetch a branch.
+/// A newtype wrapper over `String` to separate out the fact that a caller wants
+/// to fetch a branch.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BranchName(String);
 
@@ -168,7 +184,8 @@ impl<'repo> TryFrom<git2::Reference<'repo>> for Branch {
     }
 }
 
-/// A newtype wrapper over `String` to separate out the fact that a caller wants to fetch a tag.
+/// A newtype wrapper over `String` to separate out the fact that a caller wants
+/// to fetch a tag.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TagName(String);
 
@@ -236,11 +253,12 @@ impl<'repo> TryFrom<git2::Tag<'repo>> for Tag {
     }
 }
 
-/// A `RevObject` encapsulates the idea of providing a "revspec" to git and getting back the desired
-/// object.
+/// A `RevObject` encapsulates the idea of providing a "revspec" to git and
+/// getting back the desired object.
 ///
-/// `RevObject` can in turn be used by [`rev`](type.Browser.html#method.rev) to set the
-/// [`crate::vcs::git::Browser`]'s [`crate::vcs::git::History`] with the object.
+/// `RevObject` can in turn be used by [`rev`](type.Browser.html#method.rev) to
+/// set the [`crate::vcs::git::Browser`]'s [`crate::vcs::git::History`] with the
+/// object.
 ///
 /// See here for the [specifying revision](https://git-scm.com/docs/git-rev-parse.html#_specifying_revisions).
 pub enum RevObject {
@@ -255,8 +273,9 @@ pub enum RevObject {
 impl RevObject {
     /// Create a `RevObject` by calling
     /// [`revparse_ext`](https://docs.rs/git2/0.11.0/git2/struct.Repository.html#method.revparse_ext)
-    /// and attempting to turn the resulting `Object` into a [`Tag`] or a [`Commit`]. If this fails
-    /// we attempt to see if the [`git2::Reference`] is present and is a [`Branch`].
+    /// and attempting to turn the resulting `Object` into a [`Tag`] or a
+    /// [`Commit`]. If this fails we attempt to see if the
+    /// [`git2::Reference`] is present and is a [`Branch`].
     ///
     /// # Errors
     ///
@@ -284,8 +303,8 @@ impl RevObject {
     /// Peel back a `RevObject` into a [`git2::Commit`].
     ///
     /// In the case of the `RevObject` itself being a [`Commit`] it is trivial.
-    /// In the case of the `RevObject` being a [`Tag`] or [`Branch`], we first get the
-    /// object/reference and then get the commit it points to.
+    /// In the case of the `RevObject` being a [`Tag`] or [`Branch`], we first
+    /// get the object/reference and then get the commit it points to.
     pub(crate) fn into_commit(self, repo: &git2::Repository) -> Result<git2::Commit, Error> {
         match self {
             RevObject::Branch(branch) => {

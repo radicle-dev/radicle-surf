@@ -1,10 +1,24 @@
+// This file is part of radicle-surf
+// <https://github.com/radicle-dev/radicle-surf>
+//
+// Copyright (C) 2019-2020 The Radicle Team <dev@radicle.xyz>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License version 3 or
+// later as published by the Free Software Foundation.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 #![allow(dead_code, unused_variables, missing_docs)]
 
 use crate::file_system::{Directory, DirectoryContents, Label, Path};
-use std::cell::RefCell;
-use std::cmp::Ordering;
-use std::ops::Deref;
-use std::rc::Rc;
+use std::{cell::RefCell, cmp::Ordering, ops::Deref, rc::Rc};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -67,11 +81,12 @@ impl Diff {
         let path = Rc::new(RefCell::new(Path::from_labels(right.current(), &[])));
         Diff::collect_diff(&left, &right, &path, &mut diff)?;
 
-        // TODO: Some of the deleted files may actually be moved (renamed) to one of the created
-        // files. Finding out which of the deleted files were deleted and which were moved
-        // will probably require performing some variant of the longest common substring
-        // algorithm for each pair in D x C. Final decision can be based on heuristics, e.g.
-        // the file can be considered moved, if len(LCS) > 0,25 * min(size(d), size(c)), and
+        // TODO: Some of the deleted files may actually be moved (renamed) to one of the
+        // created files. Finding out which of the deleted files were deleted
+        // and which were moved will probably require performing some variant of
+        // the longest common substring algorithm for each pair in D x C. Final
+        // decision can be based on heuristics, e.g. the file can be considered
+        // moved, if len(LCS) > 0,25 * min(size(d), size(c)), and
         // deleted otherwise.
 
         Ok(diff)
@@ -299,9 +314,10 @@ impl Diff {
 
 #[cfg(test)]
 mod tests {
-    use crate::diff::*;
-    use crate::file_system::unsound;
-    use crate::file_system::*;
+    use crate::{
+        diff::*,
+        file_system::{unsound, *},
+    };
     use pretty_assertions::assert_eq;
 
     #[test]

@@ -1,15 +1,32 @@
+// This file is part of radicle-surf
+// <https://github.com/radicle-dev/radicle-surf>
+//
+// Copyright (C) 2019-2020 The Radicle Team <dev@radicle.xyz>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License version 3 or
+// later as published by the Free Software Foundation.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 extern crate radicle_surf;
 
-use std::env::Args;
-use std::time::Instant;
+use std::{env::Args, time::Instant};
 
 use git2::Oid;
 use nonempty::NonEmpty;
 
-use radicle_surf::diff::Diff;
-use radicle_surf::file_system::Directory;
-use radicle_surf::vcs::git;
-use radicle_surf::vcs::History;
+use radicle_surf::{
+    diff::Diff,
+    file_system::Directory,
+    vcs::{git, History},
+};
 
 fn main() {
     let options = get_options_or_exit();
@@ -80,7 +97,8 @@ fn reset_browser_to_head_or_exit(browser: &mut git::Browser) {
 }
 
 fn set_browser_history_or_exit(browser: &mut git::Browser, commit_id: &str) {
-    // TODO: Might consider to not require resetting to HEAD when history is not at HEAD
+    // TODO: Might consider to not require resetting to HEAD when history is not at
+    // HEAD
     reset_browser_to_head_or_exit(browser);
     if let Err(e) = set_browser_history(browser, commit_id) {
         println!("Failed to set browser history: {:?}", e);

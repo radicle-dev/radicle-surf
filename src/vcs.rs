@@ -1,5 +1,22 @@
-//! A model of a general VCS. The components consist of a [`History`], a [`Browser`], and a [`VCS`]
-//! trait.
+// This file is part of radicle-surf
+// <https://github.com/radicle-dev/radicle-surf>
+//
+// Copyright (C) 2019-2020 The Radicle Team <dev@radicle.xyz>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License version 3 or
+// later as published by the Free Software Foundation.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+//! A model of a general VCS. The components consist of a [`History`], a
+//! [`Browser`], and a [`VCS`] trait.
 
 use crate::file_system::directory::Directory;
 use nonempty::NonEmpty;
@@ -64,8 +81,8 @@ impl<A> History<A> {
 
     /// Find an artifact in the `History`.
     ///
-    /// The function provided should return `Some` if the item is the desired output and `None`
-    /// otherwise.
+    /// The function provided should return `Some` if the item is the desired
+    /// output and `None` otherwise.
     pub fn find<F, B>(&self, f: F) -> Option<B>
     where
         F: Fn(&A) -> Option<B>,
@@ -190,8 +207,9 @@ where
     fn get_repo(identifier: Self::RepoId) -> Result<Self, Error>;
 }
 
-/// The `VCS` trait encapsulates the minimal amount of information for interacting with some notion
-/// of `History` from a given Version-Control-System.
+/// The `VCS` trait encapsulates the minimal amount of information for
+/// interacting with some notion of `History` from a given
+/// Version-Control-System.
 pub trait VCS<A, Error> {
     /// The way to identify a History.
     type HistoryId;
