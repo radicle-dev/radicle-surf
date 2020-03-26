@@ -1,18 +1,11 @@
 env:
-  DOCKER_IMAGE: gcr.io/opensourcecoin/radicle-surf-build@sha256:5be613920b04adea96ee6b60ee864e93e32a4bfb7582ddf87dd9544ceb9f33cc
+  DOCKER_IMAGE: gcr.io/opensourcecoin/radicle-surf-build
   DOCKER_FILE: .buildkite/docker/rust-nightly/Dockerfile
 
 steps:
 - label: "Build, lint, test"
   commands:
-  - "echo '--- Formatting'"
-  - "cargo fmt -- --check"
-  - "echo '--- Bestest Practices'"
-  - "cargo clippy --all-targets --all-features -- -D warnings"
-  - "echo '--- Documentationz'"
-  - "cargo doc"
-  - "echo '--- Tests'"
-  - "cargo test --all"
+  - "ci/run"
   agents:
     production: "true"
     platform: "linux"

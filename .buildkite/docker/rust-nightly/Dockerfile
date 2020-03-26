@@ -4,13 +4,15 @@ FROM debian:buster-slim
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
-    	ca-certificates \
-	clang \
-        curl \
-	gcc \
-        jq \
-        libssl-dev \
-        pkg-config \
+    ca-certificates \
+    clang \
+    curl \
+    gcc \
+    jq \
+    libc6-dev \
+    libssl-dev \
+    make \
+    pkg-config \
 	; \
     apt-get autoremove; \
     rm -rf /var/lib/apt/lists/*
@@ -35,7 +37,7 @@ RUN set -eux; \
     cargo --version; \
     rustc --version; \
     rustup component add clippy rustfmt; \
-    cargo install sccache cargo-deb; \
+    cargo install sccache cargo-deb cargo-deny; \
     rm -rf /usr/local/cargo/registry; \
     rm /usr/local/cargo/.package-cache;
 

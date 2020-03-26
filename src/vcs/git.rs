@@ -1,3 +1,20 @@
+// This file is part of radicle-surf
+// <https://github.com/radicle-dev/radicle-surf>
+//
+// Copyright (C) 2019-2020 The Radicle Team <dev@radicle.xyz>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License version 3 or
+// later as published by the Free Software Foundation.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 //! ```
 //! use nonempty::NonEmpty;
 //! use radicle_surf::file_system::{Directory, File, Label, Path, SystemType};
@@ -46,24 +63,21 @@
 //! ```
 
 // Re-export git2 as sub-module
-pub use git2;
-pub use git2::{BranchType, Error as Git2Error, Oid, Time};
+pub use git2::{self, BranchType, Error as Git2Error, Oid, Time};
 
 pub mod error;
 mod object;
 
-use crate::file_system;
-use crate::file_system::directory;
-use crate::tree::*;
-use crate::vcs;
-use crate::vcs::git::error::*;
 pub use crate::vcs::git::object::*;
-use crate::vcs::VCS;
+use crate::{
+    file_system,
+    file_system::directory,
+    tree::*,
+    vcs,
+    vcs::{git::error::*, VCS},
+};
 use nonempty::NonEmpty;
-use std::cmp::Ordering;
-use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::str;
+use std::{cmp::Ordering, collections::HashMap, convert::TryFrom, str};
 
 /// A `History` that uses `git2::Commit` as the underlying artifact.
 pub type History = vcs::History<Commit>;
@@ -73,8 +87,9 @@ pub type History = vcs::History<Commit>;
 /// on the underlying object.
 pub struct Repository(pub(crate) git2::Repository);
 
-/// OrderedCommit is to allow for us to identify an ordering of commit history as we enumerate over
-/// a revwalk of commits, by assigning each commit an identifier.
+/// OrderedCommit is to allow for us to identify an ordering of commit history
+/// as we enumerate over a revwalk of commits, by assigning each commit an
+/// identifier.
 #[derive(Clone)]
 struct OrderedCommit {
     id: usize,
@@ -115,7 +130,8 @@ impl<'repo> Repository {
             .map_err(Error::from)
     }
 
-    /// List the branches within a repository, filtering out ones that do not parse correctly.
+    /// List the branches within a repository, filtering out ones that do not
+    /// parse correctly.
     ///
     /// # Errors
     ///
@@ -138,7 +154,8 @@ impl<'repo> Repository {
             })
     }
 
-    /// List the tags within a repository, filtering out ones that do not parse correctly.
+    /// List the tags within a repository, filtering out ones that do not parse
+    /// correctly.
     ///
     /// # Errors
     ///
@@ -252,7 +269,8 @@ impl<'repo> Repository {
         }
     }
 
-    /// Get the history of the file system where the head of the [`NonEmpty`] is the latest commit.
+    /// Get the history of the file system where the head of the [`NonEmpty`] is
+    /// the latest commit.
     fn file_history(
         &'repo self,
         commit: Commit,
@@ -399,8 +417,9 @@ impl std::fmt::Debug for Repository {
     }
 }
 
-/// A [`crate::vcs::Browser`] that uses [`Repository`] as the underlying repository backend,
-/// [`git2::Commit`] as the artifact, and [`Error`] for error reporting.
+/// A [`crate::vcs::Browser`] that uses [`Repository`] as the underlying
+/// repository backend, [`git2::Commit`] as the artifact, and [`Error`] for
+/// error reporting.
 pub type Browser = vcs::Browser<Repository, Commit, Error>;
 
 impl Browser {
@@ -478,7 +497,8 @@ impl Browser {
         })
     }
 
-    /// Set the current `Browser` history to the `HEAD` commit of the underlying repository.
+    /// Set the current `Browser` history to the `HEAD` commit of the underlying
+    /// repository.
     ///
     /// # Errors
     ///
@@ -511,7 +531,8 @@ impl Browser {
         Ok(())
     }
 
-    /// Set the current `Browser`'s [`History`] to the given [`BranchName`] provided.
+    /// Set the current `Browser`'s [`History`] to the given [`BranchName`]
+    /// provided.
     ///
     /// # Errors
     ///
@@ -635,7 +656,8 @@ impl Browser {
         Ok(())
     }
 
-    /// Set the current `Browser`'s [`History`] to the [`Oid`] (SHA digest) provided.
+    /// Set the current `Browser`'s [`History`] to the [`Oid`] (SHA digest)
+    /// provided.
     ///
     /// # Errors
     ///
@@ -737,7 +759,8 @@ impl Browser {
         Ok(())
     }
 
-    /// List the names of the _branches_ that are contained in the underlying [`Repository`].
+    /// List the names of the _branches_ that are contained in the underlying
+    /// [`Repository`].
     ///
     /// # Errors
     ///
@@ -775,7 +798,8 @@ impl Browser {
         self.repository.list_branches(filter)
     }
 
-    /// List the names of the _tags_ that are contained in the underlying [`Repository`].
+    /// List the names of the _tags_ that are contained in the underlying
+    /// [`Repository`].
     ///
     /// # Errors
     ///
@@ -811,8 +835,8 @@ impl Browser {
         self.repository.list_tags()
     }
 
-    /// Given a [`crate::file_system::Path`] to a file, return the last [`Commit`] that touched that
-    /// file or directory.
+    /// Given a [`crate::file_system::Path`] to a file, return the last
+    /// [`Commit`] that touched that file or directory.
     ///
     /// # Errors
     ///
@@ -872,8 +896,8 @@ impl Browser {
     /// # Arguments
     ///
     /// * `commit` - The commit to extract the signature for
-    /// * `field` - the name of the header field containing the signature block; pass `None` to
-    ///   extract the default 'gpgsig'
+    /// * `field` - the name of the header field containing the signature block;
+    ///   pass `None` to extract the default 'gpgsig'
     ///
     /// # Examples
     ///
@@ -1033,12 +1057,13 @@ mod tests {
         use super::{Browser, Error, Oid, Repository};
 
         // **FIXME**: This seems to break occasionally on
-        // buildkite. For some reason the commit 3873745c8f6ffb45c990eb23b491d4b4b6182f95,
-        // which is on master (currently HEAD), is not found. It seems to load the history
+        // buildkite. For some reason the commit
+        // 3873745c8f6ffb45c990eb23b491d4b4b6182f95, which is on master
+        // (currently HEAD), is not found. It seems to load the history
         // with d6880352fc7fda8f521ae9b7357668b17bb5bad5 as the HEAD.
         //
-        // To temporarily fix this, we need to select "New Build" from the build kite build page
-        // that's failing.
+        // To temporarily fix this, we need to select "New Build" from the build kite
+        // build page that's failing.
         // * Under "Message" put whatever you want.
         // * Under "Branch" put in the branch you're working on.
         // * Expand "Options" and select "clean checkout".
@@ -1134,9 +1159,10 @@ mod tests {
 
     #[cfg(test)]
     mod last_commit {
-        use crate::file_system::unsound;
-        use crate::file_system::Path;
-        use crate::vcs::git::{Browser, Oid, Repository};
+        use crate::{
+            file_system::{unsound, Path},
+            vcs::git::{Browser, Oid, Repository},
+        };
 
         #[test]
         fn readme_missing_and_memory() {

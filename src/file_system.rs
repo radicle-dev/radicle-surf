@@ -1,5 +1,23 @@
-//! A model of a non-empty directory data structure that can be searched, queried, and rendered.
-//! The concept is to represent VCS directory, but is not necessarily tied to one.
+// This file is part of radicle-surf
+// <https://github.com/radicle-dev/radicle-surf>
+//
+// Copyright (C) 2019-2020 The Radicle Team <dev@radicle.xyz>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License version 3 or
+// later as published by the Free Software Foundation.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+//! A model of a non-empty directory data structure that can be searched,
+//! queried, and rendered. The concept is to represent VCS directory, but is not
+//! necessarily tied to one.
 //!
 //! # Examples
 //!
@@ -96,5 +114,4 @@ pub mod directory;
 pub mod error;
 mod path;
 
-pub use self::directory::*;
-pub use self::path::*;
+pub use self::{directory::*, path::*};

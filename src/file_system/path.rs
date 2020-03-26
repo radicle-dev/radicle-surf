@@ -1,21 +1,33 @@
-use crate::file_system::error;
-use crate::nonempty::split_last;
+// This file is part of radicle-surf
+// <https://github.com/radicle-dev/radicle-surf>
+//
+// Copyright (C) 2019-2020 The Radicle Team <dev@radicle.xyz>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License version 3 or
+// later as published by the Free Software Foundation.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+use crate::{file_system::error, nonempty::split_last};
 use nonempty::NonEmpty;
-use std::convert::TryFrom;
-use std::fmt;
-use std::ops::Deref;
-use std::path;
-use std::str::FromStr;
+use std::{convert::TryFrom, fmt, ops::Deref, path, str::FromStr};
 
 pub mod unsound;
 
 /// `Label` is a special case of a `String` identifier for
 /// [`Directory`](`crate::file_system::directory::Directory`) and
-/// [`File`](`crate::file_system::directory::File`) names, and is used in [`Path`] as the component
-/// parts of a path.
+/// [`File`](`crate::file_system::directory::File`) names, and is used in
+/// [`Path`] as the component parts of a path.
 ///
-/// A `Label` should not be empty or contain `/`s. It is encouraged to use the `TryFrom` instance to
-/// create a `Label`.
+/// A `Label` should not be empty or contain `/`s. It is encouraged to use the
+/// `TryFrom` instance to create a `Label`.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Label {
     pub(crate) label: String,
@@ -33,7 +45,8 @@ impl Deref for Label {
 impl Label {
     /// The root label for the root directory, i.e. `"~"`.
     ///
-    /// Prefer creating a root [`Path`], by using [`Path::root`](struct.Path.html#method.root).
+    /// Prefer creating a root [`Path`], by using
+    /// [`Path::root`](struct.Path.html#method.root).
     ///
     /// # Examples
     ///
@@ -259,7 +272,8 @@ impl Path {
         self.0.iter()
     }
 
-    /// Get the first [`Label`] in the `Path` and the rest of the [`Label`]s after it.
+    /// Get the first [`Label`] in the `Path` and the rest of the [`Label`]s
+    /// after it.
     ///
     /// # Examples
     ///
@@ -280,7 +294,8 @@ impl Path {
 
     /// Get the prefix of the [`Label`]s and the last [`Label`].
     ///
-    /// This is useful when the prefix is a directory path and the last label is a file name.
+    /// This is useful when the prefix is a directory path and the last label is
+    /// a file name.
     ///
     /// # Examples
     ///
@@ -306,7 +321,8 @@ impl Path {
         split_last(&self.0)
     }
 
-    /// Construct a `Path` given at least one [`Label`] followed by 0 or more [`Label`]s.
+    /// Construct a `Path` given at least one [`Label`] followed by 0 or more
+    /// [`Label`]s.
     ///
     /// # Examples
     ///
@@ -337,7 +353,8 @@ impl Path {
         Path((root, labels.to_vec()).into())
     }
 
-    /// Construct a `Path` using [`Label::root`](#method.root) as the head of the `Path.
+    /// Construct a `Path` using [`Label::root`](#method.root) as the head of
+    /// the `Path.
     ///
     /// # Examples
     ///
@@ -397,7 +414,8 @@ mod tests {
 
         #[test]
         fn split_last_same_labels() {
-            // An interesting case for when first == last, but doesn't imply a singleton Path.
+            // An interesting case for when first == last, but doesn't imply a singleton
+            // Path.
             let path = unsound::path::new("foo/bar/foo");
             assert_eq!(
                 path.split_last(),

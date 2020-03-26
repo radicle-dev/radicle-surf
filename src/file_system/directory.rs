@@ -1,23 +1,42 @@
+// This file is part of radicle-surf
+// <https://github.com/radicle-dev/radicle-surf>
+//
+// Copyright (C) 2019-2020 The Radicle Team <dev@radicle.xyz>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License version 3 or
+// later as published by the Free Software Foundation.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 //! Definition for a file system consisting of `Directory` and `File`.
 //!
-//! A `Directory` is expected to be a non-empty tree of directories and files. See [`Directory`] for
-//! more information.
+//! A `Directory` is expected to be a non-empty tree of directories and files.
+//! See [`Directory`] for more information.
 //!
-//! As well as this, this module contains [`DirectoryContents`] which is the output of iterating
-//! over a [`Directory`], and also [`SystemType`] which is an identifier of what type of
-//! [`DirectoryContents`] one is viewing when [listing](#method.list_directory) a directory.
+//! As well as this, this module contains [`DirectoryContents`] which is the
+//! output of iterating over a [`Directory`], and also [`SystemType`] which is
+//! an identifier of what type of [`DirectoryContents`] one is viewing when
+//! [listing](#method.list_directory) a directory.
 
-use crate::file_system::path::*;
-use crate::tree::*;
+use crate::{file_system::path::*, tree::*};
 use nonempty::NonEmpty;
-use std::collections::hash_map::DefaultHasher;
-use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
+use std::{
+    collections::{hash_map::DefaultHasher, HashMap},
+    hash::{Hash, Hasher},
+};
 
-/// `SystemType` is an enumeration over what can be found in a [`Directory`] so we can report back
-/// to the caller a [`Label`] and its type.
+/// `SystemType` is an enumeration over what can be found in a [`Directory`] so
+/// we can report back to the caller a [`Label`] and its type.
 ///
-/// See [`SystemType::file`](#method.file) and [`SystemType::directory`](#method.directory).
+/// See [`SystemType::file`](#method.file) and
+/// [`SystemType::directory`](#method.directory).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SystemType {
     /// The `File` type in a directory system.
@@ -40,8 +59,8 @@ impl SystemType {
 
 /// A `File` consists of its file contents (a [`Vec`] of bytes).
 ///
-/// The `Debug` instance of `File` will show the first few bytes of the file and its
-/// [`size`](#method.size).
+/// The `Debug` instance of `File` will show the first few bytes of the file and
+/// its [`size`](#method.size).
 #[derive(Clone, PartialEq, Eq)]
 pub struct File {
     /// The contents of a `File` as a vector of bytes.
@@ -71,7 +90,8 @@ impl File {
         }
     }
 
-    /// Get the size of the `File` corresponding to the number of bytes in the file contents.
+    /// Get the size of the `File` corresponding to the number of bytes in the
+    /// file contents.
     ///
     /// # Examples
     ///
@@ -112,12 +132,14 @@ enum Location {
     SubDirectory(Label),
 }
 
-/// A `Directory` can be thought of as a non-empty set of entries of sub-directories and files. The
-/// reason for the non-empty property is that a VCS directory would have at least one artifact as a
-/// sub-directory which tracks the VCS work, e.g. git using the `.git` folder.
+/// A `Directory` can be thought of as a non-empty set of entries of
+/// sub-directories and files. The reason for the non-empty property is that a
+/// VCS directory would have at least one artifact as a sub-directory which
+/// tracks the VCS work, e.g. git using the `.git` folder.
 ///
-/// On top of that, some VCSes, such as git, will not track an empty directory, and so when
-/// creating a new directory to track it will have to contain at least one file.
+/// On top of that, some VCSes, such as git, will not track an empty directory,
+/// and so when creating a new directory to track it will have to contain at
+/// least one file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Directory {
     current: Location,
@@ -125,8 +147,8 @@ pub struct Directory {
 }
 
 /// `DirectoryContents` is an enumeration of what a [`Directory`] can contain
-/// and is used for when we are [`iter`](struct.Directory.html#method.iter)ating through a
-/// [`Directory`].
+/// and is used for when we are [`iter`](struct.Directory.html#method.iter)ating
+/// through a [`Directory`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DirectoryContents {
     /// The `File` variant contains the file's name and the [`File`] itself.
@@ -189,8 +211,8 @@ impl Directory {
 
     /// List the current `Directory`'s files and sub-directories.
     ///
-    /// The listings are a pair of [`Label`] and [`SystemType`], where the [`Label`] represents the
-    /// name of the file or directory.
+    /// The listings are a pair of [`Label`] and [`SystemType`], where the
+    /// [`Label`] represents the name of the file or directory.
     ///
     /// ```
     /// use nonempty::NonEmpty;
@@ -343,7 +365,8 @@ impl Directory {
         self.sub_directories.find_node(&path.0).cloned()
     }
 
-    /// Find a `Directory` in the directory given the [`Path`] to the `Directory`.
+    /// Find a `Directory` in the directory given the [`Path`] to the
+    /// `Directory`.
     ///
     /// # Failures
     ///
@@ -417,7 +440,8 @@ impl Directory {
         }
     }
 
-    // TODO(fintan): This is going to be a bit trickier so going to leave it out for now
+    // TODO(fintan): This is going to be a bit trickier so going to leave it out for
+    // now
     #[allow(dead_code)]
     fn fuzzy_find(_label: Label) -> Vec<Self> {
         unimplemented!()
@@ -445,8 +469,8 @@ impl Directory {
             .fold(0, |size, file| size + file.size())
     }
 
-    /// Insert a file into a directory, given the full path to file (file name inclusive) and
-    /// the `File` itself.
+    /// Insert a file into a directory, given the full path to file (file name
+    /// inclusive) and the `File` itself.
     ///
     /// This function is usually used for testing and demonstation purposes.
     pub fn insert_file(&mut self, path: &Path, file: File) {
@@ -455,8 +479,8 @@ impl Directory {
 
     /// Insert files into a shared directory path.
     ///
-    /// `directory_path` is used as the prefix to where the files should go. If empty the files will
-    /// be placed in the current `Directory`.
+    /// `directory_path` is used as the prefix to where the files should go. If
+    /// empty the files will be placed in the current `Directory`.
     ///
     /// `files` are pairs of file name and the [`File`] itself.
     ///
@@ -502,8 +526,7 @@ impl Directory {
 pub mod tests {
     #[cfg(test)]
     mod list_directory {
-        use crate::file_system::unsound;
-        use crate::file_system::{Directory, File, SystemType};
+        use crate::file_system::{unsound, Directory, File, SystemType};
 
         #[test]
         fn root_files() {
@@ -534,8 +557,7 @@ pub mod tests {
 
     #[cfg(test)]
     mod find_file {
-        use crate::file_system::unsound;
-        use crate::file_system::*;
+        use crate::file_system::{unsound, *};
 
         #[test]
         fn in_root() {
@@ -564,8 +586,7 @@ pub mod tests {
 
     #[cfg(test)]
     mod directory_size {
-        use crate::file_system::unsound;
-        use crate::file_system::{Directory, File};
+        use crate::file_system::{unsound, Directory, File};
         use nonempty::NonEmpty;
 
         #[test]
@@ -591,11 +612,9 @@ pub mod tests {
 
     #[cfg(test)]
     mod properties {
-        use crate::file_system::unsound;
-        use crate::file_system::*;
+        use crate::file_system::{unsound, *};
         use nonempty::NonEmpty;
-        use proptest::collection;
-        use proptest::prelude::*;
+        use proptest::{collection, prelude::*};
         use std::collections::HashMap;
 
         #[test]
