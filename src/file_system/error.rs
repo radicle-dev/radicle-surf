@@ -40,6 +40,7 @@ pub(crate) fn label_has_slash(item: &str) -> Error {
 
 /// Error type for all file system errors that can occur.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
 pub enum Error {
     /// A `LabelError` specific error for parsing a
     /// [`Path`](super::path::Label).
@@ -52,6 +53,7 @@ pub enum Error {
 
 /// Parse errors for when parsing a string to a [`Path`](super::path::Path).
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
 pub enum PathError {
     /// An error signifying that a [`Path`](super::path::Path) is empty.
     #[error("Path is empty")]
@@ -60,6 +62,7 @@ pub enum PathError {
 
 /// Parse errors for when parsing a string to a [`Label`](super::path::Label).
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
 pub enum LabelError {
     /// An error signifying that a [`Label`](super::path::Label) is contains
     /// invalid UTF-8.
