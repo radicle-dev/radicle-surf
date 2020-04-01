@@ -27,6 +27,7 @@ use thiserror::Error;
 
 /// Enumeration of errors that can occur in operations from [`crate::vcs::git`].
 #[derive(Debug, PartialEq, Error)]
+#[non_exhaustive]
 pub enum Error {
     /// The user tried to fetch a branch, but the name provided does not
     /// exist as a branch. This could mean that the branch does not exist
@@ -67,6 +68,7 @@ pub enum Error {
 ///
 /// In the of `Git` we abort both computations.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub(crate) enum TreeWalkError {
     #[error("Entry is not a blob")]
     NotBlob,
