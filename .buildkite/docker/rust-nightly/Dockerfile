@@ -8,6 +8,7 @@ RUN set -eux; \
     clang \
     curl \
     gcc \
+    git \
     jq \
     libc6-dev \
     libssl-dev \
