@@ -173,7 +173,6 @@ impl<K, A> Tree<K, A> {
     {
         let (start, mut middle) = keys.into();
         let last = middle.pop();
-        // let (start, middle, last) = keys.split();
 
         match last {
             None => Tree::node(start, node),
