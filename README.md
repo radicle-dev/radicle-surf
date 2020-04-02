@@ -9,7 +9,19 @@ We have the concept of files and directories, but these objects can change over 
 Thus, it is a file-system within history and we, the user, are viewing the file-system at a particular snapshot.
 Alongside this, we will wish to take two snapshots and view their differences.
 
-Let's start surfing (and apologies for the `unwrap`s):
+## Contributing
+
+To get started on contributing you can check out our [devloping guide](./DEVELOPMENT.md), and also
+our [LICENSE](./LICENSE) file.
+
+## The Community
+
+Join our community disccussions at [radicle.community](https://radicle.community)!
+
+# Example
+
+To a taste for the capabilities of `radicle-surf` we provide an example below, but we also
+keep our documentation and doc-tests up to date.
 
 ```rust
 use radicle_surf::vcs::git;
