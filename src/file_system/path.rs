@@ -118,7 +118,7 @@ pub struct Path(pub NonEmpty<Label>);
 
 impl fmt::Display for Path {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (prefix, suffix) = self.split_last();
+        let (prefix, suffix) = self.clone().split_last();
         for p in prefix {
             write!(f, "{}/", p)?;
         }
@@ -207,13 +207,13 @@ impl Path {
     /// use std::convert::TryFrom;
     ///
     /// let mut path1 = unsound::path::new("foo/bar");
-    /// let mut path2 = unsound::path::new("baz/quux");
-    /// path1.append(&mut path2);
+    /// let path2 = unsound::path::new("baz/quux");
+    /// path1.append(path2);
     /// let expected = unsound::path::new("foo/bar/baz/quux");
     /// assert_eq!(path1, expected);
     /// ```
-    pub fn append(&mut self, path: &mut Self) {
-        let mut other = path.0.clone().into();
+    pub fn append(&mut self, path: Self) {
+        let mut other = path.0.into();
         self.0.append(&mut other)
     }
 
@@ -317,8 +317,8 @@ impl Path {
     ///     (vec![unsound::label::new("foo"), unsound::label::new("bar")], unsound::label::new("baz"))
     /// );
     /// ```
-    pub fn split_last(&self) -> (Vec<Label>, Label) {
-        split_last(&self.0)
+    pub fn split_last(self) -> (Vec<Label>, Label) {
+        split_last(self.0)
     }
 
     /// Construct a `Path` given at least one [`Label`] followed by 0 or more

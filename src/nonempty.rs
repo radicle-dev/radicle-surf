@@ -17,20 +17,17 @@
 
 use nonempty::NonEmpty;
 
-pub fn split_last<T>(non_empty: &NonEmpty<T>) -> (Vec<T>, T)
+pub fn split_last<T>(non_empty: NonEmpty<T>) -> (Vec<T>, T)
 where
-    T: Clone + Eq,
+    T: Eq,
 {
-    let (first, middle, last) = non_empty.split();
-
-    // first == last, so drop first
-    if first == last && middle.is_empty() {
-        (vec![], last.clone())
-    } else {
-        // Create the prefix vector
-        let mut vec = vec![first.clone()];
-        let mut middle = middle.to_vec();
-        vec.append(&mut middle);
-        (vec, last.clone())
+    let (head, mut tail) = non_empty.into();
+    let last = tail.pop();
+    match last {
+        None => (vec![], head),
+        Some(last) => {
+            tail.insert(0, head);
+            (tail, last)
+        },
     }
 }

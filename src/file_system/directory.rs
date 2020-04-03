@@ -283,13 +283,13 @@ impl Directory {
     /// let mut root = Directory::root();
     ///
     /// let main = File::new(b"println!(\"Hello, world!\")");
-    /// root.insert_file(&unsound::path::new("main.rs"), main.clone());
+    /// root.insert_file(unsound::path::new("main.rs"), main.clone());
     ///
     /// let lib = File::new(b"struct Hello(String)");
-    /// root.insert_file(&unsound::path::new("lib.rs"), lib.clone());
+    /// root.insert_file(unsound::path::new("lib.rs"), lib.clone());
     ///
     /// let test_mod = File::new(b"assert_eq!(1 + 1, 2);");
-    /// root.insert_file(&unsound::path::new("test/mod.rs"), test_mod.clone());
+    /// root.insert_file(unsound::path::new("test/mod.rs"), test_mod.clone());
     ///
     /// let mut root_iter = root.iter();
     ///
@@ -304,7 +304,7 @@ impl Directory {
     /// }));
     ///
     /// let mut test_dir = Directory::new(unsound::label::new("test"));
-    /// test_dir.insert_file(&unsound::path::new("mod.rs"), test_mod);
+    /// test_dir.insert_file(unsound::path::new("mod.rs"), test_mod);
     ///
     /// assert_eq!(root_iter.next(), Some(DirectoryContents::Directory(test_dir)));
     /// ```
@@ -350,19 +350,19 @@ impl Directory {
     /// let file = File::new(b"module Banana ...");
     ///
     /// let mut directory = Directory::root();
-    /// directory.insert_file(&unsound::path::new("foo/bar/baz.rs"), file.clone());
+    /// directory.insert_file(unsound::path::new("foo/bar/baz.rs"), file.clone());
     ///
     /// // The file is succesfully found
-    /// assert_eq!(directory.find_file(&unsound::path::new("foo/bar/baz.rs")), Some(file));
+    /// assert_eq!(directory.find_file(unsound::path::new("foo/bar/baz.rs")), Some(file));
     ///
     /// // We shouldn't be able to find a directory
-    /// assert_eq!(directory.find_file(&unsound::path::new("foo")), None);
+    /// assert_eq!(directory.find_file(unsound::path::new("foo")), None);
     ///
     /// // We shouldn't be able to find a file that doesn't exist
-    /// assert_eq!(directory.find_file(&unsound::path::new("foo/bar/qux.rs")), None);
+    /// assert_eq!(directory.find_file(unsound::path::new("foo/bar/qux.rs")), None);
     /// ```
-    pub fn find_file(&self, path: &Path) -> Option<File> {
-        self.sub_directories.find_node(&path.0).cloned()
+    pub fn find_file(&self, path: Path) -> Option<File> {
+        self.sub_directories.find_node(path.0).cloned()
     }
 
     /// Find a `Directory` in the directory given the [`Path`] to the
@@ -386,23 +386,23 @@ impl Directory {
     /// let file = File::new(b"module Banana ...");
     ///
     /// let mut directory = Directory::root();
-    /// directory.insert_file(&unsound::path::new("foo/bar/baz.rs"), file.clone());
+    /// directory.insert_file(unsound::path::new("foo/bar/baz.rs"), file.clone());
     ///
     /// // Can find the first level
-    /// assert!(directory.find_directory(&unsound::path::new("foo")).is_some());
+    /// assert!(directory.find_directory(unsound::path::new("foo")).is_some());
     ///
     /// // Can find the second level
-    /// assert!(directory.find_directory(&unsound::path::new("foo/bar")).is_some());
+    /// assert!(directory.find_directory(unsound::path::new("foo/bar")).is_some());
     ///
     /// // Cannot find 'baz' since it does not exist
-    /// assert!(directory.find_directory(&unsound::path::new("foo/baz")).is_none());
+    /// assert!(directory.find_directory(unsound::path::new("foo/baz")).is_none());
     ///
     /// // 'baz.rs' is a file and not a directory
-    /// assert!(directory.find_directory(&unsound::path::new("foo/bar/baz.rs")).is_none());
+    /// assert!(directory.find_directory(unsound::path::new("foo/bar/baz.rs")).is_none());
     /// ```
-    pub fn find_directory(&self, path: &Path) -> Option<Self> {
+    pub fn find_directory(&self, path: Path) -> Option<Self> {
         self.sub_directories
-            .find_branch(&path.0)
+            .find_branch(path.0.clone())
             .cloned()
             .map(|tree| {
                 let (_, current) = path.split_last();
@@ -422,14 +422,14 @@ impl Directory {
     /// use radicle_surf::file_system::unsound;
     ///
     /// let mut root = Directory::root();
-    /// root.insert_file(&unsound::path::new("main.rs"), File::new(b"println!(\"Hello, world!\")"));
-    /// root.insert_file(&unsound::path::new("lib.rs"), File::new(b"struct Hello(String)"));
-    /// root.insert_file(&unsound::path::new("test/mod.rs"), File::new(b"assert_eq!(1 + 1, 2);"));
+    /// root.insert_file(unsound::path::new("main.rs"), File::new(b"println!(\"Hello, world!\")"));
+    /// root.insert_file(unsound::path::new("lib.rs"), File::new(b"struct Hello(String)"));
+    /// root.insert_file(unsound::path::new("test/mod.rs"), File::new(b"assert_eq!(1 + 1, 2);"));
     ///
     /// assert_eq!(root.current(), Label::root());
     ///
     /// let test = root.find_directory(
-    ///     &unsound::path::new("test")
+    ///     unsound::path::new("test")
     /// ).expect("Missing test directory");
     /// assert_eq!(test.current(), unsound::label::new("test"));
     /// ```
@@ -457,9 +457,9 @@ impl Directory {
     /// use radicle_surf::file_system::unsound;
     ///
     /// let mut root = Directory::root();
-    /// root.insert_file(&unsound::path::new("main.rs"), File::new(b"println!(\"Hello, world!\")"));
-    /// root.insert_file(&unsound::path::new("lib.rs"), File::new(b"struct Hello(String)"));
-    /// root.insert_file(&unsound::path::new("test/mod.rs"), File::new(b"assert_eq!(1 + 1, 2);"));
+    /// root.insert_file(unsound::path::new("main.rs"), File::new(b"println!(\"Hello, world!\")"));
+    /// root.insert_file(unsound::path::new("lib.rs"), File::new(b"struct Hello(String)"));
+    /// root.insert_file(unsound::path::new("test/mod.rs"), File::new(b"assert_eq!(1 + 1, 2);"));
     ///
     /// assert_eq!(root.size(), 66);
     /// ```
@@ -473,8 +473,8 @@ impl Directory {
     /// inclusive) and the `File` itself.
     ///
     /// This function is usually used for testing and demonstation purposes.
-    pub fn insert_file(&mut self, path: &Path, file: File) {
-        self.sub_directories.insert(&path.0, file)
+    pub fn insert_file(&mut self, path: Path, file: File) {
+        self.sub_directories.insert(path.0, file)
     }
 
     /// Insert files into a shared directory path.
@@ -488,16 +488,17 @@ impl Directory {
     pub fn insert_files(&mut self, directory_path: &[Label], files: NonEmpty<(Label, File)>) {
         match NonEmpty::from_slice(directory_path) {
             None => {
-                for (file_name, file) in files.iter() {
-                    self.insert_file(&Path::new(file_name.clone()), file.clone())
+                for (file_name, file) in files.into_iter() {
+                    self.insert_file(Path::new(file_name), file)
                 }
             },
-            Some(directory_path) => {
-                for (file_name, file) in files.iter() {
-                    let mut file_path = Path(directory_path.clone());
-                    file_path.push(file_name.clone());
+            Some(path) => {
+                for (file_name, file) in files.into_iter() {
+                    // The clone is necessary here because we use it as a prefix.
+                    let mut file_path = Path(path.clone());
+                    file_path.push(file_name);
 
-                    self.insert_file(&file_path, file.clone())
+                    self.insert_file(file_path, file)
                 }
             },
         }
@@ -507,14 +508,16 @@ impl Directory {
         let mut directory: Self = Directory::root();
 
         for (path, files) in files.into_iter() {
-            for (file_name, file) in files.iter() {
-                let mut file_path = path.clone();
-                file_path.push(file_name.clone());
-                if path.is_root() {
-                    directory.insert_file(&Path::new(file_name.clone()), file.clone())
+            for (file_name, file) in files.into_iter() {
+                let file_path = if path.is_root() {
+                    Path::new(file_name)
                 } else {
-                    directory.insert_file(&file_path, file.clone())
-                }
+                    let mut new_path = path.clone();
+                    new_path.push(file_name);
+                    new_path
+                };
+
+                directory.insert_file(file_path, file)
             }
         }
 
@@ -532,15 +535,15 @@ pub mod tests {
         fn root_files() {
             let mut directory = Directory::root();
             directory.insert_file(
-                &unsound::path::new("foo.hs"),
+                unsound::path::new("foo.hs"),
                 File::new(b"module BananaFoo ..."),
             );
             directory.insert_file(
-                &unsound::path::new("bar.hs"),
+                unsound::path::new("bar.hs"),
                 File::new(b"module BananaBar ..."),
             );
             directory.insert_file(
-                &unsound::path::new("baz.hs"),
+                unsound::path::new("baz.hs"),
                 File::new(b"module BananaBaz ..."),
             );
 
@@ -563,10 +566,10 @@ pub mod tests {
         fn in_root() {
             let file = File::new(b"module Banana ...");
             let mut directory = Directory::root();
-            directory.insert_file(&unsound::path::new("foo.hs"), file.clone());
+            directory.insert_file(unsound::path::new("foo.hs"), file.clone());
 
             assert_eq!(
-                directory.find_file(&unsound::path::new("foo.hs")),
+                directory.find_file(unsound::path::new("foo.hs")),
                 Some(file)
             );
         }
@@ -578,9 +581,9 @@ pub mod tests {
             let file = File::new(b"module Banana ...");
 
             let mut directory = Directory::root();
-            directory.insert_file(&unsound::path::new("foo.hs"), file);
+            directory.insert_file(unsound::path::new("foo.hs"), file);
 
-            assert_eq!(directory.find_file(&file_path), None)
+            assert_eq!(directory.find_file(file_path), None)
         }
     }
 
@@ -688,12 +691,16 @@ pub mod tests {
             for (directory_path, files) in new_directory_map {
                 for (file_name, _) in files.iter() {
                     let mut path = directory_path.clone();
-                    if directory.find_directory(&path).is_none() {
+                    if directory.find_directory(path.clone()).is_none() {
+                        eprintln!("Search Directory: {:#?}", directory);
+                        eprintln!("Path to find: {:#?}", path);
                         return false;
                     }
 
                     path.push(file_name.clone());
-                    if directory.find_file(&path).is_none() {
+                    if directory.find_file(path.clone()).is_none() {
+                        eprintln!("Search Directory: {:#?}", directory);
+                        eprintln!("Path to find: {:#?}", path);
                         return false;
                     }
                 }

@@ -43,8 +43,8 @@
 //! let file_system_mod = fs::File::new(b"pub mod directory;\npub mod error;\nmod path;");
 //!
 //! directory.insert_files(&[], root_files);
-//! directory.insert_file(&unsound::path::new("src/lib.rs"), lib.clone());
-//! directory.insert_file(&unsound::path::new("src/file_system/mod.rs"), file_system_mod);
+//! directory.insert_file(unsound::path::new("src/lib.rs"), lib.clone());
+//! directory.insert_file(unsound::path::new("src/file_system/mod.rs"), file_system_mod);
 //!
 //! // With a directory in place we can begin to operate on it
 //! // The first we will do is list what contents are at the root.
@@ -63,7 +63,7 @@
 //! // We can then go down one level to explore sub-directories
 //! // Note here that we can use `Path::new`, since there's guranteed to be a `Label`,
 //! // although we cheated and created the label unsafely.
-//! let src = directory.find_directory(&fs::Path::new(unsound::label::new("src")));
+//! let src = directory.find_directory(fs::Path::new(unsound::label::new("src")));
 //!
 //! // Ensure that we found the src directory
 //! assert!(src.is_some());
@@ -82,25 +82,25 @@
 //!
 //! // We can dive down to 'file_system' either from the root or src, they should be the same.
 //! assert_eq!(
-//!     src.find_directory(&unsound::path::new("file_system")),
-//!     directory.find_directory(&unsound::path::new("src/file_system")),
+//!     src.find_directory(unsound::path::new("file_system")),
+//!     directory.find_directory(unsound::path::new("src/file_system")),
 //! );
 //!
 //! // We can also find files
 //! assert_eq!(
-//!     src.find_file(&unsound::path::new("lib.rs")),
+//!     src.find_file(unsound::path::new("lib.rs")),
 //!     Some(lib)
 //! );
 //!
 //! // From anywhere
 //! assert_eq!(
-//!     directory.find_file(&unsound::path::new("src/file_system/mod.rs")),
-//!     src.find_file(&unsound::path::new("file_system/mod.rs")),
+//!     directory.find_file(unsound::path::new("src/file_system/mod.rs")),
+//!     src.find_file(unsound::path::new("file_system/mod.rs")),
 //! );
 //!
 //! // And we can also check the size of directories and files
 //! assert_eq!(
-//!     directory.find_file(&unsound::path::new("src/file_system/mod.rs")).map(|f| f.size()),
+//!     directory.find_file(unsound::path::new("src/file_system/mod.rs")).map(|f| f.size()),
 //!     Some(43),
 //! );
 //!

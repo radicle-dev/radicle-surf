@@ -325,7 +325,7 @@ mod tests {
         let directory = Directory::root();
 
         let mut new_directory = Directory::root();
-        new_directory.insert_file(&unsound::path::new("banana.rs"), File::new(b"use banana"));
+        new_directory.insert_file(unsound::path::new("banana.rs"), File::new(b"use banana"));
 
         let diff = Diff::diff(directory, new_directory).expect("diff failed");
 
@@ -344,7 +344,7 @@ mod tests {
     #[test]
     fn test_delete_file() {
         let mut directory = Directory::root();
-        directory.insert_file(&unsound::path::new("banana.rs"), File::new(b"use banana"));
+        directory.insert_file(unsound::path::new("banana.rs"), File::new(b"use banana"));
 
         let new_directory = Directory::root();
 
@@ -380,10 +380,10 @@ mod tests {
     #[test]
     fn test_modify_file() {
         let mut directory = Directory::root();
-        directory.insert_file(&unsound::path::new("banana.rs"), File::new(b"use banana"));
+        directory.insert_file(unsound::path::new("banana.rs"), File::new(b"use banana"));
 
         let mut new_directory = Directory::root();
-        new_directory.insert_file(&unsound::path::new("banana.rs"), File::new(b"use banana;"));
+        new_directory.insert_file(unsound::path::new("banana.rs"), File::new(b"use banana;"));
 
         let diff = Diff::diff(directory, new_directory).expect("diff failed");
 
@@ -406,7 +406,7 @@ mod tests {
 
         let mut new_directory = Directory::root();
         new_directory.insert_file(
-            &unsound::path::new("src/banana.rs"),
+            unsound::path::new("src/banana.rs"),
             File::new(b"use banana"),
         );
 
@@ -429,7 +429,7 @@ mod tests {
     fn test_delete_directory() {
         let mut directory = Directory::root();
         directory.insert_file(
-            &unsound::path::new("src/banana.rs"),
+            unsound::path::new("src/banana.rs"),
             File::new(b"use banana"),
         );
 
@@ -454,13 +454,13 @@ mod tests {
     fn test_modify_file_directory() {
         let mut directory = Directory::root();
         directory.insert_file(
-            &unsound::path::new("src/banana.rs"),
+            unsound::path::new("src/banana.rs"),
             File::new(b"use banana"),
         );
 
         let mut new_directory = Directory::root();
         new_directory.insert_file(
-            &unsound::path::new("src/banana.rs"),
+            unsound::path::new("src/banana.rs"),
             File::new(b"use banana;"),
         );
 

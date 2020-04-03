@@ -44,21 +44,21 @@ impl<K, A> SubTree<K, A> {
         }
     }
 
-    pub fn find(&self, keys: &NonEmpty<K>) -> Option<&Self>
+    pub fn find(&self, keys: NonEmpty<K>) -> Option<&Self>
     where
-        K: Ord + Clone,
+        K: Ord,
     {
-        let (head, tail) = keys.split_first();
-        let tail = NonEmpty::from_slice(tail);
+        let (head, tail) = keys.into();
+        let tail = NonEmpty::from_vec(tail);
         match self {
             SubTree::Node { key, .. } => match tail {
-                None if key == head => Some(self),
+                None if *key == head => Some(self),
                 _ => None,
             },
             SubTree::Branch { key, ref forest } => match tail {
-                None if key == head => Some(self),
+                None if *key == head => Some(self),
                 None => None,
-                Some(keys) => forest.find(&keys),
+                Some(keys) => forest.find(keys),
             },
         }
     }
@@ -123,19 +123,18 @@ impl<K, A> SubTree<K, A> {
         }
     }
 
-    pub fn map<F, B>(&self, f: F) -> SubTree<K, B>
+    pub fn map<F, B>(self, f: &mut F) -> SubTree<K, B>
     where
-        K: Clone,
-        F: Fn(&A) -> B,
+        F: FnMut(A) -> B,
     {
         match self {
             SubTree::Node { key, value } => SubTree::Node {
-                key: key.clone(),
+                key,
                 value: f(value),
             },
-            SubTree::Branch { key, ref forest } => SubTree::Branch {
-                key: key.clone(),
-                forest: Box::new(forest.map(&f)),
+            SubTree::Branch { key, forest } => SubTree::Branch {
+                key,
+                forest: Box::new(forest.map(f)),
             },
         }
     }
@@ -168,22 +167,24 @@ impl<K, A> Tree<K, A> {
     /// Create a new `Tree` that creates a series of
     /// `Branch`es built using the `keys`. The final `Branch`
     /// will contain the `node`.
-    fn new(keys: &NonEmpty<K>, node: A) -> Self
+    fn new(keys: NonEmpty<K>, node: A) -> Self
     where
-        K: Ord + Clone,
+        K: Ord,
     {
-        let (start, middle, last) = keys.split();
+        let (start, mut middle) = keys.into();
+        let last = middle.pop();
 
-        if start == last && middle.is_empty() {
-            Tree::node(last.clone(), node)
-        } else {
-            let mut branch = Tree::node(last.clone(), node);
+        match last {
+            None => Tree::node(start, node),
+            Some(last) => {
+                let mut branch = Tree::node(last, node);
 
-            for key in middle.iter().rev() {
-                branch = Tree(NonEmpty::new(SubTree::branch(key.clone(), branch)))
-            }
+                for key in middle.into_iter().rev() {
+                    branch = Tree(NonEmpty::new(SubTree::branch(key, branch)))
+                }
 
-            Tree::branch(start.clone(), branch)
+                Tree::branch(start, branch)
+            },
         }
     }
 
@@ -196,12 +197,11 @@ impl<K, A> Tree<K, A> {
         self.0.binary_search_by(|tree| tree.key().cmp(key))
     }
 
-    pub fn map<F, B>(&self, f: &F) -> Tree<K, B>
+    pub fn map<F, B>(self, mut f: F) -> Tree<K, B>
     where
-        K: Clone,
-        F: Fn(&A) -> B,
+        F: FnMut(A) -> B,
     {
-        Tree(self.0.map(|tree| tree.map(f)))
+        Tree(self.0.map(|tree| tree.map(&mut f)))
     }
 
     /// Insert a `node` into the list of sub-trees.
@@ -243,14 +243,14 @@ impl<K, A> Tree<K, A> {
     ///
     /// If the path does not exist it will be inserted into the set of
     /// sub-trees.
-    fn insert_with<F>(&mut self, keys: &NonEmpty<K>, value: A, f: F)
+    fn insert_with<F>(&mut self, keys: NonEmpty<K>, value: A, f: F)
     where
         F: FnOnce(&mut A),
-        K: Ord + Clone,
+        K: Ord,
     {
-        let (head, tail) = keys.split_first();
-        let maybe_keys = NonEmpty::from_slice(tail);
-        match self.search(head) {
+        let (head, tail) = keys.into();
+        let maybe_keys = NonEmpty::from_vec(tail);
+        match self.search(&head) {
             // Found the label in our set of sub-trees
             Ok(index) => match maybe_keys {
                 // The keys have been exhausted and so its time to insert the node
@@ -259,23 +259,18 @@ impl<K, A> Tree<K, A> {
                     match sub_tree {
                         // Our sub-tree was a node.
                         SubTree::Node { key, value } => {
-                            std::mem::replace(key, head.clone());
+                            std::mem::replace(key, head);
                             f(value);
                         },
-                        SubTree::Branch { .. } => {
-                            *sub_tree = SubTree::Node {
-                                key: head.clone(),
-                                value,
-                            }
-                        },
+                        SubTree::Branch { .. } => *sub_tree = SubTree::Node { key: head, value },
                     }
                 },
-                Some(ref keys) => {
+                Some(keys) => {
                     let sub_tree = self.0.get_mut(index).unwrap();
                     match sub_tree {
                         // We have reached a node, but still have keys left to get through.
                         SubTree::Node { .. } => {
-                            let new_tree = SubTree::branch(head.clone(), Tree::new(keys, value));
+                            let new_tree = SubTree::branch(head, Tree::new(keys, value));
                             *sub_tree = new_tree
                         },
                         // We keep moving down the set of keys to find where to insert this node.
@@ -287,25 +282,19 @@ impl<K, A> Tree<K, A> {
             Err(index) => match maybe_keys {
                 // We create the branch with the head label and node, since there are
                 // no more labels left.
-                None => self.0.insert(
-                    index,
-                    SubTree::Node {
-                        key: head.clone(),
-                        value,
-                    },
-                ),
+                None => self.0.insert(index, SubTree::Node { key: head, value }),
                 // We insert an entirely new branch with the full list of keys.
-                Some(ref tail) => self
+                Some(tail) => self
                     .0
-                    .insert(index, SubTree::branch(head.clone(), Tree::new(tail, value))),
+                    .insert(index, SubTree::branch(head, Tree::new(tail, value))),
             },
         }
     }
 
-    pub fn insert(&mut self, keys: &NonEmpty<K>, value: A)
+    pub fn insert(&mut self, keys: NonEmpty<K>, value: A)
     where
         A: Clone,
-        K: Ord + Clone,
+        K: Ord,
     {
         self.insert_with(keys, value.clone(), |old| *old = value)
     }
@@ -322,9 +311,9 @@ impl<K, A> Tree<K, A> {
         self.0.iter()
     }
 
-    pub fn find_node(&self, keys: &NonEmpty<K>) -> Option<&A>
+    pub fn find_node(&self, keys: NonEmpty<K>) -> Option<&A>
     where
-        K: Ord + Clone,
+        K: Ord,
     {
         self.find(keys).and_then(|tree| match tree {
             SubTree::Node { value, .. } => Some(value),
@@ -332,9 +321,9 @@ impl<K, A> Tree<K, A> {
         })
     }
 
-    pub fn find_branch(&self, keys: &NonEmpty<K>) -> Option<&Self>
+    pub fn find_branch(&self, keys: NonEmpty<K>) -> Option<&Self>
     where
-        K: Ord + Clone,
+        K: Ord,
     {
         self.find(keys).and_then(|tree| match tree {
             SubTree::Node { .. } => None,
@@ -344,13 +333,13 @@ impl<K, A> Tree<K, A> {
 
     /// Find a `SubTree` given a search path. If the path does not match
     /// it will return `None`.
-    pub fn find(&self, keys: &NonEmpty<K>) -> Option<&SubTree<K, A>>
+    pub fn find(&self, keys: NonEmpty<K>) -> Option<&SubTree<K, A>>
     where
-        K: Ord + Clone,
+        K: Ord,
     {
-        let (head, tail) = keys.split_first();
-        let tail = NonEmpty::from_slice(tail);
-        match self.search(head) {
+        let (head, tail) = keys.into();
+        let tail = NonEmpty::from_vec(tail);
+        match self.search(&head) {
             Err(_) => None,
             Ok(index) => {
                 let sub_tree = self.0.get(index).unwrap();
@@ -359,7 +348,10 @@ impl<K, A> Tree<K, A> {
                         SubTree::Node { .. } => Some(sub_tree),
                         SubTree::Branch { .. } => Some(sub_tree),
                     },
-                    Some(_) => sub_tree.find(&keys),
+                    Some(mut tail) => {
+                        tail.insert(0, head);
+                        sub_tree.find(tail)
+                    },
                 }
             },
         }
@@ -412,56 +404,62 @@ impl<K, A> Forest<K, A> {
     /// If the path does not exist it will be inserted into the set of
     /// sub-trees.
     #[allow(dead_code)]
-    pub fn insert(&mut self, keys: &NonEmpty<K>, node: A)
+    pub fn insert(&mut self, keys: NonEmpty<K>, node: A)
     where
         A: Clone,
-        K: Ord + Clone,
+        K: Ord,
     {
         self.insert_with(keys, node.clone(), |old| *old = node)
     }
 
-    pub fn insert_with<F>(&mut self, keys: &NonEmpty<K>, node: A, f: F)
+    pub fn insert_with<F>(&mut self, keys: NonEmpty<K>, node: A, f: F)
     where
         F: FnOnce(&mut A),
-        K: Ord + Clone,
+        K: Ord,
     {
-        let (prefix, node_key) = split_last(&keys);
+        let (prefix, node_key) = split_last(keys);
         match self.0.as_mut() {
-            Some(forest) => match NonEmpty::from_slice(&prefix) {
+            Some(forest) => match NonEmpty::from_vec(prefix) {
                 None => {
                     // Insert the node at the root
                     forest.insert_node_with(node_key, node, f)
                 },
-                Some(_) => forest.insert_with(keys, node, f),
+                Some(mut keys) => {
+                    keys.push(node_key);
+                    forest.insert_with(keys, node, f)
+                },
             },
-            None => match NonEmpty::from_slice(&prefix) {
+            None => match NonEmpty::from_vec(prefix) {
                 None => self.insert_forest(Tree::node(node_key, node)),
-                Some(_) => self.insert_forest(Tree::new(keys, node)),
+                Some(mut keys) => {
+                    keys.push(node_key);
+                    self.insert_forest(Tree::new(keys, node))
+                },
             },
         }
     }
 
-    pub fn find_node(&self, keys: &NonEmpty<K>) -> Option<&A>
+    pub fn find_node(&self, keys: NonEmpty<K>) -> Option<&A>
     where
-        K: Ord + Clone,
+        K: Ord,
     {
         self.0.as_ref().and_then(|trees| trees.find_node(keys))
     }
 
-    pub fn find_branch(&self, keys: &NonEmpty<K>) -> Option<&Tree<K, A>>
+    pub fn find_branch(&self, keys: NonEmpty<K>) -> Option<&Tree<K, A>>
     where
-        K: Ord + Clone,
+        K: Ord,
     {
         self.0.as_ref().and_then(|trees| trees.find_branch(keys))
     }
 
     /// Find a `SubTree` given a search path. If the path does not match
     /// it will return `None`.
-    pub fn find(&self, keys: &NonEmpty<K>) -> Option<&SubTree<K, A>>
+    pub fn find(&self, keys: NonEmpty<K>) -> Option<&SubTree<K, A>>
     where
-        K: Ord + Clone,
+        K: Ord,
     {
-        self.0.as_ref().and_then(|trees| trees.find(&keys))
+        self.0.as_ref().and_then(|trees| trees.find(keys))
     }
 
     #[allow(dead_code)]
@@ -499,7 +497,7 @@ mod tests {
 
         let a_node = TestNode { id: 1 };
 
-        tree.insert(&NonEmpty::new(String::from("a")), a_node);
+        tree.insert(NonEmpty::new(String::from("a")), a_node);
         assert!(!tree.is_empty());
     }
 
@@ -511,7 +509,7 @@ mod tests {
 
         let a_node = TestNode { id: 1 };
 
-        tree.insert(&NonEmpty::new(a_label), a_node.clone());
+        tree.insert(NonEmpty::new(a_label), a_node.clone());
 
         assert_eq!(tree, Forest(Some(Tree::node(String::from("a"), a_node))));
     }
@@ -526,12 +524,12 @@ mod tests {
         let b_node = TestNode { id: 2 };
 
         tree.insert_with(
-            &NonEmpty::new(a_label.clone()),
+            NonEmpty::new(a_label.clone()),
             NonEmpty::new(a_node.clone()),
             |nodes| nodes.insert(0, a_node.clone()),
         );
         tree.insert_with(
-            &NonEmpty::new(a_label),
+            NonEmpty::new(a_label),
             NonEmpty::new(b_node.clone()),
             |nodes| nodes.insert(0, b_node.clone()),
         );
@@ -556,10 +554,10 @@ mod tests {
         let a_node = TestNode { id: 1 };
         let b_node = TestNode { id: 2 };
 
-        tree.insert_with(&path.clone(), NonEmpty::new(a_node.clone()), |nodes| {
+        tree.insert_with(path.clone(), NonEmpty::new(a_node.clone()), |nodes| {
             nodes.insert(0, a_node.clone())
         });
-        tree.insert_with(&path, NonEmpty::new(b_node.clone()), |nodes| {
+        tree.insert_with(path, NonEmpty::new(b_node.clone()), |nodes| {
             nodes.insert(0, b_node.clone())
         });
 
@@ -583,7 +581,7 @@ mod tests {
 
         let c_node = TestNode { id: 1 };
 
-        tree.insert(&path, c_node.clone());
+        tree.insert(path, c_node.clone());
 
         assert_eq!(
             tree,
@@ -607,11 +605,11 @@ mod tests {
 
         let c_node = TestNode { id: 1 };
 
-        tree.insert(&c_path, c_node.clone());
+        tree.insert(c_path, c_node.clone());
 
         let d_node = TestNode { id: 3 };
 
-        tree.insert(&d_path, d_node.clone());
+        tree.insert(d_path, d_node.clone());
 
         assert_eq!(
             tree,
@@ -645,11 +643,11 @@ mod tests {
 
         let c_node = TestNode { id: 1 };
 
-        tree.insert(&c_path.clone(), c_node);
+        tree.insert(c_path.clone(), c_node);
 
         let new_c_node = TestNode { id: 3 };
 
-        tree.insert(&c_path, new_c_node.clone());
+        tree.insert(c_path, new_c_node.clone());
 
         assert_eq!(
             tree,
@@ -674,11 +672,11 @@ mod tests {
 
         let c_node = TestNode { id: 1 };
 
-        tree.insert(&NonEmpty::new(c_label.clone()), c_node);
+        tree.insert(NonEmpty::new(c_label.clone()), c_node);
 
         let new_c_node = TestNode { id: 3 };
 
-        tree.insert(&NonEmpty::new(c_label), new_c_node.clone());
+        tree.insert(NonEmpty::new(c_label), new_c_node.clone());
 
         assert_eq!(
             tree,
@@ -696,11 +694,11 @@ mod tests {
 
         let c_node = TestNode { id: 1 };
 
-        tree.insert(&c_path.clone(), c_node);
+        tree.insert(c_path.clone(), c_node);
 
         let new_c_node = TestNode { id: 3 };
 
-        tree.insert(&c_path, new_c_node.clone());
+        tree.insert(c_path, new_c_node.clone());
 
         assert_eq!(
             tree,
@@ -722,14 +720,11 @@ mod tests {
 
         let c_node = TestNode { id: 1 };
 
-        tree.insert(&c_path, c_node);
+        tree.insert(c_path, c_node);
 
         let new_c_node = TestNode { id: 3 };
 
-        tree.insert(
-            &NonEmpty::from((a_label, vec![b_label])),
-            new_c_node.clone(),
-        );
+        tree.insert(NonEmpty::from((a_label, vec![b_label])), new_c_node.clone());
 
         assert_eq!(
             tree,
@@ -752,11 +747,11 @@ mod tests {
 
         let b_node = TestNode { id: 1 };
 
-        tree.insert(&b_path, b_node);
+        tree.insert(b_path, b_node);
 
         let new_c_node = TestNode { id: 3 };
 
-        tree.insert(&c_path, new_c_node.clone());
+        tree.insert(c_path, new_c_node.clone());
 
         assert_eq!(
             tree,
@@ -786,11 +781,11 @@ mod tests {
 
         let b_node = TestNode { id: 1 };
 
-        tree.insert(&b_path, b_node);
+        tree.insert(b_path, b_node);
 
         let d_node = TestNode { id: 3 };
 
-        tree.insert(&d_path, d_node.clone());
+        tree.insert(d_path, d_node.clone());
 
         assert_eq!(
             tree,
@@ -817,11 +812,11 @@ mod tests {
 
         let d_node = TestNode { id: 3 };
 
-        tree.insert(&d_path, d_node.clone());
+        tree.insert(d_path, d_node.clone());
 
         let c_node = TestNode { id: 1 };
 
-        tree.insert(&c_path, c_node.clone());
+        tree.insert(c_path, c_node.clone());
 
         assert_eq!(
             tree,
@@ -865,9 +860,9 @@ mod tests {
 
         let f_node = TestNode { id: 2 };
 
-        tree.insert(&d_path, d_node.clone());
-        tree.insert(&c_path, c_node.clone());
-        tree.insert(&f_path, f_node.clone());
+        tree.insert(d_path, d_node.clone());
+        tree.insert(c_path, c_node.clone());
+        tree.insert(f_path, f_node.clone());
 
         assert_eq!(
             tree,
@@ -914,8 +909,8 @@ mod tests {
 
         let f_node = TestNode { id: 2 };
 
-        tree.insert(&c_path, c_node.clone());
-        tree.insert(&f_path, f_node.clone());
+        tree.insert(c_path, c_node.clone());
+        tree.insert(f_path, f_node.clone());
 
         assert_eq!(
             tree,
@@ -963,10 +958,10 @@ mod tests {
 
         let g_node = TestNode { id: 2 };
 
-        tree.insert(&d_path, d_node.clone());
-        tree.insert(&c_path, c_node.clone());
-        tree.insert(&e_path, e_node.clone());
-        tree.insert(&g_path, g_node.clone());
+        tree.insert(d_path, d_node.clone());
+        tree.insert(c_path, c_node.clone());
+        tree.insert(e_path, e_node.clone());
+        tree.insert(g_path, g_node.clone());
 
         assert_eq!(
             tree,
@@ -1009,17 +1004,17 @@ mod tests {
 
         let a_node = TestNode { id: 1 };
 
-        tree.insert(&NonEmpty::new(a_label), a_node.clone());
+        tree.insert(NonEmpty::new(a_label), a_node.clone());
 
         assert_eq!(
-            tree.find(&NonEmpty::new(String::from("a"))),
+            tree.find(NonEmpty::new(String::from("a"))),
             Some(&SubTree::Node {
                 key: String::from("a"),
                 value: a_node
             })
         );
 
-        assert_eq!(tree.find(&NonEmpty::new(String::from("b"))), None);
+        assert_eq!(tree.find(NonEmpty::new(String::from("b"))), None);
     }
 
     #[test]
@@ -1033,10 +1028,10 @@ mod tests {
 
         let c_node = TestNode { id: 1 };
 
-        tree.insert(&path, c_node.clone());
+        tree.insert(path, c_node.clone());
 
         assert_eq!(
-            tree.find(&NonEmpty::new(String::from("a"))),
+            tree.find(NonEmpty::new(String::from("a"))),
             Some(&SubTree::Branch {
                 key: String::from("a"),
                 forest: Box::new(Tree::branch(
@@ -1047,10 +1042,7 @@ mod tests {
         );
 
         assert_eq!(
-            tree.find(&NonEmpty::from((
-                String::from("a"),
-                vec![String::from("b")]
-            ))),
+            tree.find(NonEmpty::from((String::from("a"), vec![String::from("b")]))),
             Some(&SubTree::Branch {
                 key: String::from("b"),
                 forest: Box::new(Tree::node(String::from("c"), c_node.clone()))
@@ -1058,7 +1050,7 @@ mod tests {
         );
 
         assert_eq!(
-            tree.find(&NonEmpty::from((
+            tree.find(NonEmpty::from((
                 String::from("a"),
                 vec![String::from("b"), String::from("c")]
             ))),
@@ -1068,13 +1060,10 @@ mod tests {
             })
         );
 
-        assert_eq!(tree.find(&NonEmpty::new(String::from("b"))), None);
+        assert_eq!(tree.find(NonEmpty::new(String::from("b"))), None);
 
         assert_eq!(
-            tree.find(&NonEmpty::from((
-                String::from("a"),
-                vec![String::from("c")]
-            ))),
+            tree.find(NonEmpty::from((String::from("a"), vec![String::from("c")]))),
             None
         );
     }
@@ -1087,8 +1076,8 @@ mod tests {
 
         let b_node = TestNode { id: 3 };
 
-        tree.insert(&NonEmpty::new(String::from("a")), a_node.clone());
-        tree.insert(&NonEmpty::new(String::from("b")), b_node.clone());
+        tree.insert(NonEmpty::new(String::from("a")), a_node.clone());
+        tree.insert(NonEmpty::new(String::from("b")), b_node.clone());
 
         assert_eq!(tree.maximum_by(|a, b| a.id.cmp(&b.id)), Some(&b_node));
         assert_eq!(
@@ -1106,10 +1095,10 @@ mod tests {
         let b_node = TestNode { id: 3 };
 
         tree.insert(
-            &NonEmpty::from((String::from("c"), vec![String::from("a")])),
+            NonEmpty::from((String::from("c"), vec![String::from("a")])),
             a_node.clone(),
         );
-        tree.insert(&NonEmpty::new(String::from("b")), b_node.clone());
+        tree.insert(NonEmpty::new(String::from("b")), b_node.clone());
 
         assert_eq!(tree.maximum_by(|a, b| a.id.cmp(&b.id)), Some(&b_node));
         assert_eq!(
@@ -1127,11 +1116,11 @@ mod tests {
         let b_node = TestNode { id: 3 };
 
         tree.insert(
-            &NonEmpty::from((String::from("c"), vec![String::from("a")])),
+            NonEmpty::from((String::from("c"), vec![String::from("a")])),
             a_node.clone(),
         );
         tree.insert(
-            &NonEmpty::from((String::from("d"), vec![String::from("a")])),
+            NonEmpty::from((String::from("d"), vec![String::from("a")])),
             b_node.clone(),
         );
 
@@ -1151,11 +1140,11 @@ mod tests {
         let b_node = TestNode { id: 3 };
 
         tree.insert(
-            &NonEmpty::from((String::from("c"), vec![String::from("a")])),
+            NonEmpty::from((String::from("c"), vec![String::from("a")])),
             a_node.clone(),
         );
         tree.insert(
-            &NonEmpty::from((String::from("c"), vec![String::from("b")])),
+            NonEmpty::from((String::from("c"), vec![String::from("b")])),
             b_node.clone(),
         );
 
@@ -1174,8 +1163,8 @@ mod tests {
 
         let b_node = TestNode { id: 3 };
 
-        tree.insert(&NonEmpty::new(String::from("a")), a_node);
-        tree.insert(&NonEmpty::new(String::from("b")), b_node);
+        tree.insert(NonEmpty::new(String::from("a")), a_node);
+        tree.insert(NonEmpty::new(String::from("b")), b_node);
 
         assert_eq!(tree.iter().fold(0, |b, a| a.id + b), 4);
     }

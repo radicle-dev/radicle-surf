@@ -11,8 +11,8 @@ license = "GPL-3.0-or-later"
 
 [dependencies]
 git2 = "0.12"
-nonempty = "0.2"
 thiserror = "1.0"
+nonempty = "0.4"
 
 [dev-dependencies]
 pretty_assertions = "0.6"
