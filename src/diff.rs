@@ -61,7 +61,60 @@ pub struct ModifiedFile {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct FileDiff {
-    // TODO
+    pub lines: Vec<LineDiff>,
+}
+
+/// The content of a single line.
+pub type Line = Vec<u8>;
+
+/// Single line delta. Two of these are need to represented a modified line: one
+/// addition and one deletion. Context is also represented with this type.
+#[derive(Debug, PartialEq, Eq)]
+pub struct LineDiff {
+    /// Line number in old file or `None` for added line.
+    pub old_line_num: Option<u32>,
+    /// Line number in new file or `None` for deleted line.
+    pub new_line_num: Option<u32>,
+    /// Line content.
+    pub line: Line,
+}
+
+impl LineDiff {
+    pub fn addition(line: Line, line_num: u32) -> Self {
+        Self {
+            old_line_num: None,
+            new_line_num: Some(line_num),
+            line,
+        }
+    }
+
+    pub fn deletion(line: Line, line_num: u32) -> Self {
+        Self {
+            old_line_num: Some(line_num),
+            new_line_num: None,
+            line,
+        }
+    }
+
+    pub fn context(line: Line, line_num: u32) -> Self {
+        Self {
+            old_line_num: Some(line_num),
+            new_line_num: Some(line_num),
+            line,
+        }
+    }
+
+    pub fn is_addition(&self) -> bool {
+        self.old_line_num.is_none() && self.new_line_num.is_some()
+    }
+
+    pub fn is_deletion(&self) -> bool {
+        self.old_line_num.is_some() && self.new_line_num.is_none()
+    }
+
+    pub fn is_context(&self) -> bool {
+        self.old_line_num.is_some() && self.new_line_num.is_some()
+    }
 }
 
 impl Diff {
@@ -269,7 +322,7 @@ impl Diff {
         // https://nest.pijul.com/pijul_org/pijul:master/1468b7281a6f3785e9#anesp4Qdq3V
         self.modified.push(ModifiedFile {
             path: Diff::build_path(&name, parent_path),
-            diff: FileDiff {},
+            diff: FileDiff { lines: vec![] },
         });
     }
 
