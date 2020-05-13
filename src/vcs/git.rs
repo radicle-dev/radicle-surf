@@ -288,7 +288,7 @@ impl<'repo> Repository {
         let mut revwalk = self.0.revwalk()?;
 
         // Set the revwalk to the head commit
-        revwalk.push(commit_id.clone())?;
+        revwalk.push(*commit_id)?;
 
         for (id, commit_result) in revwalk.enumerate() {
             let parent_id = commit_result?;

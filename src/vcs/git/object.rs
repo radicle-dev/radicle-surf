@@ -16,7 +16,6 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::vcs::git::error::*;
-use git2;
 use std::{cmp::Ordering, convert::TryFrom, fmt, str};
 
 /// `Author` is the static information of a [`git2::Signature`].
