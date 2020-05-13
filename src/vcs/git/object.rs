@@ -67,6 +67,8 @@ pub struct Commit {
     pub message: String,
     /// The summary message of the commit.
     pub summary: String,
+    /// The parents of this commit.
+    pub parents: Vec<git2::Oid>,
 }
 
 impl<'repo> TryFrom<git2::Commit<'repo>> for Commit {
@@ -80,6 +82,7 @@ impl<'repo> TryFrom<git2::Commit<'repo>> for Commit {
         let message = str::from_utf8(message_raw)?.into();
         let summary_raw = commit.summary_bytes().expect("TODO");
         let summary = str::from_utf8(summary_raw)?.into();
+        let parents = commit.parent_ids().collect();
 
         Ok(Commit {
             id,
@@ -87,6 +90,7 @@ impl<'repo> TryFrom<git2::Commit<'repo>> for Commit {
             committer,
             message,
             summary,
+            parents,
         })
     }
 }

@@ -1126,6 +1126,21 @@ mod tests {
         }
 
         #[test]
+        fn commit_parents() -> Result<(), Error> {
+            let repo = Repository::new("./data/git-platinum")?;
+            let mut browser = Browser::new(repo)?;
+            browser.revspec("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
+            let commit = browser.history.first();
+
+            assert_eq!(
+                commit.parents,
+                vec![Oid::from_str("d6880352fc7fda8f521ae9b7357668b17bb5bad5")?]
+            );
+
+            Ok(())
+        }
+
+        #[test]
         fn commit_short() -> Result<(), Error> {
             let repo = Repository::new("./data/git-platinum")?;
             let mut browser = Browser::new(repo)?;
