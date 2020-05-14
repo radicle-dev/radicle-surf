@@ -91,3 +91,7 @@ mod nonempty;
 mod tree;
 
 pub use crate::vcs::git;
+
+#[cfg(test)]
+#[macro_use]
+extern crate pretty_assertions;
