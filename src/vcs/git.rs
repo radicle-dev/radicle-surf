@@ -1341,4 +1341,41 @@ mod tests {
             assert_eq!(root_last_commit_id, Some(browser.get().first().id));
         }
     }
+
+    #[test]
+    fn test_diff() {
+        use file_system::*;
+
+        let repo = Repository::new("./data/git-platinum").unwrap();
+
+        let commit = repo
+            .0
+            .find_commit(Oid::from_str("80bacafba303bf0cdf6142921f430ff265f25095").unwrap())
+            .unwrap();
+        let parent = commit.parent(0).unwrap();
+
+        let diff = repo.diff(&parent, &commit).unwrap();
+
+        assert_eq!(
+            Diff {
+                created: vec![],
+                deleted: vec![],
+                moved: vec![],
+                modified: vec![ModifiedFile {
+                    path: Path::with_root(&[unsound::label::new("README.md")]),
+                    diff: FileDiff {
+                        hunks: vec![Hunk {
+                            header: b"@@ -1 +1,2 @@\n".to_vec(),
+                            lines: vec![
+                                LineDiff::deletion(b"This repository is a data source for the Upstream front-end tests.\n".to_vec(), 1),
+                                LineDiff::addition(b"This repository is a data source for the Upstream front-end tests and the\n".to_vec(), 1),
+                                LineDiff::addition(b"[`radicle-surf`](https://github.com/radicle-dev/git-platinum) unit tests.\n".to_vec(), 2),
+                            ]
+                        }]
+                    }
+                }]
+            },
+            diff
+        );
+    }
 }
