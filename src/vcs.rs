@@ -132,13 +132,13 @@ type Snapshot<A, Repo, Error> = Box<dyn Fn(&Repo, &History<A>) -> Result<Directo
 /// A `Browser` is a way of rendering a `History` into a
 /// `Directory` snapshot, and the current `History` it is
 /// viewing.
-pub struct Browser<Repo, A, Error> {
+pub struct Browser<'a, Repo, A, Error> {
     snapshot: Snapshot<A, Repo, Error>,
     history: History<A>,
-    repository: Repo,
+    repository: &'a Repo,
 }
 
-impl<Repo, A, Error> Browser<Repo, A, Error> {
+impl<'a, Repo, A, Error> Browser<'a, Repo, A, Error> {
     /// Get the current `History` the `Browser` is viewing.
     pub fn get(&self) -> History<A>
     where
@@ -176,7 +176,7 @@ impl<Repo, A, Error> Browser<Repo, A, Error> {
     }
 }
 
-impl<Repo, A, Error> VCS<A, Error> for Browser<Repo, A, Error>
+impl<'a, Repo, A, Error> VCS<A, Error> for Browser<'a, Repo, A, Error>
 where
     Repo: VCS<A, Error>,
 {

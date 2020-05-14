@@ -14,7 +14,7 @@ thiserror = "1.0"
 nonempty = "0.4"
 
 [dependencies.git2]
-version = "0.13"
+version = "^0"
 default-features = false
 features = []
 

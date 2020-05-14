@@ -28,7 +28,7 @@
 //!
 //! // Pin the browser to a parituclar commit.
 //! let pin_commit = Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
-//! let mut browser = Browser::new(repo)?;
+//! let mut browser = Browser::new(&repo)?;
 //! browser.commit(pin_commit)?;
 //!
 //! let directory = browser.get_directory()?;
@@ -420,9 +420,9 @@ impl std::fmt::Debug for Repository {
 /// A [`crate::vcs::Browser`] that uses [`Repository`] as the underlying
 /// repository backend, [`git2::Commit`] as the artifact, and [`Error`] for
 /// error reporting.
-pub type Browser = vcs::Browser<Repository, Commit, Error>;
+pub type Browser<'a> = vcs::Browser<'a, Repository, Commit, Error>;
 
-impl Browser {
+impl<'a> Browser<'a> {
     /// Create a new browser to interact with.
     ///
     /// It uses the current `HEAD` as the starting [`History`].
@@ -439,12 +439,12 @@ impl Browser {
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let browser = Browser::new(repo)?;
+    /// let browser = Browser::new(&repo)?;
     /// #
     /// # Ok(())
     /// # }
     /// ```
-    pub fn new(repository: Repository) -> Result<Self, Error> {
+    pub fn new(repository: &'a Repository) -> Result<Self, Error> {
         let history = repository.head()?;
         let snapshot = Box::new(|repository: &Repository, history: &History| {
             let tree = Self::get_tree(&repository.0, history.0.first())?;
@@ -479,12 +479,15 @@ impl Browser {
     ///     .first()
     ///     .cloned()
     ///     .expect("failed to get first branch");
-    /// let browser = Browser::new_with_branch(repo, first_branch.name)?;
+    /// let browser = Browser::new_with_branch(&repo, first_branch.name)?;
     /// #
     /// # Ok(())
     /// # }
     /// ```
-    pub fn new_with_branch(repository: Repository, branch_name: BranchName) -> Result<Self, Error> {
+    pub fn new_with_branch(
+        repository: &'a Repository,
+        branch_name: BranchName,
+    ) -> Result<Self, Error> {
         let history = repository.get_history(branch_name.name().to_string())?;
         let snapshot = Box::new(|repository: &Repository, history: &History| {
             let tree = Self::get_tree(&repository.0, history.0.first())?;
@@ -512,7 +515,7 @@ impl Browser {
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(repo)?;
+    /// let mut browser = Browser::new(&repo)?;
     ///
     /// // ensure we're at HEAD
     /// browser.head();
@@ -547,7 +550,7 @@ impl Browser {
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(repo)?;
+    /// let mut browser = Browser::new(&repo)?;
     ///
     /// // ensure we're on 'master'
     /// browser.branch(BranchName::new("master"));
@@ -569,7 +572,7 @@ impl Browser {
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(repo)?;
+    /// let mut browser = Browser::new(&repo)?;
     /// browser.branch(BranchName::new("origin/dev"))?;
     ///
     /// let directory = browser.get_directory()?;
@@ -617,7 +620,7 @@ impl Browser {
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(repo)?;
+    /// let mut browser = Browser::new(&repo)?;
     ///
     /// // Switch to "v0.3.0"
     /// browser.tag(TagName::new("v0.3.0"))?;
@@ -674,7 +677,7 @@ impl Browser {
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(repo)?;
+    /// let mut browser = Browser::new(&repo)?;
     ///
     /// // Set to the initial commit
     /// let commit = Oid::from_str("e24124b7538658220b5aaf3b6ef53758f0a106dc")?;
@@ -722,7 +725,7 @@ impl Browser {
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(repo)?;
+    /// let mut browser = Browser::new(&repo)?;
     ///
     /// browser.revspec("refs/remotes/origin/dev")?;
     ///
@@ -774,7 +777,7 @@ impl Browser {
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(repo)?;
+    /// let mut browser = Browser::new(&repo)?;
     ///
     /// let branches = browser.list_branches(None)?;
     ///
@@ -813,7 +816,7 @@ impl Browser {
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(repo)?;
+    /// let mut browser = Browser::new(&repo)?;
     ///
     /// let tags = browser.list_tags()?;
     ///
@@ -854,7 +857,7 @@ impl Browser {
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(repo)?;
+    /// let mut browser = Browser::new(&repo)?;
     ///
     /// // Clamp the Browser to a particular commit
     /// let commit = Oid::from_str("d6880352fc7fda8f521ae9b7357668b17bb5bad5")?;
@@ -907,7 +910,7 @@ impl Browser {
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(repo)?;
+    /// let mut browser = Browser::new(&repo)?;
     ///
     /// let commit_with_signature_oid = Oid::from_str(
     ///     "e24124b7538658220b5aaf3b6ef53758f0a106dc"
@@ -1047,7 +1050,7 @@ mod tests {
     // An issue with submodules, see: https://github.com/radicle-dev/radicle-surf/issues/54
     fn test_submodule_failure() {
         let repo = Repository::new(".").unwrap();
-        let browser = Browser::new(repo).unwrap();
+        let browser = Browser::new(&repo).unwrap();
 
         browser.get_directory().unwrap();
     }
@@ -1070,7 +1073,7 @@ mod tests {
         #[test]
         fn _master() -> Result<(), Error> {
             let repo = Repository::new("./data/git-platinum")?;
-            let mut browser = Browser::new(repo)?;
+            let mut browser = Browser::new(&repo)?;
             browser.revspec("master")?;
 
             let commit1 = Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
@@ -1109,7 +1112,7 @@ mod tests {
         #[test]
         fn commit() -> Result<(), Error> {
             let repo = Repository::new("./data/git-platinum")?;
-            let mut browser = Browser::new(repo)?;
+            let mut browser = Browser::new(&repo)?;
             browser.revspec("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
 
             let commit1 = Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
@@ -1128,7 +1131,7 @@ mod tests {
         #[test]
         fn commit_parents() -> Result<(), Error> {
             let repo = Repository::new("./data/git-platinum")?;
-            let mut browser = Browser::new(repo)?;
+            let mut browser = Browser::new(&repo)?;
             browser.revspec("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
             let commit = browser.history.first();
 
@@ -1143,7 +1146,7 @@ mod tests {
         #[test]
         fn commit_short() -> Result<(), Error> {
             let repo = Repository::new("./data/git-platinum")?;
-            let mut browser = Browser::new(repo)?;
+            let mut browser = Browser::new(&repo)?;
             browser.revspec("3873745c8")?;
 
             let commit1 = Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
@@ -1162,7 +1165,7 @@ mod tests {
         #[test]
         fn tag() -> Result<(), Error> {
             let repo = Repository::new("./data/git-platinum")?;
-            let mut browser = Browser::new(repo)?;
+            let mut browser = Browser::new(&repo)?;
             browser.revspec("v0.2.0")?;
 
             let commit1 = Oid::from_str("2429f097664f9af0c5b7b389ab998b2199ffa977")?;
@@ -1183,7 +1186,7 @@ mod tests {
         fn readme_missing_and_memory() {
             let repo = Repository::new("./data/git-platinum")
                 .expect("Could not retrieve ./data/git-platinum as git repository");
-            let mut browser = Browser::new(repo).expect("Could not initialise Browser");
+            let mut browser = Browser::new(&repo).expect("Could not initialise Browser");
 
             // Set the browser history to the initial commit
             let commit = Oid::from_str("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3")
@@ -1216,7 +1219,7 @@ mod tests {
         fn folder_svelte() {
             let repo = Repository::new("./data/git-platinum")
                 .expect("Could not retrieve ./data/git-platinum as git repository");
-            let mut browser = Browser::new(repo).expect("Could not initialise Browser");
+            let mut browser = Browser::new(&repo).expect("Could not initialise Browser");
 
             // Check that last commit is the actual last commit even if head commit differs.
             let commit = Oid::from_str("19bec071db6474af89c866a1bd0e4b1ff76e2b97")
@@ -1238,7 +1241,7 @@ mod tests {
         fn nest_directory() {
             let repo = Repository::new("./data/git-platinum")
                 .expect("Could not retrieve ./data/git-platinum as git repository");
-            let mut browser = Browser::new(repo).expect("Could not initialise Browser");
+            let mut browser = Browser::new(&repo).expect("Could not initialise Browser");
 
             // Check that last commit is the actual last commit even if head commit differs.
             let commit = Oid::from_str("19bec071db6474af89c866a1bd0e4b1ff76e2b97")
@@ -1262,7 +1265,7 @@ mod tests {
         fn root() {
             let repo = Repository::new("./data/git-platinum")
                 .expect("Could not retrieve ./data/git-platinum as git repository");
-            let browser = Browser::new(repo).expect("Could not initialise Browser");
+            let browser = Browser::new(&repo).expect("Could not initialise Browser");
 
             let root_last_commit_id = browser
                 .last_commit(Path::root())
