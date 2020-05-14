@@ -1345,6 +1345,7 @@ mod tests {
     #[test]
     fn test_diff() {
         use file_system::*;
+        use pretty_assertions::assert_eq;
 
         let repo = Repository::new("./data/git-platinum").unwrap();
 
