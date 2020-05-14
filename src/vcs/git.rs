@@ -126,6 +126,7 @@ impl<'a> From<git2::DiffLine<'a>> for LineDiff {
             new_line_num: line.new_lineno(),
             // perf(cloudhead): This could get expensive with very large diffs.
             line: line.content().to_owned(),
+            origin: line.origin(),
         }
     }
 }
@@ -247,14 +248,20 @@ impl<'repo> Repository {
                     let patch = Patch::from_diff(&git_diff, idx)?;
 
                     if let Some(patch) = patch {
-                        for h in 0..patch.num_hunks() {
-                            let _hunk = patch.hunk(h)?;
+                        let mut hunks: Vec<Hunk> = Vec::new();
 
-                            for l in 0..patch.num_lines_in_hunk(h)? {
-                                let _line = patch.line_in_hunk(h, l)?;
+                        for h in 0..patch.num_hunks() {
+                            let (hunk, hunk_lines) = patch.hunk(h)?;
+                            let header = hunk.header().to_owned();
+                            let mut lines: Vec<LineDiff> = Vec::new();
+
+                            for l in 0..hunk_lines {
+                                let line = patch.line_in_hunk(h, l)?;
+                                lines.push(line.into());
                             }
+                            hunks.push(Hunk { header, lines });
                         }
-                        diff.add_modified_file(&label, &parent, vec![]);
+                        diff.add_modified_file(&label, &parent, hunks);
                     } else if diff_file.is_binary() {
                         // TODO
                     } else {

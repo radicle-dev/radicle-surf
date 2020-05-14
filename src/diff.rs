@@ -66,6 +66,7 @@ pub struct FileDiff {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Hunk {
+    pub header: Line,
     pub lines: Vec<LineDiff>,
 }
 
@@ -82,6 +83,8 @@ pub struct LineDiff {
     pub new_line_num: Option<u32>,
     /// Line content.
     pub line: Line,
+    /// Sigil showing origin of this `LineDiff`. Eg. `+`, `-`, etc.
+    pub origin: char,
 }
 
 impl LineDiff {
@@ -90,6 +93,7 @@ impl LineDiff {
             old_line_num: None,
             new_line_num: Some(line_num),
             line,
+            origin: '+',
         }
     }
 
@@ -98,6 +102,7 @@ impl LineDiff {
             old_line_num: Some(line_num),
             new_line_num: None,
             line,
+            origin: '-',
         }
     }
 
@@ -106,6 +111,7 @@ impl LineDiff {
             old_line_num: Some(line_num),
             new_line_num: Some(line_num),
             line,
+            origin: ' ',
         }
     }
 
@@ -452,7 +458,7 @@ mod tests {
             moved: vec![],
             modified: vec![ModifiedFile {
                 path: Path::with_root(&[unsound::label::new("banana.rs")]),
-                diff: FileDiff { lines: vec![] },
+                diff: FileDiff { hunks: vec![] },
             }],
         };
 
@@ -534,7 +540,7 @@ mod tests {
                     unsound::label::new("src"),
                     unsound::label::new("banana.rs"),
                 ]),
-                diff: FileDiff { lines: vec![] },
+                diff: FileDiff { hunks: vec![] },
             }],
         };
 
