@@ -259,7 +259,7 @@ impl<K, A> Tree<K, A> {
                     match sub_tree {
                         // Our sub-tree was a node.
                         SubTree::Node { key, value } => {
-                            std::mem::replace(key, head);
+                            let _ = std::mem::replace(key, head);
                             f(value);
                         },
                         SubTree::Branch { .. } => *sub_tree = SubTree::Node { key: head, value },

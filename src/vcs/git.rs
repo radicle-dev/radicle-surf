@@ -288,7 +288,7 @@ impl<'repo> Repository {
         let mut revwalk = self.0.revwalk()?;
 
         // Set the revwalk to the head commit
-        revwalk.push(commit_id.clone())?;
+        revwalk.push(*commit_id)?;
 
         for (id, commit_result) in revwalk.enumerate() {
             let parent_id = commit_result?;
@@ -1121,6 +1121,21 @@ mod tests {
                     None
                 })
                 .is_some());
+
+            Ok(())
+        }
+
+        #[test]
+        fn commit_parents() -> Result<(), Error> {
+            let repo = Repository::new("./data/git-platinum")?;
+            let mut browser = Browser::new(repo)?;
+            browser.revspec("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
+            let commit = browser.history.first();
+
+            assert_eq!(
+                commit.parents,
+                vec![Oid::from_str("d6880352fc7fda8f521ae9b7357668b17bb5bad5")?]
+            );
 
             Ok(())
         }
