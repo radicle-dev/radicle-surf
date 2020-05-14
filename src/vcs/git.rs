@@ -70,6 +70,7 @@ mod object;
 
 pub use crate::vcs::git::object::*;
 use crate::{
+    diff::*,
     file_system,
     file_system::directory,
     tree::*,
@@ -115,6 +116,17 @@ impl OrderedCommit {
 impl From<OrderedCommit> for Commit {
     fn from(ordered_commit: OrderedCommit) -> Self {
         ordered_commit.commit
+    }
+}
+
+impl<'a> From<git2::DiffLine<'a>> for LineDiff {
+    fn from(line: git2::DiffLine) -> Self {
+        Self {
+            old_line_num: line.old_lineno(),
+            new_line_num: line.new_lineno(),
+            // perf(cloudhead): This could get expensive with very large diffs.
+            line: line.content().to_owned(),
+        }
     }
 }
 
@@ -190,6 +202,71 @@ impl<'repo> Repository {
         let rev = self.rev(spec)?;
         let commit = rev.into_commit(&self.0)?;
         self.commit_to_history(commit)
+    }
+
+    /// Get the [`Diff`] between two commits.
+    pub fn diff(&self, from: &'repo git2::Commit, to: &'repo git2::Commit) -> Result<Diff, Error> {
+        use git2::{Delta, Patch};
+
+        let mut diff = Diff::new();
+        let git_diff = self.diff_commits(from, Some(to))?;
+
+        for (idx, delta) in git_diff.deltas().enumerate() {
+            match delta.status() {
+                Delta::Added => {
+                    let diff_file = delta.new_file();
+                    let path = diff_file.path().expect("file should have a path");
+                    let name = path.file_name().expect("path should have a name");
+                    let parent = path.parent().expect("path should have a parent");
+
+                    let label = file_system::Label::try_from(&*name.to_string_lossy())?;
+                    let parent = file_system::Path::try_from(parent.to_path_buf())?;
+
+                    diff.add_created_file(&label, &parent);
+                },
+                Delta::Deleted => {
+                    let diff_file = delta.old_file();
+                    let path = diff_file.path().expect("file should have a path");
+                    let name = path.file_name().expect("path should have a name");
+                    let parent = path.parent().expect("path should have a parent");
+
+                    let label = file_system::Label::try_from(&*name.to_string_lossy())?;
+                    let parent = file_system::Path::try_from(parent.to_path_buf())?;
+
+                    diff.add_deleted_file(&label, &parent);
+                },
+                Delta::Modified => {
+                    let diff_file = delta.new_file();
+                    let path = diff_file.path().expect("file should have a path");
+                    let name = path.file_name().expect("path should have a name");
+                    let parent = path.parent().expect("path should have a parent");
+
+                    let label = file_system::Label::try_from(&*name.to_string_lossy())?;
+                    let parent = file_system::Path::try_from(parent.to_path_buf())?;
+
+                    let patch = Patch::from_diff(&git_diff, idx)?;
+
+                    if let Some(patch) = patch {
+                        for h in 0..patch.num_hunks() {
+                            let _hunk = patch.hunk(h)?;
+
+                            for l in 0..patch.num_lines_in_hunk(h)? {
+                                let _line = patch.line_in_hunk(h, l)?;
+                            }
+                        }
+                        diff.add_modified_file(&label, &parent, vec![]);
+                    } else if diff_file.is_binary() {
+                        // TODO
+                    } else {
+                        unreachable!()
+                    }
+                },
+                _ => {},
+            }
+            //
+        }
+
+        Ok(diff)
     }
 
     /// Get a particular `Commit`.

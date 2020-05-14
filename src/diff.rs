@@ -118,7 +118,7 @@ impl LineDiff {
 }
 
 impl Diff {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Diff {
             created: Vec::new(),
             deleted: Vec::new(),
@@ -185,6 +185,7 @@ impl Diff {
                                     diff.add_modified_file(
                                         &new_file_name,
                                         &RefCell::borrow(parent_path),
+                                        vec![],
                                     );
                                 }
                                 old_entry_opt = old_iter.next();
@@ -316,17 +317,22 @@ impl Diff {
         CreateFile(Diff::build_path(&name, parent_path))
     }
 
-    fn add_modified_file(&mut self, name: &Label, parent_path: &Path) {
+    pub(crate) fn add_modified_file(
+        &mut self,
+        name: &Label,
+        parent_path: &Path,
+        lines: Vec<LineDiff>,
+    ) {
         // TODO: file diff can be calculated at this point
         // Use pijul's transaction diff as an inspiration?
         // https://nest.pijul.com/pijul_org/pijul:master/1468b7281a6f3785e9#anesp4Qdq3V
         self.modified.push(ModifiedFile {
             path: Diff::build_path(&name, parent_path),
-            diff: FileDiff { lines: vec![] },
+            diff: FileDiff { lines },
         });
     }
 
-    fn add_created_file(&mut self, name: &Label, parent_path: &Path) {
+    pub(crate) fn add_created_file(&mut self, name: &Label, parent_path: &Path) {
         self.created
             .push(Diff::convert_to_created(name, parent_path));
     }
@@ -342,7 +348,7 @@ impl Diff {
         Ok(())
     }
 
-    fn add_deleted_file(&mut self, name: &Label, parent_path: &Path) {
+    pub(crate) fn add_deleted_file(&mut self, name: &Label, parent_path: &Path) {
         self.deleted
             .push(Diff::convert_to_deleted(name, parent_path));
     }
@@ -446,7 +452,7 @@ mod tests {
             moved: vec![],
             modified: vec![ModifiedFile {
                 path: Path::with_root(&[unsound::label::new("banana.rs")]),
-                diff: FileDiff {},
+                diff: FileDiff { lines: vec![] },
             }],
         };
 
@@ -528,7 +534,7 @@ mod tests {
                     unsound::label::new("src"),
                     unsound::label::new("banana.rs"),
                 ]),
-                diff: FileDiff {},
+                diff: FileDiff { lines: vec![] },
             }],
         };
 
