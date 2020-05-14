@@ -41,7 +41,7 @@
 //! let repo = git::Repository::new("./data/git-platinum")?;
 //!
 //! // Here we initialise a new Broswer for a the git repo.
-//! let mut browser = git::Browser::new(repo)?;
+//! let mut browser = git::Browser::new(&repo)?;
 //!
 //! // Set the history to a particular commit
 //! let commit = git::Oid::from_str("80ded66281a4de2889cc07293a8f10947c6d57fe")?;

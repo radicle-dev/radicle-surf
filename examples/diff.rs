@@ -31,7 +31,7 @@ use radicle_surf::{
 fn main() {
     let options = get_options_or_exit();
     let repo = init_repository_or_exit(&options.path_to_repo);
-    let mut browser = init_browser_or_exit(repo);
+    let mut browser = git::Browser::new(&repo).expect("failed to create browser:");
 
     match options.head_revision {
         HeadRevision::HEAD => {
@@ -74,16 +74,6 @@ fn init_repository_or_exit(path_to_repo: &str) -> git::Repository {
         Ok(repo) => repo,
         Err(e) => {
             println!("Failed to create repository: {:?}", e);
-            std::process::exit(1);
-        },
-    }
-}
-
-fn init_browser_or_exit(repo: git::Repository) -> git::Browser {
-    match git::Browser::new(repo) {
-        Ok(browser) => browser,
-        Err(e) => {
-            println!("Failed to create browser: {:?}", e);
             std::process::exit(1);
         },
     }
