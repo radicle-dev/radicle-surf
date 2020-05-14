@@ -41,6 +41,12 @@ pub struct Diff {
     pub modified: Vec<ModifiedFile>,
 }
 
+impl Default for Diff {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct CreateFile(pub Path);
 
