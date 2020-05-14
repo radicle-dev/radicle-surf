@@ -61,6 +61,11 @@ pub struct ModifiedFile {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct FileDiff {
+    pub hunks: Vec<Hunk>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct Hunk {
     pub lines: Vec<LineDiff>,
 }
 
@@ -317,18 +322,13 @@ impl Diff {
         CreateFile(Diff::build_path(&name, parent_path))
     }
 
-    pub(crate) fn add_modified_file(
-        &mut self,
-        name: &Label,
-        parent_path: &Path,
-        lines: Vec<LineDiff>,
-    ) {
+    pub(crate) fn add_modified_file(&mut self, name: &Label, parent_path: &Path, hunks: Vec<Hunk>) {
         // TODO: file diff can be calculated at this point
         // Use pijul's transaction diff as an inspiration?
         // https://nest.pijul.com/pijul_org/pijul:master/1468b7281a6f3785e9#anesp4Qdq3V
         self.modified.push(ModifiedFile {
             path: Diff::build_path(&name, parent_path),
-            diff: FileDiff { lines },
+            diff: FileDiff { hunks },
         });
     }
 
