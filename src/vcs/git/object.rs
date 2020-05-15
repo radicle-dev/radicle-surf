@@ -165,6 +165,14 @@ impl Branch {
             locality: git2::BranchType::Local,
         }
     }
+
+    pub(crate) fn from_git_branch(
+        branch: git2::Branch,
+        locality: git2::BranchType,
+    ) -> Result<Self, Error> {
+        let name = BranchName::try_from(branch.name_bytes()?)?;
+        Ok(Branch { name, locality })
+    }
 }
 
 impl<'repo> TryFrom<git2::Reference<'repo>> for Branch {

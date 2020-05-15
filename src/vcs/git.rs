@@ -362,6 +362,39 @@ impl<'repo> Repository {
         }
     }
 
+    pub(crate) fn branch_contains(&self, commit: &Oid) -> Result<Vec<Branch>, Error> {
+        let branches = self
+            .0
+            .branches(Some(BranchType::Local))?
+            .collect::<Result<Vec<(git2::Branch, BranchType)>, git2::Error>>()?;
+
+        let mut contained_branches = vec![];
+
+        branches.into_iter().try_for_each(|(branch, locality)| {
+            self.reachable_from(&branch.get(), &commit)
+                .and_then(|contains| {
+                    if contains {
+                        let branch = Branch::from_git_branch(branch, locality)?;
+                        contained_branches.push(branch);
+                    }
+                    Ok(())
+                })
+        })?;
+
+        Ok(contained_branches)
+    }
+
+    fn reachable_from(&self, reference: &git2::Reference, commit: &Oid) -> Result<bool, Error> {
+        let other = reference.peel_to_commit()?.id();
+        let is_descendant = self.0.graph_descendant_of(other, *commit)?;
+
+        if other == *commit || is_descendant {
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
     /// Get the history of the file system where the head of the [`NonEmpty`] is
     /// the latest commit.
     fn file_history(
@@ -1038,6 +1071,42 @@ impl<'a> Browser<'a> {
         field: Option<&str>,
     ) -> Result<Option<Signature>, Error> {
         self.repository.extract_signature(&commit.id, field)
+    }
+
+    /// List the [`Branch`]es, which contain the provided [`Commit`].
+    ///
+    /// # Errors
+    ///
+    /// * [`error::Error::Git`]
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use radicle_surf::vcs::git::{Browser, Repository, Branch, BranchName, Oid};
+    /// # use std::error::Error;
+    ///
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let repo = Repository::new("./data/git-platinum")?;
+    /// let browser = Browser::new(&repo)?;
+    ///
+    /// let commit = Oid::from_str("27acd68c7504755aa11023300890bb85bbd69d45")?;
+    ///
+    /// assert_eq!(browser.branch_contains(&commit), Ok(vec![
+    ///     Branch::local(BranchName::new("dev")),
+    /// ]));
+    ///
+    /// // TODO(finto): I worry that this test will fail as other branches get added
+    /// let commit = Oid::from_str("1820cb07c1a890016ca5578aa652fd4d4c38967e")?;
+    /// assert_eq!(browser.branch_contains(&commit), Ok(vec![
+    ///     Branch::local(BranchName::new("dev")),
+    ///     Branch::local(BranchName::new("master")),
+    /// ]));
+    /// #
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn branch_contains(&self, commit: &Oid) -> Result<Vec<Branch>, Error> {
+        self.repository.branch_contains(&commit)
     }
 
     /// Do a pre-order TreeWalk of the given commit. This turns a Tree
