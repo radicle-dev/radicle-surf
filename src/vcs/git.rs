@@ -217,33 +217,21 @@ impl<'repo> Repository {
                 Delta::Added => {
                     let diff_file = delta.new_file();
                     let path = diff_file.path().expect("file should have a path");
-                    let name = path.file_name().expect("path should have a name");
-                    let parent = path.parent().expect("path should have a parent");
+                    let path = file_system::Path::try_from(path.to_path_buf()).unwrap();
 
-                    let label = file_system::Label::try_from(&*name.to_string_lossy())?;
-                    let parent = file_system::Path::try_from(parent.to_path_buf())?;
-
-                    diff.add_created_file(&label, &parent);
+                    diff.add_created_file(path);
                 },
                 Delta::Deleted => {
                     let diff_file = delta.old_file();
                     let path = diff_file.path().expect("file should have a path");
-                    let name = path.file_name().expect("path should have a name");
-                    let parent = path.parent().expect("path should have a parent");
+                    let path = file_system::Path::try_from(path.to_path_buf()).unwrap();
 
-                    let label = file_system::Label::try_from(&*name.to_string_lossy())?;
-                    let parent = file_system::Path::try_from(parent.to_path_buf())?;
-
-                    diff.add_deleted_file(&label, &parent);
+                    diff.add_deleted_file(path);
                 },
                 Delta::Modified => {
                     let diff_file = delta.new_file();
                     let path = diff_file.path().expect("file should have a path");
-                    let name = path.file_name().expect("path should have a name");
-                    let parent = path.parent().expect("path should have a parent");
-
-                    let label = file_system::Label::try_from(&*name.to_string_lossy())?;
-                    let parent = file_system::Path::try_from(parent.to_path_buf())?;
+                    let path = file_system::Path::try_from(path.to_path_buf()).unwrap();
 
                     let patch = Patch::from_diff(&git_diff, idx)?;
 
@@ -261,7 +249,7 @@ impl<'repo> Repository {
                             }
                             hunks.push(Hunk { header, lines });
                         }
-                        diff.add_modified_file(&label, &parent, hunks);
+                        diff.add_modified_file(path, hunks);
                     } else if diff_file.is_binary() {
                         // TODO
                     } else {
