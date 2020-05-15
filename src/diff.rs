@@ -83,54 +83,54 @@ pub type Line = Vec<u8>;
 /// addition and one deletion. Context is also represented with this type.
 #[derive(Debug, PartialEq, Eq)]
 pub struct LineDiff {
-    /// Line number in old file or `None` for added line.
-    pub old_line_num: Option<u32>,
-    /// Line number in new file or `None` for deleted line.
-    pub new_line_num: Option<u32>,
+    /// Line number in old or new file.
+    pub line_num: u32,
     /// Line content.
     pub line: Line,
-    /// Sigil showing origin of this `LineDiff`. Eg. `+`, `-`, etc.
-    pub origin: char,
+    /// Line diff kind, eg. addition or deletion.
+    pub kind: LineDiffKind,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum LineDiffKind {
+    Addition,
+    Deletion,
+    Context,
+}
+
+impl From<LineDiffKind> for char {
+    fn from(kind: LineDiffKind) -> Self {
+        match kind {
+            LineDiffKind::Addition => '+',
+            LineDiffKind::Deletion => '-',
+            LineDiffKind::Context => ' ',
+        }
+    }
 }
 
 impl LineDiff {
     pub fn addition(line: Line, line_num: u32) -> Self {
         Self {
-            old_line_num: None,
-            new_line_num: Some(line_num),
+            line_num,
             line,
-            origin: '+',
+            kind: LineDiffKind::Addition,
         }
     }
 
     pub fn deletion(line: Line, line_num: u32) -> Self {
         Self {
-            old_line_num: Some(line_num),
-            new_line_num: None,
+            line_num,
             line,
-            origin: '-',
+            kind: LineDiffKind::Deletion,
         }
     }
 
     pub fn context(line: Line, line_num: u32) -> Self {
         Self {
-            old_line_num: Some(line_num),
-            new_line_num: Some(line_num),
+            line_num,
             line,
-            origin: ' ',
+            kind: LineDiffKind::Context,
         }
-    }
-
-    pub fn is_addition(&self) -> bool {
-        self.old_line_num.is_none() && self.new_line_num.is_some()
-    }
-
-    pub fn is_deletion(&self) -> bool {
-        self.old_line_num.is_some() && self.new_line_num.is_none()
-    }
-
-    pub fn is_context(&self) -> bool {
-        self.old_line_num.is_some() && self.new_line_num.is_some()
     }
 }
 

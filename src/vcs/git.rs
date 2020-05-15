@@ -121,12 +121,11 @@ impl From<OrderedCommit> for Commit {
 
 impl<'a> From<git2::DiffLine<'a>> for LineDiff {
     fn from(line: git2::DiffLine) -> Self {
-        Self {
-            old_line_num: line.old_lineno(),
-            new_line_num: line.new_lineno(),
-            // perf(cloudhead): This could get expensive with very large diffs.
-            line: line.content().to_owned(),
-            origin: line.origin(),
+        match (line.old_lineno(), line.new_lineno()) {
+            (None, Some(n)) => Self::addition(line.content().to_owned(), n),
+            (Some(n), None) => Self::deletion(line.content().to_owned(), n),
+            (Some(_), Some(n)) => Self::context(line.content().to_owned(), n),
+            (None, None) => unreachable!(),
         }
     }
 }
