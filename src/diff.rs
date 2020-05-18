@@ -65,11 +65,13 @@ pub struct ModifiedFile {
     pub diff: FileDiff,
 }
 
+/// A set of changes belonging to one file.
 #[derive(Debug, PartialEq, Eq)]
 pub struct FileDiff {
     pub hunks: Vec<Hunk>,
 }
 
+/// A set of line changes.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Hunk {
     pub header: Line,
