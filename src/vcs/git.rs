@@ -572,6 +572,85 @@ impl<'a> Browser<'a> {
         }))
     }
 
+    /// Get the commit history for a file _or_ directory.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use nonempty::NonEmpty;
+    /// use radicle_surf::vcs::git::{Browser, Oid, Repository};
+    /// use radicle_surf::file_system::{Label, Path, SystemType};
+    /// use radicle_surf::file_system::unsound;
+    /// use std::str::FromStr;
+    /// # use std::error::Error;
+    ///
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let repo = Repository::new("./data/git-platinum")?;
+    /// let mut browser = Browser::new(&repo)?;
+    ///
+    /// // Clamp the Browser to a particular commit
+    /// let commit = Oid::from_str("223aaf87d6ea62eef0014857640fd7c8dd0f80b5")?;
+    /// browser.commit(commit)?;
+    ///
+    /// let root_commits: Vec<Oid> = browser
+    ///     .file_history(unsound::path::new("~"))?
+    ///     .into_iter()
+    ///     .map(|commit| commit.id)
+    ///     .collect();
+    ///
+    /// assert_eq!(root_commits,
+    ///     vec![
+    ///         Oid::from_str("223aaf87d6ea62eef0014857640fd7c8dd0f80b5")?,
+    ///         Oid::from_str("80bacafba303bf0cdf6142921f430ff265f25095")?,
+    ///         Oid::from_str("a57846bbc8ced6587bf8329fc4bce970eb7b757e")?,
+    ///         Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?,
+    ///         Oid::from_str("80ded66281a4de2889cc07293a8f10947c6d57fe")?,
+    ///         Oid::from_str("91b69e00cd8e5a07e20942e9e4457d83ce7a3ff1")?,
+    ///         Oid::from_str("1820cb07c1a890016ca5578aa652fd4d4c38967e")?,
+    ///         Oid::from_str("1e0206da8571ca71c51c91154e2fee376e09b4e7")?,
+    ///         Oid::from_str("e24124b7538658220b5aaf3b6ef53758f0a106dc")?,
+    ///         Oid::from_str("19bec071db6474af89c866a1bd0e4b1ff76e2b97")?,
+    ///         Oid::from_str("f3a089488f4cfd1a240a9c01b3fcc4c34a4e97b2")?,
+    ///         Oid::from_str("2429f097664f9af0c5b7b389ab998b2199ffa977")?,
+    ///         Oid::from_str("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3")?,
+    ///     ]
+    /// );
+    ///
+    /// let eval_commits: Vec<Oid> = browser
+    ///     .file_history(unsound::path::new("~/src/Eval.hs"))?
+    ///     .into_iter()
+    ///     .map(|commit| commit.id)
+    ///     .collect();
+    ///
+    /// assert_eq!(eval_commits,
+    ///     vec![
+    ///         Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?,
+    ///         Oid::from_str("e24124b7538658220b5aaf3b6ef53758f0a106dc")?,
+    ///     ]
+    /// );
+    /// #
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn file_history(&self, path: file_system::Path) -> Result<Vec<Commit>, Error> {
+        self.repository
+            .file_history(self.get().first().clone())
+            .and_then(|history| {
+                let subtree = history
+                    .find(path.clone().0)
+                    .ok_or_else(|| Error::PathNotFound(path))?;
+                let mut commits: Vec<repo::OrderedCommit> =
+                    NonEmpty::flatten(subtree.to_nonempty()).into();
+                commits.sort_by(|commit, other| commit.id.cmp(&other.id));
+                commits.dedup_by(|commit, other| commit.id == other.id);
+
+                Ok(commits
+                    .into_iter()
+                    .map(|ordered_commit| ordered_commit.commit)
+                    .collect())
+            })
+    }
+
     /// Extract the signature for a commit
     ///
     /// # Arguments
