@@ -101,6 +101,7 @@ pub struct LineDiff {
     pub kind: LineDiffKind,
 }
 
+/// The kind or "status" of a `LineDiff`.
 #[derive(Debug, PartialEq, Eq)]
 pub enum LineDiffKind {
     Addition,
@@ -298,8 +299,7 @@ impl Diff {
                 let mut path = parent_path.borrow().clone();
                 path.push(name.clone());
 
-                let mapped = mapper(path);
-                Ok(vec![mapped])
+                Ok(vec![mapper(path)])
             },
         }
     }
