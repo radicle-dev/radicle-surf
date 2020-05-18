@@ -21,6 +21,8 @@ use crate::file_system::{Directory, DirectoryContents, Path};
 use std::{cell::RefCell, cmp::Ordering, ops::Deref, rc::Rc};
 use thiserror::Error;
 
+pub mod git;
+
 #[derive(Debug, Error)]
 #[error("A diff error occurred: {reason}")]
 pub struct DiffError {

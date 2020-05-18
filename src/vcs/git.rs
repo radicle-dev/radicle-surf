@@ -70,6 +70,7 @@ mod object;
 
 pub use crate::vcs::git::object::*;
 use crate::{
+    diff,
     diff::*,
     file_system,
     file_system::directory,
@@ -116,19 +117,6 @@ impl OrderedCommit {
 impl From<OrderedCommit> for Commit {
     fn from(ordered_commit: OrderedCommit) -> Self {
         ordered_commit.commit
-    }
-}
-
-impl<'a> TryFrom<git2::DiffLine<'a>> for LineDiff {
-    type Error = &'static str;
-
-    fn try_from(line: git2::DiffLine) -> Result<Self, Self::Error> {
-        match (line.old_lineno(), line.new_lineno()) {
-            (None, Some(n)) => Ok(Self::addition(line.content().to_owned(), n)),
-            (Some(n), None) => Ok(Self::deletion(line.content().to_owned(), n)),
-            (Some(_), Some(n)) => Ok(Self::context(line.content().to_owned(), n)),
-            (None, None) => Err("invalid `git2::DiffLine`"),
-        }
     }
 }
 
@@ -219,7 +207,7 @@ impl<'repo> Repository {
                     let diff_file = delta.new_file();
                     let path = diff_file
                         .path()
-                        .ok_or(Error::GitDiff("couldn't retrieve file path"))?;
+                        .ok_or(Error::GitDiff(diff::git::Error::PathUnavailable))?;
                     let path = file_system::Path::try_from(path.to_path_buf())?;
 
                     diff.add_created_file(path);
@@ -228,7 +216,7 @@ impl<'repo> Repository {
                     let diff_file = delta.old_file();
                     let path = diff_file
                         .path()
-                        .ok_or(Error::GitDiff("couldn't retrieve file path"))?;
+                        .ok_or(Error::GitDiff(diff::git::Error::PathUnavailable))?;
                     let path = file_system::Path::try_from(path.to_path_buf())?;
 
                     diff.add_deleted_file(path);
@@ -237,7 +225,7 @@ impl<'repo> Repository {
                     let diff_file = delta.new_file();
                     let path = diff_file
                         .path()
-                        .ok_or(Error::GitDiff("couldn't retrieve file path"))?;
+                        .ok_or(Error::GitDiff(diff::git::Error::PathUnavailable))?;
                     let path = file_system::Path::try_from(path.to_path_buf())?;
 
                     let patch = Patch::from_diff(&git_diff, idx)?;
@@ -261,18 +249,18 @@ impl<'repo> Repository {
                     } else if diff_file.is_binary() {
                         diff.add_modified_binary_file(path);
                     } else {
-                        return Err(Error::GitDiff("couldn't retrieve patch"));
+                        return Err(Error::GitDiff(diff::git::Error::PatchUnavailable(path)));
                     }
                 },
                 Delta::Renamed => {
                     let old = delta
                         .old_file()
                         .path()
-                        .ok_or(Error::GitDiff("couldn't retrieve file path"))?;
+                        .ok_or(Error::GitDiff(diff::git::Error::PathUnavailable))?;
                     let new = delta
                         .new_file()
                         .path()
-                        .ok_or(Error::GitDiff("couldn't retrieve file path"))?;
+                        .ok_or(Error::GitDiff(diff::git::Error::PathUnavailable))?;
 
                     let old_path = file_system::Path::try_from(old.to_path_buf())?;
                     let new_path = file_system::Path::try_from(new.to_path_buf())?;
@@ -283,11 +271,11 @@ impl<'repo> Repository {
                     let old = delta
                         .old_file()
                         .path()
-                        .ok_or(Error::GitDiff("couldn't retrieve file path"))?;
+                        .ok_or(Error::GitDiff(diff::git::Error::PathUnavailable))?;
                     let new = delta
                         .new_file()
                         .path()
-                        .ok_or(Error::GitDiff("couldn't retrieve file path"))?;
+                        .ok_or(Error::GitDiff(diff::git::Error::PathUnavailable))?;
 
                     let old_path = file_system::Path::try_from(old.to_path_buf())?;
                     let new_path = file_system::Path::try_from(new.to_path_buf())?;
@@ -295,7 +283,7 @@ impl<'repo> Repository {
                     diff.add_copied_file(old_path, new_path);
                 },
                 status => {
-                    return Err(Error::GitDeltaUnhandled(status));
+                    return Err(Error::GitDiff(diff::git::Error::DeltaUnhandled(status)));
                 },
             }
         }

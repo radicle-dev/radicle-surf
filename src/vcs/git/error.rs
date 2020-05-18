@@ -19,6 +19,7 @@
 //! operations from [`crate::vcs::git`].
 
 use crate::{
+    diff,
     file_system::error as file_error,
     vcs::git::object::{BranchName, TagName},
 };
@@ -60,10 +61,7 @@ pub enum Error {
     Git(#[from] git2::Error),
     /// An error that comes from performing a *diff* operations.
     #[error("Git diff error: {0}")]
-    GitDiff(&'static str),
-    /// A Git delta type isn't currently handled.
-    #[error("Git delta type is not handled")]
-    GitDeltaUnhandled(git2::Delta),
+    GitDiff(diff::git::Error),
 }
 
 /// A private enum that captures a recoverable and
