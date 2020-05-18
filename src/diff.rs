@@ -345,6 +345,10 @@ impl Diff {
         });
     }
 
+    pub(crate) fn add_moved_file(&mut self, old_path: Path, new_path: Path) {
+        self.moved.push(MoveFile { old_path, new_path });
+    }
+
     pub(crate) fn add_modified_binary_file(&mut self, path: Path) {
         self.modified.push(ModifiedFile {
             path,
