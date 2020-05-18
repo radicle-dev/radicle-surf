@@ -61,6 +61,9 @@ pub enum Error {
     /// An error that comes from performing a *diff* operations.
     #[error("Git diff error: {0}")]
     GitDiff(&'static str),
+    /// A Git delta type isn't currently handled.
+    #[error("Git delta type is not handled")]
+    GitDeltaUnhandled(git2::Delta),
 }
 
 /// A private enum that captures a recoverable and

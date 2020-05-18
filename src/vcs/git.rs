@@ -294,7 +294,9 @@ impl<'repo> Repository {
 
                     diff.add_copied_file(old_path, new_path);
                 },
-                _ => {},
+                status => {
+                    return Err(Error::GitDeltaUnhandled(status));
+                },
             }
         }
 
