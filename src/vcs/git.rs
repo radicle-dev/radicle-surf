@@ -1089,24 +1089,28 @@ impl<'a> Browser<'a> {
     /// let repo = Repository::new("./data/git-platinum")?;
     /// let browser = Browser::new(&repo)?;
     ///
-    /// let commit = Oid::from_str("27acd68c7504755aa11023300890bb85bbd69d45")?;
     ///
-    /// assert_eq!(browser.revision_branches(&commit), Ok(vec![
-    ///     Branch::local(BranchName::new("dev")),
-    /// ]));
+    /// assert_eq!(
+    ///     browser.revision_branches("27acd68c7504755aa11023300890bb85bbd69d45"),
+    ///     Ok(vec![Branch::local(BranchName::new("dev"))])
+    /// );
     ///
     /// // TODO(finto): I worry that this test will fail as other branches get added
-    /// let commit = Oid::from_str("1820cb07c1a890016ca5578aa652fd4d4c38967e")?;
-    /// assert_eq!(browser.revision_branches(&commit), Ok(vec![
-    ///     Branch::local(BranchName::new("dev")),
-    ///     Branch::local(BranchName::new("master")),
-    /// ]));
+    /// assert_eq!(
+    ///     browser.revision_branches("1820cb07c1a890016ca5578aa652fd4d4c38967e"),
+    ///     Ok(vec![
+    ///         Branch::local(BranchName::new("dev")),
+    ///         Branch::local(BranchName::new("master")),
+    ///     ])
+    /// );
     /// #
     /// # Ok(())
     /// # }
     /// ```
-    pub fn revision_branches(&self, commit: &Oid) -> Result<Vec<Branch>, Error> {
-        self.repository.revision_branches(&commit)
+    pub fn revision_branches(&self, revspec: &str) -> Result<Vec<Branch>, Error> {
+        let rev = self.repository.rev(revspec)?;
+        let commit = rev.into_commit(&self.repository.0)?;
+        self.repository.revision_branches(&commit.id())
     }
 
     /// Do a pre-order TreeWalk of the given commit. This turns a Tree
