@@ -4,6 +4,7 @@ use thiserror::Error;
 
 use crate::{diff::LineDiff, file_system::Path};
 
+/// A Git diff error.
 #[derive(Debug, PartialEq, Error)]
 #[non_exhaustive]
 pub enum Error {
