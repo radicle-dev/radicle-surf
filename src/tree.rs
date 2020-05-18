@@ -63,7 +63,18 @@ impl<K, A> SubTree<K, A> {
         }
     }
 
-    fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = &A> + 'a> {
+    pub fn to_nonempty(&self) -> NonEmpty<A>
+    where
+        A: Clone,
+        K: Clone,
+    {
+        match self {
+            Self::Node { value, .. } => NonEmpty::new(value.clone()),
+            Self::Branch { forest, .. } => forest.to_nonempty(),
+        }
+    }
+
+    pub(crate) fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = &A> + 'a> {
         match self {
             SubTree::Node { value, .. } => Box::new(std::iter::once(value)),
             SubTree::Branch { ref forest, .. } => Box::new(forest.iter()),
@@ -297,6 +308,14 @@ impl<K, A> Tree<K, A> {
         K: Ord,
     {
         self.insert_with(keys, value.clone(), |old| *old = value)
+    }
+
+    pub fn to_nonempty(&self) -> NonEmpty<A>
+    where
+        A: Clone,
+        K: Clone,
+    {
+        self.0.clone().flat_map(|sub_tree| sub_tree.to_nonempty())
     }
 
     pub fn iter<'a>(&'a self) -> impl Iterator<Item = &A> + 'a {

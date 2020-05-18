@@ -11,7 +11,7 @@ license = "GPL-3.0-or-later"
 
 [dependencies]
 thiserror = "1.0"
-nonempty = "0.4"
+nonempty = "0.5"
 
 [dependencies.git2]
 version = ">= 0.10"
