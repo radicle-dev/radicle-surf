@@ -489,6 +489,12 @@ impl Repository {
     }
 }
 
+impl<'a> From<&'a Repository> for RepositoryRef<'a> {
+    fn from(repo: &'a Repository) -> Self {
+        repo.as_ref()
+    }
+}
+
 impl vcs::GetVCS<Error> for Repository {
     type RepoId = String;
 
