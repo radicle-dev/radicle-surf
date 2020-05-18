@@ -215,22 +215,28 @@ impl<'repo> Repository {
             match delta.status() {
                 Delta::Added => {
                     let diff_file = delta.new_file();
-                    let path = diff_file.path().expect("file should have a path");
-                    let path = file_system::Path::try_from(path.to_path_buf()).unwrap();
+                    let path = diff_file
+                        .path()
+                        .ok_or(Error::GitDiff("couldn't retrieve file path"))?;
+                    let path = file_system::Path::try_from(path.to_path_buf())?;
 
                     diff.add_created_file(path);
                 },
                 Delta::Deleted => {
                     let diff_file = delta.old_file();
-                    let path = diff_file.path().expect("file should have a path");
-                    let path = file_system::Path::try_from(path.to_path_buf()).unwrap();
+                    let path = diff_file
+                        .path()
+                        .ok_or(Error::GitDiff("couldn't retrieve file path"))?;
+                    let path = file_system::Path::try_from(path.to_path_buf())?;
 
                     diff.add_deleted_file(path);
                 },
                 Delta::Modified => {
                     let diff_file = delta.new_file();
-                    let path = diff_file.path().expect("file should have a path");
-                    let path = file_system::Path::try_from(path.to_path_buf()).unwrap();
+                    let path = diff_file
+                        .path()
+                        .ok_or(Error::GitDiff("couldn't retrieve file path"))?;
+                    let path = file_system::Path::try_from(path.to_path_buf())?;
 
                     let patch = Patch::from_diff(&git_diff, idx)?;
 

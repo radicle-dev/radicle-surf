@@ -58,6 +58,9 @@ pub enum Error {
     /// A wrapper around the generic [`git2::Error`].
     #[error(transparent)]
     Git(#[from] git2::Error),
+    /// An error that comes from performing a *diff* operations.
+    #[error("Git diff error: {0}")]
+    GitDiff(&'static str),
 }
 
 /// A private enum that captures a recoverable and
