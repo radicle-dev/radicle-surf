@@ -67,8 +67,9 @@ pub struct ModifiedFile {
 
 /// A set of changes belonging to one file.
 #[derive(Debug, PartialEq, Eq)]
-pub struct FileDiff {
-    pub hunks: Vec<Hunk>,
+pub enum FileDiff {
+    Binary,
+    Plain(Vec<Hunk>),
 }
 
 /// A set of line changes.
@@ -340,7 +341,14 @@ impl Diff {
         // https://nest.pijul.com/pijul_org/pijul:master/1468b7281a6f3785e9#anesp4Qdq3V
         self.modified.push(ModifiedFile {
             path,
-            diff: FileDiff { hunks },
+            diff: FileDiff::Plain(hunks),
+        });
+    }
+
+    pub(crate) fn add_modified_binary_file(&mut self, path: Path) {
+        self.modified.push(ModifiedFile {
+            path,
+            diff: FileDiff::Binary,
         });
     }
 

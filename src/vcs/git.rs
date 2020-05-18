@@ -256,7 +256,7 @@ impl<'repo> Repository {
                         }
                         diff.add_modified_file(path, hunks);
                     } else if diff_file.is_binary() {
-                        // TODO
+                        diff.add_modified_binary_file(path);
                     } else {
                         unreachable!()
                     }
