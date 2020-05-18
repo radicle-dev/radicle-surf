@@ -362,7 +362,7 @@ impl<'repo> Repository {
         }
     }
 
-    pub(crate) fn branch_contains(&self, commit: &Oid) -> Result<Vec<Branch>, Error> {
+    pub(crate) fn revision_branches(&self, commit: &Oid) -> Result<Vec<Branch>, Error> {
         let branches = self
             .0
             .branches(Some(BranchType::Local))?
@@ -1091,13 +1091,13 @@ impl<'a> Browser<'a> {
     ///
     /// let commit = Oid::from_str("27acd68c7504755aa11023300890bb85bbd69d45")?;
     ///
-    /// assert_eq!(browser.branch_contains(&commit), Ok(vec![
+    /// assert_eq!(browser.revision_branches(&commit), Ok(vec![
     ///     Branch::local(BranchName::new("dev")),
     /// ]));
     ///
     /// // TODO(finto): I worry that this test will fail as other branches get added
     /// let commit = Oid::from_str("1820cb07c1a890016ca5578aa652fd4d4c38967e")?;
-    /// assert_eq!(browser.branch_contains(&commit), Ok(vec![
+    /// assert_eq!(browser.revision_branches(&commit), Ok(vec![
     ///     Branch::local(BranchName::new("dev")),
     ///     Branch::local(BranchName::new("master")),
     /// ]));
@@ -1105,8 +1105,8 @@ impl<'a> Browser<'a> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn branch_contains(&self, commit: &Oid) -> Result<Vec<Branch>, Error> {
-        self.repository.branch_contains(&commit)
+    pub fn revision_branches(&self, commit: &Oid) -> Result<Vec<Branch>, Error> {
+        self.repository.revision_branches(&commit)
     }
 
     /// Do a pre-order TreeWalk of the given commit. This turns a Tree
