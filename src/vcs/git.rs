@@ -205,27 +205,21 @@ impl<'repo> Repository {
             match delta.status() {
                 Delta::Added => {
                     let diff_file = delta.new_file();
-                    let path = diff_file
-                        .path()
-                        .ok_or(Error::GitDiff(diff::git::Error::PathUnavailable))?;
+                    let path = diff_file.path().ok_or(diff::git::Error::PathUnavailable)?;
                     let path = file_system::Path::try_from(path.to_path_buf())?;
 
                     diff.add_created_file(path);
                 },
                 Delta::Deleted => {
                     let diff_file = delta.old_file();
-                    let path = diff_file
-                        .path()
-                        .ok_or(Error::GitDiff(diff::git::Error::PathUnavailable))?;
+                    let path = diff_file.path().ok_or(diff::git::Error::PathUnavailable)?;
                     let path = file_system::Path::try_from(path.to_path_buf())?;
 
                     diff.add_deleted_file(path);
                 },
                 Delta::Modified => {
                     let diff_file = delta.new_file();
-                    let path = diff_file
-                        .path()
-                        .ok_or(Error::GitDiff(diff::git::Error::PathUnavailable))?;
+                    let path = diff_file.path().ok_or(diff::git::Error::PathUnavailable)?;
                     let path = file_system::Path::try_from(path.to_path_buf())?;
 
                     let patch = Patch::from_diff(&git_diff, idx)?;
@@ -240,7 +234,7 @@ impl<'repo> Repository {
 
                             for l in 0..hunk_lines {
                                 let line = patch.line_in_hunk(h, l)?;
-                                let line = LineDiff::try_from(line).map_err(Error::GitDiff)?;
+                                let line = LineDiff::try_from(line)?;
                                 lines.push(line);
                             }
                             hunks.push(Hunk { header, lines });
@@ -249,18 +243,18 @@ impl<'repo> Repository {
                     } else if diff_file.is_binary() {
                         diff.add_modified_binary_file(path);
                     } else {
-                        return Err(Error::GitDiff(diff::git::Error::PatchUnavailable(path)));
+                        return Err(diff::git::Error::PatchUnavailable(path).into());
                     }
                 },
                 Delta::Renamed => {
                     let old = delta
                         .old_file()
                         .path()
-                        .ok_or(Error::GitDiff(diff::git::Error::PathUnavailable))?;
+                        .ok_or(diff::git::Error::PathUnavailable)?;
                     let new = delta
                         .new_file()
                         .path()
-                        .ok_or(Error::GitDiff(diff::git::Error::PathUnavailable))?;
+                        .ok_or(diff::git::Error::PathUnavailable)?;
 
                     let old_path = file_system::Path::try_from(old.to_path_buf())?;
                     let new_path = file_system::Path::try_from(new.to_path_buf())?;
@@ -271,11 +265,11 @@ impl<'repo> Repository {
                     let old = delta
                         .old_file()
                         .path()
-                        .ok_or(Error::GitDiff(diff::git::Error::PathUnavailable))?;
+                        .ok_or(diff::git::Error::PathUnavailable)?;
                     let new = delta
                         .new_file()
                         .path()
-                        .ok_or(Error::GitDiff(diff::git::Error::PathUnavailable))?;
+                        .ok_or(diff::git::Error::PathUnavailable)?;
 
                     let old_path = file_system::Path::try_from(old.to_path_buf())?;
                     let new_path = file_system::Path::try_from(new.to_path_buf())?;
@@ -283,7 +277,7 @@ impl<'repo> Repository {
                     diff.add_copied_file(old_path, new_path);
                 },
                 status => {
-                    return Err(Error::GitDiff(diff::git::Error::DeltaUnhandled(status)));
+                    return Err(diff::git::Error::DeltaUnhandled(status).into());
                 },
             }
         }

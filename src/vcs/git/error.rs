@@ -64,6 +64,12 @@ pub enum Error {
     GitDiff(diff::git::Error),
 }
 
+impl From<diff::git::Error> for Error {
+    fn from(other: diff::git::Error) -> Self {
+        Self::GitDiff(other)
+    }
+}
+
 /// A private enum that captures a recoverable and
 /// non-recoverable error when walking the git tree.
 ///
