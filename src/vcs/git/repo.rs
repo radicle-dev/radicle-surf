@@ -74,7 +74,9 @@ pub struct RepositoryRef<'a> {
     pub(super) repo_ref: &'a git2::Repository,
 }
 
-// RepositoryRef should be safe to share among threads since it is read-only
+// RepositoryRef should be safe to transfer across thread boundaries since it
+// only holds a reference to git2::Repository. git2::Repository is also Send
+// (see: https://docs.rs/git2/0.13.5/src/git2/repo.rs.html#46)
 unsafe impl<'a> Send for RepositoryRef<'a> {}
 
 impl<'a> RepositoryRef<'a> {
