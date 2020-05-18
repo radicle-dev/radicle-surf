@@ -261,7 +261,7 @@ impl<'repo> Repository {
                     } else if diff_file.is_binary() {
                         diff.add_modified_binary_file(path);
                     } else {
-                        unreachable!()
+                        return Err(Error::GitDiff("couldn't retrieve patch"));
                     }
                 },
                 _ => {},
