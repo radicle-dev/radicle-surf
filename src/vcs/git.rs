@@ -1040,4 +1040,32 @@ mod tests {
             Ok(())
         }
     }
+
+    #[cfg(test)]
+    mod threading {
+        use crate::vcs::git::*;
+        use std::sync::{Mutex, MutexGuard};
+
+        #[test]
+        fn basic_test() -> Result<(), Error> {
+            let shared_repo = Mutex::new(Repository::new("./data/git-platinum")?);
+            let locked_repo: MutexGuard<Repository> = shared_repo.lock().unwrap();
+            let bro = Browser::new(&*locked_repo)?;
+            let mut branches = bro.list_branches(None)?;
+            branches.sort();
+
+            assert_eq!(
+                branches,
+                vec![
+                    Branch::local(BranchName::new("dev")),
+                    Branch::local(BranchName::new("master")),
+                    Branch::remote(BranchName::new("origin/HEAD")),
+                    Branch::remote(BranchName::new("origin/dev")),
+                    Branch::remote(BranchName::new("origin/master")),
+                ]
+            );
+
+            Ok(())
+        }
+    }
 }
