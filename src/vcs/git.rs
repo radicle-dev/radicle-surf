@@ -112,8 +112,8 @@ impl<'a> Browser<'a> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn new(repository: &'a Repository) -> Result<Self, Error> {
-        let repository = repository.as_ref();
+    pub fn new(repository: impl Into<RepositoryRef<'a>>) -> Result<Self, Error> {
+        let repository = repository.into();
         let history = repository.head()?;
         let snapshot = Box::new(|repository: &RepositoryRef<'a>, history: &History| {
             let tree = Self::get_tree(&repository.repo_ref, history.0.first())?;
@@ -155,10 +155,10 @@ impl<'a> Browser<'a> {
     /// # }
     /// ```
     pub fn new_with_branch(
-        repository: &'a Repository,
+        repository: impl Into<RepositoryRef<'a>>,
         branch_name: BranchName,
     ) -> Result<Self, Error> {
-        let repository = repository.as_ref();
+        let repository = repository.into();
         let history = repository.get_history(branch_name.name().to_string())?;
         let snapshot = Box::new(|repository: &RepositoryRef<'a>, history: &History| {
             let tree = Self::get_tree(&repository.repo_ref, history.0.first())?;
