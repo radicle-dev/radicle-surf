@@ -1390,8 +1390,8 @@ mod tests {
                 copied: vec![],
                 modified: vec![ModifiedFile {
                     path: Path::with_root(&[unsound::label::new("README.md")]),
-                    diff: FileDiff {
-                        hunks: vec![Hunk {
+                    diff: FileDiff::Plain(
+                        vec![Hunk {
                             header: b"@@ -1 +1,2 @@\n".to_vec(),
                             lines: vec![
                                 LineDiff::deletion(b"This repository is a data source for the Upstream front-end tests.\n".to_vec(), 1),
@@ -1399,7 +1399,7 @@ mod tests {
                                 LineDiff::addition(b"[`radicle-surf`](https://github.com/radicle-dev/git-platinum) unit tests.\n".to_vec(), 2),
                             ]
                         }]
-                    }
+                    )
                 }]
             },
             diff
