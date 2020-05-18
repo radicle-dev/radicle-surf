@@ -119,13 +119,15 @@ impl From<OrderedCommit> for Commit {
     }
 }
 
-impl<'a> From<git2::DiffLine<'a>> for LineDiff {
-    fn from(line: git2::DiffLine) -> Self {
+impl<'a> TryFrom<git2::DiffLine<'a>> for LineDiff {
+    type Error = &'static str;
+
+    fn try_from(line: git2::DiffLine) -> Result<Self, Self::Error> {
         match (line.old_lineno(), line.new_lineno()) {
-            (None, Some(n)) => Self::addition(line.content().to_owned(), n),
-            (Some(n), None) => Self::deletion(line.content().to_owned(), n),
-            (Some(_), Some(n)) => Self::context(line.content().to_owned(), n),
-            (None, None) => unreachable!(),
+            (None, Some(n)) => Ok(Self::addition(line.content().to_owned(), n)),
+            (Some(n), None) => Ok(Self::deletion(line.content().to_owned(), n)),
+            (Some(_), Some(n)) => Ok(Self::context(line.content().to_owned(), n)),
+            (None, None) => Err("invalid `git2::DiffLine`"),
         }
     }
 }
@@ -250,7 +252,8 @@ impl<'repo> Repository {
 
                             for l in 0..hunk_lines {
                                 let line = patch.line_in_hunk(h, l)?;
-                                lines.push(line.into());
+                                let line = LineDiff::try_from(line).map_err(Error::GitDiff)?;
+                                lines.push(line);
                             }
                             hunks.push(Hunk { header, lines });
                         }
