@@ -147,7 +147,7 @@ impl<'a> RepositoryRef<'a> {
         use git2::{Delta, Patch};
 
         let mut diff = Diff::new();
-        let git_diff = self.diff_commits(from, Some(to))?;
+        let git_diff = self.diff_commits(Some(from), to)?;
 
         for (idx, delta) in git_diff.deltas().enumerate() {
             match delta.status() {
@@ -384,10 +384,9 @@ impl<'a> RepositoryRef<'a> {
         commit: &'a git2::Commit,
     ) -> Result<Vec<file_system::Path>, Error> {
         let mut parents = commit.parents();
-        let head = parents.next();
         let mut touched_files = vec![];
 
-        let mut add_deltas = |diff: git2::Diff| -> Result<(), Error> {
+        let add_deltas = |diff: git2::Diff| -> Result<(), Error> {
             let deltas = diff.deltas();
 
             for delta in deltas {
@@ -399,19 +398,13 @@ impl<'a> RepositoryRef<'a> {
             Ok(())
         };
 
-        match head {
+        match parents.next() {
             None => {
-                let diff = self.diff_commits(&commit, None)?;
-                add_deltas(diff)?;
+                self.diff_commits(None, &commit).and_then(add_deltas)?;
             },
             Some(parent) => {
-                let diff = self.diff_commits(&commit, Some(&parent))?;
-                add_deltas(diff)?;
-
-                for parent in parents {
-                    let diff = self.diff_commits(&commit, Some(&parent))?;
-                    add_deltas(diff)?;
-                }
+                self.diff_commits(Some(&parent), &commit)
+                    .and_then(add_deltas)?;
             },
         }
 
@@ -420,15 +413,15 @@ impl<'a> RepositoryRef<'a> {
 
     fn diff_commits(
         &self,
-        left: &'a git2::Commit,
-        right: Option<&'a git2::Commit>,
+        old_tree: Option<&'a git2::Commit>,
+        new_tree: &'a git2::Commit,
     ) -> Result<git2::Diff, Error> {
-        let left_tree = left.tree()?;
-        let right_tree = right.map_or(Ok(None), |commit| commit.tree().map(Some))?;
+        let new_tree = new_tree.tree()?;
+        let old_tree = old_tree.map_or(Ok(None), |commit| commit.tree().map(Some))?;
 
         let diff = self
             .repo_ref
-            .diff_tree_to_tree(Some(&left_tree), right_tree.as_ref(), None)?;
+            .diff_tree_to_tree(old_tree.as_ref(), Some(&new_tree), None)?;
 
         Ok(diff)
     }
