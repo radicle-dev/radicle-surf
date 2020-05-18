@@ -104,8 +104,11 @@ pub struct LineDiff {
 /// The kind or "status" of a `LineDiff`.
 #[derive(Debug, PartialEq, Eq)]
 pub enum LineDiffKind {
+    /// Line addition.
     Addition,
+    /// Line deletion.
     Deletion,
+    /// Line context.
     Context,
 }
 
