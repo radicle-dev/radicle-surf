@@ -17,9 +17,11 @@
 
 #![allow(dead_code, unused_variables, missing_docs)]
 
-use crate::file_system::{Directory, DirectoryContents, Label, Path};
+use crate::file_system::{Directory, DirectoryContents, Path};
 use std::{cell::RefCell, cmp::Ordering, ops::Deref, rc::Rc};
 use thiserror::Error;
+
+pub mod git;
 
 #[derive(Debug, Error)]
 #[error("A diff error occurred: {reason}")]
@@ -38,7 +40,14 @@ pub struct Diff {
     pub created: Vec<CreateFile>,
     pub deleted: Vec<DeleteFile>,
     pub moved: Vec<MoveFile>,
+    pub copied: Vec<CopyFile>,
     pub modified: Vec<ModifiedFile>,
+}
+
+impl Default for Diff {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -54,22 +63,100 @@ pub struct MoveFile {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+pub struct CopyFile {
+    pub old_path: Path,
+    pub new_path: Path,
+}
+
+#[derive(Debug, PartialEq, Eq)]
 pub struct ModifiedFile {
     pub path: Path,
     pub diff: FileDiff,
 }
 
+/// A set of changes belonging to one file.
 #[derive(Debug, PartialEq, Eq)]
-pub struct FileDiff {
-    // TODO
+pub enum FileDiff {
+    Binary,
+    Plain(Vec<Hunk>),
+}
+
+/// A set of line changes.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Hunk {
+    pub header: Line,
+    pub lines: Vec<LineDiff>,
+}
+
+/// The content of a single line.
+pub type Line = Vec<u8>;
+
+/// Single line delta. Two of these are need to represented a modified line: one
+/// addition and one deletion. Context is also represented with this type.
+#[derive(Debug, PartialEq, Eq)]
+pub struct LineDiff {
+    /// Line number in old or new file.
+    pub line_num: u32,
+    /// Line content.
+    pub line: Line,
+    /// Line diff kind, eg. addition or deletion.
+    pub kind: LineDiffKind,
+}
+
+/// The kind or "status" of a `LineDiff`.
+#[derive(Debug, PartialEq, Eq)]
+pub enum LineDiffKind {
+    /// Line addition.
+    Addition,
+    /// Line deletion.
+    Deletion,
+    /// Line context.
+    Context,
+}
+
+impl From<LineDiffKind> for char {
+    fn from(kind: LineDiffKind) -> Self {
+        match kind {
+            LineDiffKind::Addition => '+',
+            LineDiffKind::Deletion => '-',
+            LineDiffKind::Context => ' ',
+        }
+    }
+}
+
+impl LineDiff {
+    pub fn addition(line: Line, line_num: u32) -> Self {
+        Self {
+            line_num,
+            line,
+            kind: LineDiffKind::Addition,
+        }
+    }
+
+    pub fn deletion(line: Line, line_num: u32) -> Self {
+        Self {
+            line_num,
+            line,
+            kind: LineDiffKind::Deletion,
+        }
+    }
+
+    pub fn context(line: Line, line_num: u32) -> Self {
+        Self {
+            line_num,
+            line,
+            kind: LineDiffKind::Context,
+        }
+    }
 }
 
 impl Diff {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Diff {
             created: Vec::new(),
             deleted: Vec::new(),
             moved: Vec::new(),
+            copied: Vec::new(),
             modified: Vec::new(),
         }
     }
@@ -129,10 +216,10 @@ impl Diff {
                                 if old_file.size != new_file.size
                                     || old_file.checksum() != new_file.checksum()
                                 {
-                                    diff.add_modified_file(
-                                        &new_file_name,
-                                        &RefCell::borrow(parent_path),
-                                    );
+                                    let mut path = parent_path.borrow().clone();
+                                    path.push(new_file_name.clone());
+
+                                    diff.add_modified_file(path, vec![]);
                                 }
                                 old_entry_opt = old_iter.next();
                                 new_entry_opt = new_iter.next();
@@ -144,11 +231,12 @@ impl Diff {
                                 },
                                 DirectoryContents::Directory(old_dir),
                             ) => {
-                                diff.add_created_file(
-                                    &new_file_name,
-                                    &RefCell::borrow(parent_path),
-                                );
+                                let mut path = parent_path.borrow().clone();
+                                path.push(new_file_name.clone());
+
+                                diff.add_created_file(path);
                                 diff.add_deleted_files(old_entry, parent_path)?;
+
                                 old_entry_opt = old_iter.next();
                                 new_entry_opt = new_iter.next();
                             },
@@ -159,11 +247,12 @@ impl Diff {
                                     file: old_file,
                                 },
                             ) => {
+                                let mut path = parent_path.borrow().clone();
+                                path.push(old_file_name.clone());
+
                                 diff.add_created_files(new_entry, parent_path)?;
-                                diff.add_deleted_file(
-                                    &old_file_name,
-                                    &RefCell::borrow(parent_path),
-                                );
+                                diff.add_deleted_file(path);
+
                                 old_entry_opt = old_iter.next();
                                 new_entry_opt = new_iter.next();
                             },
@@ -207,13 +296,15 @@ impl Diff {
         mapper: F,
     ) -> Result<Vec<T>, String>
     where
-        F: Fn(&Label, &Path) -> T + Copy,
+        F: Fn(Path) -> T + Copy,
     {
         match entry {
             DirectoryContents::Directory(dir) => Diff::collect_files(dir, parent_path, mapper),
             DirectoryContents::File { name, .. } => {
-                let mapped = mapper(name, &RefCell::borrow(parent_path));
-                Ok(vec![mapped])
+                let mut path = parent_path.borrow().clone();
+                path.push(name.clone());
+
+                Ok(vec![mapper(path)])
             },
         }
     }
@@ -224,7 +315,7 @@ impl Diff {
         mapper: F,
     ) -> Result<Vec<T>, String>
     where
-        F: Fn(&Label, &Path) -> T + Copy,
+        F: Fn(Path) -> T + Copy,
     {
         let mut files: Vec<T> = Vec::new();
         Diff::collect_files_inner(dir, parent_path, mapper, &mut files)?;
@@ -238,7 +329,7 @@ impl Diff {
         files: &mut Vec<T>,
     ) -> Result<(), String>
     where
-        F: Fn(&Label, &Path) -> T + Copy,
+        F: Fn(Path) -> T + Copy,
     {
         parent_path.borrow_mut().push(dir.current());
         for entry in dir.iter() {
@@ -247,7 +338,9 @@ impl Diff {
                     Diff::collect_files_inner(&subdir, parent_path, mapper, files)?;
                 },
                 DirectoryContents::File { name, .. } => {
-                    files.push(mapper(&name, &RefCell::borrow(parent_path)));
+                    let mut path = parent_path.borrow().clone();
+                    path.push(name);
+                    files.push(mapper(path));
                 },
             }
         }
@@ -255,27 +348,33 @@ impl Diff {
         Ok(())
     }
 
-    fn convert_to_deleted(name: &Label, parent_path: &Path) -> DeleteFile {
-        DeleteFile(Diff::build_path(&name, parent_path))
-    }
-
-    fn convert_to_created(name: &Label, parent_path: &Path) -> CreateFile {
-        CreateFile(Diff::build_path(&name, parent_path))
-    }
-
-    fn add_modified_file(&mut self, name: &Label, parent_path: &Path) {
+    pub(crate) fn add_modified_file(&mut self, path: Path, hunks: Vec<Hunk>) {
         // TODO: file diff can be calculated at this point
         // Use pijul's transaction diff as an inspiration?
         // https://nest.pijul.com/pijul_org/pijul:master/1468b7281a6f3785e9#anesp4Qdq3V
         self.modified.push(ModifiedFile {
-            path: Diff::build_path(&name, parent_path),
-            diff: FileDiff {},
+            path,
+            diff: FileDiff::Plain(hunks),
         });
     }
 
-    fn add_created_file(&mut self, name: &Label, parent_path: &Path) {
-        self.created
-            .push(Diff::convert_to_created(name, parent_path));
+    pub(crate) fn add_moved_file(&mut self, old_path: Path, new_path: Path) {
+        self.moved.push(MoveFile { old_path, new_path });
+    }
+
+    pub(crate) fn add_copied_file(&mut self, old_path: Path, new_path: Path) {
+        self.copied.push(CopyFile { old_path, new_path });
+    }
+
+    pub(crate) fn add_modified_binary_file(&mut self, path: Path) {
+        self.modified.push(ModifiedFile {
+            path,
+            diff: FileDiff::Binary,
+        });
+    }
+
+    pub(crate) fn add_created_file(&mut self, path: Path) {
+        self.created.push(CreateFile(path));
     }
 
     fn add_created_files(
@@ -284,14 +383,13 @@ impl Diff {
         parent_path: &Rc<RefCell<Path>>,
     ) -> Result<(), String> {
         let mut new_files: Vec<CreateFile> =
-            Diff::collect_files_from_entry(dc, &parent_path, Diff::convert_to_created)?;
+            Diff::collect_files_from_entry(dc, &parent_path, CreateFile)?;
         self.created.append(&mut new_files);
         Ok(())
     }
 
-    fn add_deleted_file(&mut self, name: &Label, parent_path: &Path) {
-        self.deleted
-            .push(Diff::convert_to_deleted(name, parent_path));
+    pub(crate) fn add_deleted_file(&mut self, path: Path) {
+        self.deleted.push(DeleteFile(path));
     }
 
     fn add_deleted_files(
@@ -300,15 +398,9 @@ impl Diff {
         parent_path: &Rc<RefCell<Path>>,
     ) -> Result<(), String> {
         let mut new_files: Vec<DeleteFile> =
-            Diff::collect_files_from_entry(dc, &parent_path, Diff::convert_to_deleted)?;
+            Diff::collect_files_from_entry(dc, &parent_path, DeleteFile)?;
         self.deleted.append(&mut new_files);
         Ok(())
-    }
-
-    fn build_path(name: &Label, parent_path: &Path) -> Path {
-        let mut result_path = parent_path.clone();
-        result_path.push(name.clone());
-        result_path
     }
 }
 
@@ -334,6 +426,7 @@ mod tests {
                 "banana.rs",
             )]))],
             deleted: vec![],
+            copied: vec![],
             moved: vec![],
             modified: vec![],
         };
@@ -356,6 +449,7 @@ mod tests {
                 "banana.rs",
             )]))],
             moved: vec![],
+            copied: vec![],
             modified: vec![],
         };
 
@@ -391,9 +485,10 @@ mod tests {
             created: vec![],
             deleted: vec![],
             moved: vec![],
+            copied: vec![],
             modified: vec![ModifiedFile {
                 path: Path::with_root(&[unsound::label::new("banana.rs")]),
-                diff: FileDiff {},
+                diff: FileDiff::Plain(vec![]),
             }],
         };
 
@@ -419,6 +514,7 @@ mod tests {
             ]))],
             deleted: vec![],
             moved: vec![],
+            copied: vec![],
             modified: vec![],
         };
 
@@ -444,6 +540,7 @@ mod tests {
                 unsound::label::new("banana.rs"),
             ]))],
             moved: vec![],
+            copied: vec![],
             modified: vec![],
         };
 
@@ -470,12 +567,13 @@ mod tests {
             created: vec![],
             deleted: vec![],
             moved: vec![],
+            copied: vec![],
             modified: vec![ModifiedFile {
                 path: Path::with_root(&[
                     unsound::label::new("src"),
                     unsound::label::new("banana.rs"),
                 ]),
-                diff: FileDiff {},
+                diff: FileDiff::Plain(vec![]),
             }],
         };
 

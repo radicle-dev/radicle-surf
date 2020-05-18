@@ -70,6 +70,8 @@ mod object;
 
 pub use crate::vcs::git::object::*;
 use crate::{
+    diff,
+    diff::*,
     file_system,
     file_system::directory,
     tree::*,
@@ -190,6 +192,97 @@ impl<'repo> Repository {
         let rev = self.rev(spec)?;
         let commit = rev.into_commit(&self.0)?;
         self.commit_to_history(commit)
+    }
+
+    /// Get the [`Diff`] between two commits.
+    pub fn diff(&self, from: &'repo git2::Commit, to: &'repo git2::Commit) -> Result<Diff, Error> {
+        use git2::{Delta, Patch};
+
+        let mut diff = Diff::new();
+        let git_diff = self.diff_commits(from, Some(to))?;
+
+        for (idx, delta) in git_diff.deltas().enumerate() {
+            match delta.status() {
+                Delta::Added => {
+                    let diff_file = delta.new_file();
+                    let path = diff_file.path().ok_or(diff::git::Error::PathUnavailable)?;
+                    let path = file_system::Path::try_from(path.to_path_buf())?;
+
+                    diff.add_created_file(path);
+                },
+                Delta::Deleted => {
+                    let diff_file = delta.old_file();
+                    let path = diff_file.path().ok_or(diff::git::Error::PathUnavailable)?;
+                    let path = file_system::Path::try_from(path.to_path_buf())?;
+
+                    diff.add_deleted_file(path);
+                },
+                Delta::Modified => {
+                    let diff_file = delta.new_file();
+                    let path = diff_file.path().ok_or(diff::git::Error::PathUnavailable)?;
+                    let path = file_system::Path::try_from(path.to_path_buf())?;
+
+                    let patch = Patch::from_diff(&git_diff, idx)?;
+
+                    if let Some(patch) = patch {
+                        let mut hunks: Vec<Hunk> = Vec::new();
+
+                        for h in 0..patch.num_hunks() {
+                            let (hunk, hunk_lines) = patch.hunk(h)?;
+                            let header = hunk.header().to_owned();
+                            let mut lines: Vec<LineDiff> = Vec::new();
+
+                            for l in 0..hunk_lines {
+                                let line = patch.line_in_hunk(h, l)?;
+                                let line = LineDiff::try_from(line)?;
+                                lines.push(line);
+                            }
+                            hunks.push(Hunk { header, lines });
+                        }
+                        diff.add_modified_file(path, hunks);
+                    } else if diff_file.is_binary() {
+                        diff.add_modified_binary_file(path);
+                    } else {
+                        return Err(diff::git::Error::PatchUnavailable(path).into());
+                    }
+                },
+                Delta::Renamed => {
+                    let old = delta
+                        .old_file()
+                        .path()
+                        .ok_or(diff::git::Error::PathUnavailable)?;
+                    let new = delta
+                        .new_file()
+                        .path()
+                        .ok_or(diff::git::Error::PathUnavailable)?;
+
+                    let old_path = file_system::Path::try_from(old.to_path_buf())?;
+                    let new_path = file_system::Path::try_from(new.to_path_buf())?;
+
+                    diff.add_moved_file(old_path, new_path);
+                },
+                Delta::Copied => {
+                    let old = delta
+                        .old_file()
+                        .path()
+                        .ok_or(diff::git::Error::PathUnavailable)?;
+                    let new = delta
+                        .new_file()
+                        .path()
+                        .ok_or(diff::git::Error::PathUnavailable)?;
+
+                    let old_path = file_system::Path::try_from(old.to_path_buf())?;
+                    let new_path = file_system::Path::try_from(new.to_path_buf())?;
+
+                    diff.add_copied_file(old_path, new_path);
+                },
+                status => {
+                    return Err(diff::git::Error::DeltaUnhandled(status).into());
+                },
+            }
+        }
+
+        Ok(diff)
     }
 
     /// Get a particular `Commit`.
@@ -1274,5 +1367,44 @@ mod tests {
 
             assert_eq!(root_last_commit_id, Some(browser.get().first().id));
         }
+    }
+
+    #[test]
+    fn test_diff() {
+        use file_system::*;
+        use pretty_assertions::assert_eq;
+
+        let repo = Repository::new("./data/git-platinum").unwrap();
+
+        let commit = repo
+            .0
+            .find_commit(Oid::from_str("80bacafba303bf0cdf6142921f430ff265f25095").unwrap())
+            .unwrap();
+        let parent = commit.parent(0).unwrap();
+
+        let diff = repo.diff(&parent, &commit).unwrap();
+
+        assert_eq!(
+            Diff {
+                created: vec![],
+                deleted: vec![],
+                moved: vec![],
+                copied: vec![],
+                modified: vec![ModifiedFile {
+                    path: Path::with_root(&[unsound::label::new("README.md")]),
+                    diff: FileDiff::Plain(
+                        vec![Hunk {
+                            header: b"@@ -1 +1,2 @@\n".to_vec(),
+                            lines: vec![
+                                LineDiff::deletion(b"This repository is a data source for the Upstream front-end tests.\n".to_vec(), 1),
+                                LineDiff::addition(b"This repository is a data source for the Upstream front-end tests and the\n".to_vec(), 1),
+                                LineDiff::addition(b"[`radicle-surf`](https://github.com/radicle-dev/git-platinum) unit tests.\n".to_vec(), 2),
+                            ]
+                        }]
+                    )
+                }]
+            },
+            diff
+        );
     }
 }

@@ -19,6 +19,7 @@
 //! operations from [`crate::vcs::git`].
 
 use crate::{
+    diff,
     file_system::error as file_error,
     vcs::git::object::{BranchName, TagName},
 };
@@ -58,6 +59,15 @@ pub enum Error {
     /// A wrapper around the generic [`git2::Error`].
     #[error(transparent)]
     Git(#[from] git2::Error),
+    /// An error that comes from performing a *diff* operations.
+    #[error("Git diff error: {0}")]
+    GitDiff(diff::git::Error),
+}
+
+impl From<diff::git::Error> for Error {
+    fn from(other: diff::git::Error) -> Self {
+        Self::GitDiff(other)
+    }
 }
 
 /// A private enum that captures a recoverable and
