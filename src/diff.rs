@@ -38,6 +38,7 @@ pub struct Diff {
     pub created: Vec<CreateFile>,
     pub deleted: Vec<DeleteFile>,
     pub moved: Vec<MoveFile>,
+    pub copied: Vec<CopyFile>,
     pub modified: Vec<ModifiedFile>,
 }
 
@@ -55,6 +56,12 @@ pub struct DeleteFile(pub Path);
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct MoveFile {
+    pub old_path: Path,
+    pub new_path: Path,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct CopyFile {
     pub old_path: Path,
     pub new_path: Path,
 }
@@ -143,6 +150,7 @@ impl Diff {
             created: Vec::new(),
             deleted: Vec::new(),
             moved: Vec::new(),
+            copied: Vec::new(),
             modified: Vec::new(),
         }
     }
@@ -349,6 +357,10 @@ impl Diff {
         self.moved.push(MoveFile { old_path, new_path });
     }
 
+    pub(crate) fn add_copied_file(&mut self, old_path: Path, new_path: Path) {
+        self.copied.push(CopyFile { old_path, new_path });
+    }
+
     pub(crate) fn add_modified_binary_file(&mut self, path: Path) {
         self.modified.push(ModifiedFile {
             path,
@@ -409,6 +421,7 @@ mod tests {
                 "banana.rs",
             )]))],
             deleted: vec![],
+            copied: vec![],
             moved: vec![],
             modified: vec![],
         };
@@ -431,6 +444,7 @@ mod tests {
                 "banana.rs",
             )]))],
             moved: vec![],
+            copied: vec![],
             modified: vec![],
         };
 
@@ -466,9 +480,10 @@ mod tests {
             created: vec![],
             deleted: vec![],
             moved: vec![],
+            copied: vec![],
             modified: vec![ModifiedFile {
                 path: Path::with_root(&[unsound::label::new("banana.rs")]),
-                diff: FileDiff { hunks: vec![] },
+                diff: FileDiff::Plain(vec![]),
             }],
         };
 
@@ -494,6 +509,7 @@ mod tests {
             ]))],
             deleted: vec![],
             moved: vec![],
+            copied: vec![],
             modified: vec![],
         };
 
@@ -519,6 +535,7 @@ mod tests {
                 unsound::label::new("banana.rs"),
             ]))],
             moved: vec![],
+            copied: vec![],
             modified: vec![],
         };
 
@@ -545,12 +562,13 @@ mod tests {
             created: vec![],
             deleted: vec![],
             moved: vec![],
+            copied: vec![],
             modified: vec![ModifiedFile {
                 path: Path::with_root(&[
                     unsound::label::new("src"),
                     unsound::label::new("banana.rs"),
                 ]),
-                diff: FileDiff { hunks: vec![] },
+                diff: FileDiff::Plain(vec![]),
             }],
         };
 

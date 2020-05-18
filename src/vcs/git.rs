@@ -279,6 +279,21 @@ impl<'repo> Repository {
 
                     diff.add_moved_file(old_path, new_path);
                 },
+                Delta::Copied => {
+                    let old = delta
+                        .old_file()
+                        .path()
+                        .ok_or(Error::GitDiff("couldn't retrieve file path"))?;
+                    let new = delta
+                        .new_file()
+                        .path()
+                        .ok_or(Error::GitDiff("couldn't retrieve file path"))?;
+
+                    let old_path = file_system::Path::try_from(old.to_path_buf())?;
+                    let new_path = file_system::Path::try_from(new.to_path_buf())?;
+
+                    diff.add_copied_file(old_path, new_path);
+                },
                 _ => {},
             }
         }
@@ -1372,6 +1387,7 @@ mod tests {
                 created: vec![],
                 deleted: vec![],
                 moved: vec![],
+                copied: vec![],
                 modified: vec![ModifiedFile {
                     path: Path::with_root(&[unsound::label::new("README.md")]),
                     diff: FileDiff {
