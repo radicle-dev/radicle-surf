@@ -44,10 +44,10 @@ pub(crate) fn label_has_slash(item: &str) -> Error {
 pub enum Error {
     /// A `LabelError` specific error for parsing a
     /// [`Path`](super::path::Label).
-    #[error("malformed label: {0}")]
+    #[error(transparent)]
     Label(#[from] LabelError),
     /// A `PathError` specific error for parsing a [`Path`](super::path::Path).
-    #[error("malformed path: {0}")]
+    #[error(transparent)]
     Path(#[from] PathError),
 }
 
