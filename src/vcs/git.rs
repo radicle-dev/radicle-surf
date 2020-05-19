@@ -1086,18 +1086,20 @@ impl<'a> Browser<'a> {
     /// let browser = Browser::new(&repo)?;
     ///
     ///
+    /// let branches = browser.revision_branches("27acd68c7504755aa11023300890bb85bbd69d45")?;
     /// assert_eq!(
-    ///     browser.revision_branches("27acd68c7504755aa11023300890bb85bbd69d45"),
-    ///     Ok(vec![Branch::local(BranchName::new("dev"))])
+    ///     branches,
+    ///     vec![Branch::local(BranchName::new("dev"))]
     /// );
     ///
     /// // TODO(finto): I worry that this test will fail as other branches get added
+    /// let branches = browser.revision_branches("1820cb07c1a890016ca5578aa652fd4d4c38967e")?;
     /// assert_eq!(
-    ///     browser.revision_branches("1820cb07c1a890016ca5578aa652fd4d4c38967e"),
-    ///     Ok(vec![
+    ///     branches,
+    ///     vec![
     ///         Branch::local(BranchName::new("dev")),
     ///         Branch::local(BranchName::new("master")),
-    ///     ])
+    ///     ]
     /// );
     /// #
     /// # Ok(())
