@@ -15,7 +15,24 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{env, path::Path, process::Command};
+use std::{
+    env,
+    path::Path,
+    process::{Command, ExitStatus},
+};
+
+fn checkout(curr_dir: &Path, branch: &str) -> ExitStatus {
+    let mut git_checkout = "git checkout ".to_string();
+    git_checkout.push_str(branch);
+
+    Command::new("git")
+        .arg("submodule")
+        .arg("foreach")
+        .arg(&git_checkout)
+        .current_dir(&curr_dir)
+        .status()
+        .unwrap_or_else(|_| panic!("Failed to execute `git submodule update {}`", git_checkout))
+}
 
 fn main() {
     // Path set up for the project directory
@@ -23,13 +40,20 @@ fn main() {
     let curr_dir = Path::new(&manifest_dir);
 
     // Run `git submodule update --init`
-    Command::new("git")
+    let init = Command::new("git")
         .arg("submodule")
         .arg("update")
         .arg("--init")
         .current_dir(&curr_dir)
         .status()
         .expect("Failed to execute `git submodule update --init`");
+    assert!(init.success(), "init of submodule failed");
+
+    let dev_status = checkout(curr_dir, "dev");
+    assert!(dev_status.success(), "failed to checkout dev");
+
+    let master_status = checkout(curr_dir, "master");
+    assert!(master_status.success(), "failed to checkout master");
 
     // Tell the build script that we should re-run this if git-platinum changes.
     println!("cargo:rerun-if-changed=data/git-platinum");
