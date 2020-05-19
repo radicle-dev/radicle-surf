@@ -20,7 +20,7 @@
 
 use crate::{
     diff,
-    file_system::error as file_error,
+    file_system,
     vcs::git::object::{BranchName, TagName},
 };
 use std::str;
@@ -33,41 +33,38 @@ pub enum Error {
     /// The user tried to fetch a branch, but the name provided does not
     /// exist as a branch. This could mean that the branch does not exist
     /// or that a tag or commit was provided by accident.
-    #[error("Provided branch name does not exist: {0}")]
+    #[error("provided branch name does not exist: {0}")]
     NotBranch(BranchName),
     /// The user tried to fetch a tag, but the name provided does not
     /// exist as a tag. This could mean that the tag does not exist
     /// or that a branch or commit was provided by accident.
-    #[error("Provided tag name does not exist: {0}")]
+    #[error("provided tag name does not exist: {0}")]
     NotTag(TagName),
     /// A `revspec` was provided that could not be parsed into a branch, tag, or
     /// commit object.
-    #[error("Provided revspec could not be parsed into a git object: {0}")]
+    #[error("provided revspec could not be parsed into a git object: {0}")]
     RevParseFailure(String),
     /// A [`str::Utf8Error`] error, which usually occurs when a git object's
     /// name is not in UTF-8 form and parsing of it as such fails.
-    #[error("Git object name is invalid UTF-8: {0}")]
+    #[error("git object name is invalid UTF-8: {0}")]
     Utf8Error(#[from] str::Utf8Error),
     /// An error that comes from performing a [`crate::file_system`] operation.
-    #[error("File system error: {0}")]
-    FileSystem(#[from] file_error::Error),
+    #[error(transparent)]
+    FileSystem(#[from] file_system::Error),
     /// While attempting to calculate a diff for retrieving the
     /// [`crate::vcs::git::Browser.last_commit()`], the file path was returned
     /// as an `Option::None`.
-    #[error("Last commit has an invalid file path")]
+    #[error("last commit has an invalid file path")]
     LastCommitException,
+    /// The requested file was not found.
+    #[error("path not found for: {0}")]
+    PathNotFound(file_system::Path),
+    /// An error that comes from performing a *diff* operations.
+    #[error(transparent)]
+    Diff(#[from] diff::git::Error),
     /// A wrapper around the generic [`git2::Error`].
     #[error(transparent)]
     Git(#[from] git2::Error),
-    /// An error that comes from performing a *diff* operations.
-    #[error("Git diff error: {0}")]
-    GitDiff(diff::git::Error),
-}
-
-impl From<diff::git::Error> for Error {
-    fn from(other: diff::git::Error) -> Self {
-        Self::GitDiff(other)
-    }
 }
 
 /// A private enum that captures a recoverable and
@@ -78,13 +75,12 @@ impl From<diff::git::Error> for Error {
 ///
 /// In the of `Git` we abort both computations.
 #[derive(Debug, Error)]
-#[non_exhaustive]
 pub(crate) enum TreeWalkError {
-    #[error("Entry is not a blob")]
+    #[error("entry is not a blob")]
     NotBlob,
-    #[error("Git object is a commit")]
+    #[error("git object is a commit")]
     Commit,
-    #[error("Git error: {0}")]
+    #[error("git error: {0}")]
     Git(Error),
 }
 
@@ -94,8 +90,8 @@ impl From<git2::Error> for TreeWalkError {
     }
 }
 
-impl From<file_error::Error> for TreeWalkError {
-    fn from(err: file_error::Error) -> Self {
+impl From<file_system::Error> for TreeWalkError {
+    fn from(err: file_system::Error) -> Self {
         err.into()
     }
 }

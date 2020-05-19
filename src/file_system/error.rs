@@ -44,10 +44,10 @@ pub(crate) fn label_has_slash(item: &str) -> Error {
 pub enum Error {
     /// A `LabelError` specific error for parsing a
     /// [`Path`](super::path::Label).
-    #[error("Label error: {0}")]
+    #[error("malformed label: {0}")]
     Label(#[from] LabelError),
     /// A `PathError` specific error for parsing a [`Path`](super::path::Path).
-    #[error("Path error: {0}")]
+    #[error("malformed path: {0}")]
     Path(#[from] PathError),
 }
 
@@ -56,7 +56,7 @@ pub enum Error {
 #[non_exhaustive]
 pub enum PathError {
     /// An error signifying that a [`Path`](super::path::Path) is empty.
-    #[error("Path is empty")]
+    #[error("path is empty")]
     Empty,
 }
 
@@ -66,12 +66,12 @@ pub enum PathError {
 pub enum LabelError {
     /// An error signifying that a [`Label`](super::path::Label) is contains
     /// invalid UTF-8.
-    #[error("Label contains invalid UTF-8: {0}")]
+    #[error("label contains invalid UTF-8: {0}")]
     InvalidUTF8(String),
     /// An error signifying that a [`Label`](super::path::Label) contains a `/`.
-    #[error("Label contains a slash: {0}")]
+    #[error("label contains a slash: {0}")]
     ContainsSlash(String),
     /// An error signifying that a [`Label`](super::path::Label) is empty.
-    #[error("Label is empty")]
+    #[error("label is empty")]
     Empty,
 }
