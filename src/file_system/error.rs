@@ -30,12 +30,14 @@ pub(crate) const EMPTY_LABEL: Error = Error::Label(LabelError::Empty);
 /// Build an [`Error::Label(LabelError::InvalidUTF8)`] from an
 /// [`OsStr`](std::ffi::OsStr)
 pub(crate) fn label_invalid_utf8(item: &OsStr) -> Error {
-    Error::Label(LabelError::InvalidUTF8(item.to_string_lossy().into()))
+    Error::Label(LabelError::InvalidUTF8 {
+        label: item.to_string_lossy().into(),
+    })
 }
 
 /// Build an [`Error::Label(LabelError::ContainsSlash)`] from a [`str`]
 pub(crate) fn label_has_slash(item: &str) -> Error {
-    Error::Label(LabelError::ContainsSlash(item.into()))
+    Error::Label(LabelError::ContainsSlash { label: item.into() })
 }
 
 /// Error type for all file system errors that can occur.
@@ -66,11 +68,11 @@ pub enum PathError {
 pub enum LabelError {
     /// An error signifying that a [`Label`](super::path::Label) is contains
     /// invalid UTF-8.
-    #[error("label contains invalid UTF-8: {0}")]
-    InvalidUTF8(String),
+    #[error("label '{label}' contains invalid UTF-8")]
+    InvalidUTF8 { label: String },
     /// An error signifying that a [`Label`](super::path::Label) contains a `/`.
-    #[error("label contains a slash: {0}")]
-    ContainsSlash(String),
+    #[error("label '{label}' contains a slash")]
+    ContainsSlash { label: String },
     /// An error signifying that a [`Label`](super::path::Label) is empty.
     #[error("label is empty")]
     Empty,
