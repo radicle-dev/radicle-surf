@@ -560,16 +560,12 @@ impl<'a> Browser<'a> {
     /// # }
     /// ```
     pub fn last_commit(&self, path: file_system::Path) -> Result<Option<Commit>, Error> {
-        let file_history = self.repository.file_history(self.get().first().clone())?;
-
-        Ok(file_history.find(path.0).map(|tree| {
-            tree.maximum_by(&|c: &NonEmpty<repo::OrderedCommit>, d| {
-                c.first().compare_by_id(&d.first())
-            })
-            .first()
-            .commit
-            .clone()
-        }))
+        let file_history = self.repository.file_history(
+            &path,
+            repo::CommitHistory::Last,
+            self.get().first().clone(),
+        )?;
+        Ok(file_history.first().cloned())
     }
 
     /// Get the commit history for a file _or_ directory.
@@ -634,21 +630,7 @@ impl<'a> Browser<'a> {
     /// ```
     pub fn file_history(&self, path: file_system::Path) -> Result<Vec<Commit>, Error> {
         self.repository
-            .file_history(self.get().first().clone())
-            .and_then(|history| {
-                let subtree = history
-                    .find(path.clone().0)
-                    .ok_or_else(|| Error::PathNotFound(path))?;
-                let mut commits: Vec<repo::OrderedCommit> =
-                    NonEmpty::flatten(subtree.to_nonempty()).into();
-                commits.sort_by(|commit, other| commit.id.cmp(&other.id));
-                commits.dedup_by(|commit, other| commit.id == other.id);
-
-                Ok(commits
-                    .into_iter()
-                    .map(|ordered_commit| ordered_commit.commit)
-                    .collect())
-            })
+            .file_history(&path, repo::CommitHistory::Full, self.get().first().clone())
     }
 
     /// Extract the signature for a commit

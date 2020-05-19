@@ -21,3 +21,8 @@ features = []
 [dev-dependencies]
 pretty_assertions = "0.6"
 proptest = "0.9"
+criterion = "0.3"
+
+[[bench]]
+name = "last_commit"
+harness = false

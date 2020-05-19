@@ -17,7 +17,7 @@
 
 use crate::{file_system::error, nonempty::split_last};
 use nonempty::NonEmpty;
-use std::{convert::TryFrom, fmt, ops::Deref, path, str::FromStr};
+use std::{convert::TryFrom, ffi::CString, fmt, ops::Deref, path, str::FromStr};
 
 pub mod unsound;
 
@@ -154,6 +154,24 @@ impl FromStr for Path {
 impl From<Path> for Vec<Label> {
     fn from(path: Path) -> Self {
         path.0.into()
+    }
+}
+
+impl git2::IntoCString for Path {
+    fn into_c_string(self) -> Result<CString, git2::Error> {
+        if self.is_root() {
+            // the root pathsec is empty
+            "".into_c_string()
+        } else {
+            // build the file path pathsec
+            let path = self.0.tail;
+            let mut pathspec = "".to_string();
+            for p in path.iter() {
+                pathspec.push_str(&format!("{}/", &p.label));
+            }
+            let pathspec = pathspec.trim_end_matches('/');
+            pathspec.into_c_string()
+        }
     }
 }
 
