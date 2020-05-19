@@ -362,7 +362,7 @@ impl<'repo> Repository {
         }
     }
 
-    pub(crate) fn revision_branches(&self, commit: &Oid) -> Result<Vec<Branch>, Error> {
+    pub(crate) fn revision_branches(&self, oid: &Oid) -> Result<Vec<Branch>, Error> {
         let branches = self
             .0
             .branches(Some(BranchType::Local))?
@@ -371,7 +371,7 @@ impl<'repo> Repository {
         let mut contained_branches = vec![];
 
         branches.into_iter().try_for_each(|(branch, locality)| {
-            self.reachable_from(&branch.get(), &commit)
+            self.reachable_from(&branch.get(), &oid)
                 .and_then(|contains| {
                     if contains {
                         let branch = Branch::from_git_branch(branch, locality)?;
@@ -384,15 +384,11 @@ impl<'repo> Repository {
         Ok(contained_branches)
     }
 
-    fn reachable_from(&self, reference: &git2::Reference, commit: &Oid) -> Result<bool, Error> {
+    fn reachable_from(&self, reference: &git2::Reference, oid: &Oid) -> Result<bool, Error> {
         let other = reference.peel_to_commit()?.id();
-        let is_descendant = self.0.graph_descendant_of(other, *commit)?;
+        let is_descendant = self.0.graph_descendant_of(other, *oid)?;
 
-        if other == *commit || is_descendant {
-            Ok(true)
-        } else {
-            Ok(false)
-        }
+        Ok(other == *oid || is_descendant)
     }
 
     /// Get the history of the file system where the head of the [`NonEmpty`] is
