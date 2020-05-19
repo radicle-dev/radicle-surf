@@ -7,6 +7,8 @@ stdenv.mkDerivation {
     name = "radicle-surf-dev";
     buildInputs = [
         (nixpkgs.rustChannelOf { rustToolChain = ./rust-toolchain; }).rust
+        # gnuplot for benchmark purposes
+        gnuplot
         pkgconfig
         zlib
         openssl

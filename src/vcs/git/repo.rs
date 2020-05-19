@@ -20,13 +20,12 @@ use crate::{
     diff,
     diff::*,
     file_system,
-    tree::*,
     vcs,
     vcs::{git::error::*, VCS},
 };
 use git2::{BranchType, Oid};
 use nonempty::NonEmpty;
-use std::{cmp::Ordering, convert::TryFrom, str};
+use std::{convert::TryFrom, str};
 
 /// OrderedCommit is to allow for us to identify an ordering of commit history
 /// as we enumerate over a revwalk of commits, by assigning each commit an
@@ -47,16 +46,17 @@ impl std::fmt::Debug for OrderedCommit {
     }
 }
 
-impl OrderedCommit {
-    pub(super) fn compare_by_id(&self, other: &Self) -> Ordering {
-        self.id.cmp(&other.id).reverse()
-    }
-}
-
 impl From<OrderedCommit> for Commit {
     fn from(ordered_commit: OrderedCommit) -> Self {
         ordered_commit.commit
     }
+}
+
+/// This is for flagging to the `file_history` function that it should
+/// stop at the first (i.e. Last) commit it finds for a file.
+pub(super) enum CommitHistory {
+    Full,
+    Last,
 }
 
 /// A `History` that uses `git2::Commit` as the underlying artifact.
@@ -147,7 +147,7 @@ impl<'a> RepositoryRef<'a> {
         use git2::{Delta, Patch};
 
         let mut diff = Diff::new();
-        let git_diff = self.diff_commits(Some(from), to)?;
+        let git_diff = self.diff_commits(None, Some(from), to)?;
 
         for (idx, delta) in git_diff.deltas().enumerate() {
             match delta.status() {
@@ -340,88 +340,67 @@ impl<'a> RepositoryRef<'a> {
     /// the latest commit.
     pub(super) fn file_history(
         &self,
+        path: &file_system::Path,
+        commit_history: CommitHistory,
         commit: Commit,
-    ) -> Result<Forest<file_system::Label, NonEmpty<OrderedCommit>>, Error> {
-        let mut file_histories = Forest::root();
-        self.collect_file_history(&commit.id, &mut file_histories)?;
-        Ok(file_histories)
-    }
-
-    fn collect_file_history(
-        &self,
-        commit_id: &Oid,
-        file_histories: &mut Forest<file_system::Label, NonEmpty<OrderedCommit>>,
-    ) -> Result<(), Error> {
+    ) -> Result<Vec<Commit>, Error> {
         let mut revwalk = self.repo_ref.revwalk()?;
+        let mut commits = vec![];
 
         // Set the revwalk to the head commit
-        revwalk.push(*commit_id)?;
+        revwalk.push(commit.id)?;
 
-        for (id, commit_result) in revwalk.enumerate() {
-            let parent_id = commit_result?;
-
+        for commit in revwalk {
+            let parent_id: Oid = commit?;
             let parent = self.repo_ref.find_commit(parent_id)?;
-            let paths = self.diff_commit_and_parents(&parent)?;
-            let parent_commit = Commit::try_from(parent)?;
-            for path in paths {
-                let parent_commit = OrderedCommit {
-                    id,
-                    commit: parent_commit.clone(),
-                };
-
-                file_histories.insert_with(
-                    path.0,
-                    NonEmpty::new(parent_commit.clone()),
-                    |commits| commits.push(parent_commit),
-                );
+            let paths = self.diff_commit_and_parents(path, &parent)?;
+            if let Some(_path) = paths {
+                commits.push(Commit::try_from(parent)?);
+                match &commit_history {
+                    CommitHistory::Last => break,
+                    CommitHistory::Full => {},
+                }
             }
         }
-        Ok(())
+
+        Ok(commits)
     }
 
     fn diff_commit_and_parents(
         &self,
-        commit: &'a git2::Commit,
-    ) -> Result<Vec<file_system::Path>, Error> {
+        path: &file_system::Path,
+        commit: &git2::Commit,
+    ) -> Result<Option<file_system::Path>, Error> {
         let mut parents = commit.parents();
-        let mut touched_files = vec![];
+        let parent = parents.next();
 
-        let add_deltas = |diff: git2::Diff| -> Result<(), Error> {
-            let deltas = diff.deltas();
-
-            for delta in deltas {
-                let new = delta.new_file().path().ok_or(Error::LastCommitException)?;
-                let path = file_system::Path::try_from(new.to_path_buf())?;
-                touched_files.push(path);
-            }
-
-            Ok(())
-        };
-
-        match parents.next() {
-            None => {
-                self.diff_commits(None, &commit).and_then(add_deltas)?;
-            },
-            Some(parent) => {
-                self.diff_commits(Some(&parent), &commit)
-                    .and_then(add_deltas)?;
-            },
+        let diff = self.diff_commits(Some(path), parent.as_ref(), &commit)?;
+        if let Some(_delta) = diff.deltas().next() {
+            Ok(Some(path.clone()))
+        } else {
+            Ok(None)
         }
-
-        Ok(touched_files)
     }
 
     fn diff_commits(
         &self,
+        path: Option<&file_system::Path>,
         old_tree: Option<&'a git2::Commit>,
         new_tree: &'a git2::Commit,
     ) -> Result<git2::Diff, Error> {
         let new_tree = new_tree.tree()?;
         let old_tree = old_tree.map_or(Ok(None), |commit| commit.tree().map(Some))?;
 
-        let diff = self
-            .repo_ref
-            .diff_tree_to_tree(old_tree.as_ref(), Some(&new_tree), None)?;
+        let mut opts = git2::DiffOptions::new();
+        if let Some(path) = path {
+            opts.pathspec(path);
+            // We're skipping the binary pass because we won't be inspecting deltas.
+            opts.skip_binary_check(true);
+        }
+
+        let diff =
+            self.repo_ref
+                .diff_tree_to_tree(old_tree.as_ref(), Some(&new_tree), Some(&mut opts))?;
 
         Ok(diff)
     }
