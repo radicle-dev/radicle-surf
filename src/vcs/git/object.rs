@@ -304,7 +304,9 @@ impl RevObject {
                     Ok(commit) => Ok(RevObject::Commit(commit?)),
                     Err(_object) => match optional_ref {
                         Some(reference) => Branch::try_from(reference).map(RevObject::Branch),
-                        None => Err(Error::RevParseFailure(spec.to_string())),
+                        None => Err(Error::RevParseFailure {
+                            rev: spec.to_string(),
+                        }),
                     },
                 }
             },

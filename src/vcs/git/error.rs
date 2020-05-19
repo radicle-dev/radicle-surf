@@ -42,8 +42,11 @@ pub enum Error {
     NotTag(TagName),
     /// A `revspec` was provided that could not be parsed into a branch, tag, or
     /// commit object.
-    #[error("provided revspec could not be parsed into a git object: {0}")]
-    RevParseFailure(String),
+    #[error("provided revspec '{rev}' could not be parsed into a git object")]
+    RevParseFailure {
+        /// The provided revspec that failed to parse.
+        rev: String,
+    },
     /// A [`str::Utf8Error`] error, which usually occurs when a git object's
     /// name is not in UTF-8 form and parsing of it as such fails.
     #[error(transparent)]
