@@ -46,7 +46,7 @@ pub enum Error {
     RevParseFailure(String),
     /// A [`str::Utf8Error`] error, which usually occurs when a git object's
     /// name is not in UTF-8 form and parsing of it as such fails.
-    #[error("git object name is invalid UTF-8: {0}")]
+    #[error(transparent)]
     Utf8Error(#[from] str::Utf8Error),
     /// An error that comes from performing a [`crate::file_system`] operation.
     #[error(transparent)]
@@ -80,8 +80,8 @@ pub(crate) enum TreeWalkError {
     NotBlob,
     #[error("git object is a commit")]
     Commit,
-    #[error("git error: {0}")]
-    Git(Error),
+    #[error(transparent)]
+    Git(#[from] Error),
 }
 
 impl From<git2::Error> for TreeWalkError {
@@ -98,12 +98,6 @@ impl From<file_system::Error> for TreeWalkError {
 
 impl From<str::Utf8Error> for TreeWalkError {
     fn from(err: str::Utf8Error) -> Self {
-        err.into()
-    }
-}
-
-impl From<Error> for TreeWalkError {
-    fn from(err: Error) -> Self {
         err.into()
     }
 }
