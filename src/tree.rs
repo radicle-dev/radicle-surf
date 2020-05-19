@@ -472,6 +472,7 @@ impl<K, A> Forest<K, A> {
         self.0.as_ref().and_then(|trees| trees.find_branch(keys))
     }
 
+    #[allow(dead_code)]
     /// Find a `SubTree` given a search path. If the path does not match
     /// it will return `None`.
     pub fn find(&self, keys: NonEmpty<K>) -> Option<&SubTree<K, A>>
