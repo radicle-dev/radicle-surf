@@ -27,31 +27,6 @@ use git2::{BranchType, Oid};
 use nonempty::NonEmpty;
 use std::{convert::TryFrom, str};
 
-/// OrderedCommit is to allow for us to identify an ordering of commit history
-/// as we enumerate over a revwalk of commits, by assigning each commit an
-/// identifier.
-#[derive(Clone)]
-pub(super) struct OrderedCommit {
-    pub(super) id: usize,
-    pub(super) commit: Commit,
-}
-
-impl std::fmt::Debug for OrderedCommit {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "OrderedCommit {{ id: {}, commit: {} }}",
-            self.id, self.commit.id
-        )
-    }
-}
-
-impl From<OrderedCommit> for Commit {
-    fn from(ordered_commit: OrderedCommit) -> Self {
-        ordered_commit.commit
-    }
-}
-
 /// This is for flagging to the `file_history` function that it should
 /// stop at the first (i.e. Last) commit it finds for a file.
 pub(super) enum CommitHistory {
