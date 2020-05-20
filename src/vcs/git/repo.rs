@@ -51,6 +51,11 @@ pub struct Repository(pub(super) git2::Repository);
 /// A reference-only `Repository`. This means that we cannot mutate the
 /// underlying `Repository`. Not being able to mutate the `Repository` means
 /// that the functions defined for `RepositoryRef` should be thread-safe.
+///
+/// # Construction
+///
+/// Use the `From<&'a git2::Repository>` implementation to construct a
+/// `RepositoryRef`.
 pub struct RepositoryRef<'a> {
     pub(super) repo_ref: &'a git2::Repository,
 }
@@ -59,6 +64,12 @@ pub struct RepositoryRef<'a> {
 // only holds a reference to git2::Repository. git2::Repository is also Send
 // (see: https://docs.rs/git2/0.13.5/src/git2/repo.rs.html#46)
 unsafe impl<'a> Send for RepositoryRef<'a> {}
+
+impl<'a> From<&'a git2::Repository> for RepositoryRef<'a> {
+    fn from(repo_ref: &'a git2::Repository) -> Self {
+        RepositoryRef { repo_ref }
+    }
+}
 
 impl<'a> RepositoryRef<'a> {
     /// What is the current namespace we're browsing in.
