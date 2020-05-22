@@ -413,6 +413,11 @@ impl<'a> VCS<Commit, Error> for RepositoryRef<'a> {
     type HistoryId = String;
     type ArtefactId = Oid;
 
+    fn default_history_id(&self) -> Result<Self::HistoryId, Error> {
+        let reference = self.repo_ref.find_reference("refs/remotes/origin/HEAD")?;
+        Ok(reference.symbolic_target().unwrap().to_string())
+    }
+
     fn get_history(&self, history_id: Self::HistoryId) -> Result<History, Error> {
         self.revspec(&history_id)
     }
@@ -489,5 +494,22 @@ impl From<git2::Repository> for Repository {
 impl std::fmt::Debug for Repository {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, ".git")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use vcs::{git::error::Error, VCS};
+
+    #[test]
+    fn default_history_id() -> Result<(), Error> {
+        let repo = Repository::new("./data/git-platinum")?;
+        let repo = repo.as_ref();
+        assert_eq!(
+            repo.default_history_id(),
+            Ok("refs/remotes/origin/master".to_string())
+        );
+        Ok(())
     }
 }

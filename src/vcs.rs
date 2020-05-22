@@ -183,6 +183,10 @@ where
     type HistoryId = Repo::HistoryId;
     type ArtefactId = Repo::ArtefactId;
 
+    fn default_history_id(&self) -> Result<Repo::HistoryId, Error> {
+        self.repository.default_history_id()
+    }
+
     fn get_history(&self, identifier: Self::HistoryId) -> Result<History<A>, Error> {
         self.repository.get_history(identifier)
     }
@@ -217,6 +221,9 @@ pub trait VCS<A, Error> {
     /// The way to identify an artifact.
     type ArtefactId;
 
+    /// Fetch the default history for this VCS.
+    fn default_history_id(&self) -> Result<Self::HistoryId, Error>;
+
     /// Find a History in a Repo given a way to identify it
     fn get_history(&self, identifier: Self::HistoryId) -> Result<History<A>, Error>;
 
@@ -225,4 +232,9 @@ pub trait VCS<A, Error> {
 
     /// Identify artifacts of a Repository
     fn get_identifier(artifact: &A) -> Self::ArtefactId;
+
+    /// Get the `History` for the default `HistoryId` of the `VCS`.
+    fn default_history(&self) -> Result<History<A>, Error> {
+        self.get_history(self.default_history_id()?)
+    }
 }

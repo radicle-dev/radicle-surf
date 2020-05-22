@@ -127,16 +127,8 @@ impl<'a> Browser<'a> {
     /// ```
     pub fn new(repository: impl Into<RepositoryRef<'a>>) -> Result<Self, Error> {
         let repository = repository.into();
-        let history = repository.head()?;
-        let snapshot = Box::new(|repository: &RepositoryRef<'a>, history: &History| {
-            let tree = Self::get_tree(&repository.repo_ref, history.0.first())?;
-            Ok(directory::Directory::from_hash_map(tree))
-        });
-        Ok(vcs::Browser {
-            snapshot,
-            history,
-            repository,
-        })
+        let history = repository.default_history()?;
+        Ok(Self::init(repository, history))
     }
 
     /// Create a new browser to interact with.
@@ -173,15 +165,20 @@ impl<'a> Browser<'a> {
     ) -> Result<Self, Error> {
         let repository = repository.into();
         let history = repository.get_history(branch_name.name().to_string())?;
+        Ok(Self::init(repository, history))
+    }
+
+    // Common setup for the Browser
+    fn init(repository: RepositoryRef<'a>, history: History) -> Self {
         let snapshot = Box::new(|repository: &RepositoryRef<'a>, history: &History| {
             let tree = Self::get_tree(&repository.repo_ref, history.0.first())?;
             Ok(directory::Directory::from_hash_map(tree))
         });
-        Ok(vcs::Browser {
+        vcs::Browser {
             snapshot,
             history,
             repository,
-        })
+        }
     }
 
     /// Switch the namespace you are browsing in. This will consume the previous
