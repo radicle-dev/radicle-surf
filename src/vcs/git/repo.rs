@@ -208,6 +208,10 @@ impl<'a> RepositoryRef<'a> {
         Ok(diff)
     }
 
+    pub(super) fn switch_namespace(&self, namespace: &str) -> Result<(), Error> {
+        Ok(self.repo_ref.set_namespace(namespace)?)
+    }
+
     /// Get a particular `Commit`.
     pub(super) fn get_commit(&self, oid: Oid) -> Result<git2::Commit<'a>, Error> {
         let commit = self.repo_ref.find_commit(oid)?;

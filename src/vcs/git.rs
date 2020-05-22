@@ -73,7 +73,7 @@ mod object;
 
 pub use crate::{
     diff::Diff,
-    vcs::git::object::{Branch, BranchName, Commit, RevObject, Signature, TagName},
+    vcs::git::object::{Branch, BranchName, Commit, Namespace, RevObject, Signature, TagName},
 };
 
 use crate::{
@@ -169,6 +169,30 @@ impl<'a> Browser<'a> {
             history,
             repository,
         })
+    }
+
+    /// Switch the namespace you are browsing in. This will consume the previous
+    /// `Browser` and give you back a new `Browser` for that particular
+    /// namespace. The `revision` provided will kick-off the history for
+    /// this `Browser`.
+    pub fn switch_namespace(self, namespace: Namespace, revision: &str) -> Result<Self, Error> {
+        self.repository.switch_namespace(&namespace.value)?;
+        let history = self.repository.get_history(revision.to_string())?;
+        Ok(Browser {
+            snapshot: self.snapshot,
+            repository: self.repository,
+            history,
+        })
+    }
+
+    /// What is the current namespace we're browsing in.
+    pub fn which_namespace(&self) -> Result<Option<Namespace>, Error> {
+        Ok(self
+            .repository
+            .repo_ref
+            .namespace_bytes()
+            .map(Namespace::try_from)
+            .transpose()?)
     }
 
     /// Set the current `Browser` history to the `HEAD` commit of the underlying
