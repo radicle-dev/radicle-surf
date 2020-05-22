@@ -33,6 +33,20 @@ fn checkout(curr_dir: &Path, branch: &str) -> ExitStatus {
         .unwrap_or_else(|_| panic!("Failed to execute `git submodule update {}`", git_checkout))
 }
 
+fn setup_namespace(curr_dir: &Path, namespace: &str) -> ExitStatus {
+    let namespace = format!(
+        "git update-ref refs/namespaces/{}/refs/heads/master refs/heads/dev",
+        namespace
+    );
+    Command::new("git")
+        .arg("submodule")
+        .arg("foreach")
+        .arg(&namespace)
+        .current_dir(&curr_dir)
+        .status()
+        .unwrap_or_else(|_| panic!("Failed to execute `git submodule update {}`", namespace))
+}
+
 fn main() {
     // Path set up for the project directory
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("Failed to get CARGO_MANIFEST_DIR");
@@ -53,6 +67,12 @@ fn main() {
 
     let master_status = checkout(curr_dir, "master");
     assert!(master_status.success(), "failed to checkout master");
+
+    let namespace_ststaus = setup_namespace(curr_dir, "golden");
+    assert!(
+        namespace_ststaus.success(),
+        "failed to set up 'golden' namespace"
+    );
 
     // Tell the build script that we should re-run this if git-platinum changes.
     println!("cargo:rerun-if-changed=data/git-platinum");
