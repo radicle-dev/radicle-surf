@@ -22,8 +22,7 @@ use std::{
 };
 
 fn checkout(curr_dir: &Path, branch: &str) -> ExitStatus {
-    let mut git_checkout = "git checkout ".to_string();
-    git_checkout.push_str(branch);
+    let git_checkout = format!("git checkout {}", branch);
 
     Command::new("git")
         .arg("submodule")
