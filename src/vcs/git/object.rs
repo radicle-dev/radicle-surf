@@ -346,3 +346,34 @@ impl Signature {
         Signature((*buf).into())
     }
 }
+
+/// A `Namespace` value allows us to switch the git namespace of
+/// [`super::Browser`].
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Namespace {
+    pub(super) value: String,
+}
+
+impl fmt::Display for Namespace {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.value)
+    }
+}
+
+impl From<&str> for Namespace {
+    fn from(namespace: &str) -> Namespace {
+        Self {
+            value: namespace.to_string(),
+        }
+    }
+}
+
+impl TryFrom<&[u8]> for Namespace {
+    type Error = str::Utf8Error;
+
+    fn try_from(namespace: &[u8]) -> Result<Self, Self::Error> {
+        str::from_utf8(namespace).map(|n| Self {
+            value: n.to_string(),
+        })
+    }
+}
