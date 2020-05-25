@@ -63,7 +63,7 @@
 //! ```
 
 // Re-export git2 as sub-module
-pub use git2::{self, BranchType, Error as Git2Error, Oid, Time};
+pub use git2::{self, Error as Git2Error, Time};
 
 mod reference;
 pub use reference::Ref;
@@ -75,7 +75,17 @@ mod object;
 
 pub use crate::{
     diff::Diff,
-    vcs::git::object::{Branch, BranchName, Commit, Namespace, RevObject, Signature, TagName},
+    vcs::git::object::{
+        Branch,
+        BranchName,
+        BranchType,
+        Commit,
+        Namespace,
+        Oid,
+        RevObject,
+        Signature,
+        TagName,
+    },
 };
 
 use crate::{

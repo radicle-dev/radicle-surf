@@ -16,6 +16,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::vcs::git::error::*;
+pub use git2::{BranchType, Oid};
 use std::{cmp::Ordering, convert::TryFrom, fmt, str};
 
 /// `Author` is the static information of a [`git2::Signature`].
@@ -52,12 +53,12 @@ impl<'repo> TryFrom<git2::Signature<'repo>> for Author {
 }
 
 /// `Commit` is the static information of a [`git2::Commit`]. To get back the
-/// original `Commit` in the repository we can use the [`git2::Oid`] to retrieve
+/// original `Commit` in the repository we can use the [`Oid`] to retrieve
 /// it.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Commit {
     /// Object ID of the Commit, i.e. the SHA1 digest.
-    pub id: git2::Oid,
+    pub id: Oid,
     /// The author of the commit.
     pub author: Author,
     /// The actor who committed this commit.
@@ -67,7 +68,7 @@ pub struct Commit {
     /// The summary message of the commit.
     pub summary: String,
     /// The parents of this commit.
-    pub parents: Vec<git2::Oid>,
+    pub parents: Vec<Oid>,
 }
 
 impl<'repo> TryFrom<git2::Commit<'repo>> for Commit {
@@ -134,7 +135,7 @@ pub struct Branch {
     /// Name identifier of the `Branch`.
     pub name: BranchName,
     /// Whether the `Branch` is `Remote` or `Local`.
-    pub locality: git2::BranchType,
+    pub locality: BranchType,
 }
 
 impl PartialOrd for Branch {
@@ -154,7 +155,7 @@ impl Branch {
     pub fn remote(name: BranchName) -> Self {
         Branch {
             name,
-            locality: git2::BranchType::Remote,
+            locality: BranchType::Remote,
         }
     }
 
@@ -162,13 +163,13 @@ impl Branch {
     pub fn local(name: BranchName) -> Self {
         Branch {
             name,
-            locality: git2::BranchType::Local,
+            locality: BranchType::Local,
         }
     }
 
     pub(crate) fn from_git_branch(
         branch: git2::Branch,
-        locality: git2::BranchType,
+        locality: BranchType,
     ) -> Result<Self, Error> {
         let name = BranchName::try_from(branch.name_bytes()?)?;
         Ok(Branch { name, locality })
@@ -186,9 +187,9 @@ impl<'repo> TryFrom<git2::Reference<'repo>> for Branch {
 
         let name = BranchName::try_from(reference.name_bytes())?;
         let locality = if reference.is_remote() {
-            git2::BranchType::Remote
+            BranchType::Remote
         } else {
-            git2::BranchType::Local
+            BranchType::Local
         };
 
         Ok(Branch { name, locality })
@@ -230,7 +231,7 @@ impl TagName {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Tag {
     /// The Object ID for the `Tag`, i.e the SHA1 digest.
-    pub id: git2::Oid,
+    pub id: Oid,
     /// The name that references this `Tag`.
     pub name: TagName,
     /// The named author of this `Tag`, if the `Tag` was annotated.

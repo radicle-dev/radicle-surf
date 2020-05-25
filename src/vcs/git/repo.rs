@@ -15,13 +15,18 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-pub use crate::vcs::git::object::{Branch, BranchName, Commit, RevObject, Signature, TagName};
 use crate::{
     diff,
     diff::*,
     file_system,
     vcs,
-    vcs::{git::error::*, VCS},
+    vcs::{
+        git::{
+            error::*,
+            object::{Branch, BranchName, Commit, RevObject, Signature, TagName},
+        },
+        VCS,
+    },
 };
 use git2::{BranchType, Oid};
 use nonempty::NonEmpty;
