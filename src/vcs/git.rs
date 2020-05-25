@@ -65,6 +65,8 @@
 // Re-export git2 as sub-module
 pub use git2::{self, BranchType, Error as Git2Error, Oid, Time};
 
+mod reference;
+pub use reference::Ref;
 mod repo;
 pub use repo::{History, Repository, RepositoryRef};
 
