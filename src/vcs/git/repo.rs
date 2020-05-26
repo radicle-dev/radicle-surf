@@ -442,6 +442,12 @@ impl<'a> From<&'a Repository> for RepositoryRef<'a> {
     }
 }
 
+impl<'a> From<&'a git2::Repository> for RepositoryRef<'a> {
+    fn from(repo_ref: &'a git2::Repository) -> Self {
+        RepositoryRef { repo_ref }
+    }
+}
+
 impl vcs::GetVCS<Error> for Repository {
     type RepoId = String;
 
