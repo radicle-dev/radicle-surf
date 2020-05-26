@@ -20,6 +20,10 @@ use regex::Regex;
 use std::{fmt, str};
 use thiserror::Error;
 
+pub mod glob;
+
+/// TODO(finto): This isn't used currently, but it could be a better way of
+/// passing around references.
 /// A structured way of referring to a git reference.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Ref {
@@ -50,7 +54,7 @@ pub enum Ref {
     /// Note that namespaces can be nested.
     Namespace {
         /// The name value of the namespace.
-        namespace: Namespace,
+        namespace: String,
         /// The reference under that namespace, e.g. The
         /// `refs/remotes/origin/master/ portion of `refs/namespaces/
         /// moi/refs/remotes/origin/master`.
@@ -133,20 +137,82 @@ impl str::FromStr for Ref {
                     }),
                     "refs/namespaces/" => match cap.get(2) {
                         None => Err(ParseError::MissingNamespace),
-                        Some(namespace) => {
-                            println!("NAMESPACE: {}", namespace.as_str());
-                            Ok(Self::Namespace {
-                                namespace: Namespace {
-                                    value: namespace.as_str().trim_end_matches('/').to_string(),
-                                },
-                                reference: Box::new(Ref::from_str(name)?),
-                            })
-                        },
+                        Some(namespace) => Ok(Self::Namespace {
+                            namespace: namespace.as_str().trim_end_matches('/').to_string(),
+                            reference: Box::new(Ref::from_str(name)?),
+                        }),
                     },
                     _ => Err(ParseError::MalformedRef(reference.to_string())),
                 }
             },
         )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RefGlob {
+    /// When calling `.to_string()` this will display as the glob `refs/tags/*`.
+    Tag,
+    /// When calling `.to_string()` this will display as the glob
+    /// `refs/heads/*`.
+    LocalBranch,
+    /// When calling `.to_string()` this will display as the either the glob:
+    ///     * `refs/remotes/**/*`
+    ///     * `refs/remotes/{remote}/*`
+    RemoteBranch {
+        /// If `remote` is `None` then the `**` wildcard will be used, otherwise
+        /// the provided remote name will be used.
+        remote: Option<String>,
+    },
+    /// When calling `.to_string()` this will display as the glob
+    /// `refs/{heads,remotes}/**`.
+    Branch,
+    /// When calling `.to_string()` this will display as the glob
+    /// `refs/namespaces/{namespace}` followed by the glob of the
+    /// `ref_glob`.
+    ///
+    /// Note that namespaces can be nested.
+    Namespace {
+        /// The name value of the namespace.
+        namespace: Namespace,
+        ref_glob: Box<RefGlob>,
+    },
+}
+
+impl RefGlob {
+    pub fn from_branch_type(branch_type: git2::BranchType) -> Self {
+        match branch_type {
+            git2::BranchType::Remote => Self::RemoteBranch { remote: None },
+            git2::BranchType::Local => Self::LocalBranch,
+        }
+    }
+
+    pub fn namespace(namespace: Namespace, ref_glob: RefGlob) -> Self {
+        Self::Namespace {
+            namespace,
+            ref_glob: Box::new(ref_glob),
+        }
+    }
+}
+
+impl fmt::Display for RefGlob {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Tag => write!(f, "refs/tags/*"),
+            Self::LocalBranch => write!(f, "refs/heads/*"),
+            Self::RemoteBranch { remote } => {
+                write!(f, "refs/remotes/")?;
+                match remote {
+                    None => write!(f, "**/*"),
+                    Some(remote) => write!(f, "{}/*", remote),
+                }
+            },
+            Self::Branch => write!(f, "refs/{{remotes,heads}}/**"),
+            Self::Namespace {
+                namespace,
+                ref_glob,
+            } => write!(f, "refs/namespaces/{}/{}", namespace, ref_glob),
+        }
     }
 }
 
@@ -182,7 +248,7 @@ mod tests {
         assert_eq!(
             Ref::from_str("refs/namespaces/moi/refs/remotes/origin/master"),
             Ok(Ref::Namespace {
-                namespace: Namespace::from("moi"),
+                namespace: "moi".to_string(),
                 reference: Box::new(Ref::RemoteBranch {
                     remote: "origin".to_string(),
                     name: BranchName::new("master")
@@ -193,9 +259,9 @@ mod tests {
         assert_eq!(
             Ref::from_str("refs/namespaces/moi/refs/namespaces/toi/refs/tags/v1.0.0"),
             Ok(Ref::Namespace {
-                namespace: Namespace::from("moi"),
+                namespace: "moi".to_string(),
                 reference: Box::new(Ref::Namespace {
-                    namespace: Namespace::from("toi"),
+                    namespace: "toi".to_string(),
                     reference: Box::new(Ref::Tag {
                         name: TagName::new("v1.0.0")
                     })
