@@ -180,13 +180,18 @@ impl<'repo> TryFrom<git2::Reference<'repo>> for Branch {
     type Error = Error;
 
     fn try_from(reference: git2::Reference) -> Result<Self, Self::Error> {
-        if !reference.is_branch() {
-            let branch_name = BranchName::try_from(reference.name_bytes())?;
-            return Err(Error::NotBranch(branch_name));
+        let is_remote = reference.is_remote();
+        let is_tag = reference.is_tag();
+        let is_note = reference.is_note();
+        let name = BranchName::try_from(reference.shorthand_bytes())?;
+
+        // Best effort to not return tags or notes. Assuming everything after that is a
+        // branch.
+        if is_tag || is_note {
+            return Err(Error::NotBranch(name));
         }
 
-        let name = BranchName::try_from(reference.name_bytes())?;
-        let locality = if reference.is_remote() {
+        let locality = if is_remote {
             BranchType::Remote
         } else {
             BranchType::Local
