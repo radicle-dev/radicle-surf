@@ -234,15 +234,43 @@ impl TagName {
 
 /// The static information of a [`git2::Tag`].
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Tag {
-    /// The Object ID for the `Tag`, i.e the SHA1 digest.
-    pub id: Oid,
-    /// The name that references this `Tag`.
-    pub name: TagName,
-    /// The named author of this `Tag`, if the `Tag` was annotated.
-    pub tagger: Option<Author>,
-    /// The message with this `Tag`, if the `Tag` was annotated.
-    pub message: Option<String>,
+pub enum Tag {
+    /// A light-weight git tag.
+    Light {
+        /// The Object ID for the `Tag`, i.e the SHA1 digest.
+        id: Oid,
+        /// The name that references this `Tag`.
+        name: TagName,
+    },
+    /// An annotated git tag.
+    Annotated {
+        /// The Object ID for the `Tag`, i.e the SHA1 digest.
+        id: Oid,
+        /// The name that references this `Tag`.
+        name: TagName,
+        /// The named author of this `Tag`, if the `Tag` was annotated.
+        tagger: Option<Author>,
+        /// The message with this `Tag`, if the `Tag` was annotated.
+        message: Option<String>,
+    },
+}
+
+impl Tag {
+    /// Get the `Oid` of the tag, regardless of its type.
+    pub fn id(&self) -> Oid {
+        match self {
+            Self::Light { id, .. } => id.clone(),
+            Self::Annotated { id, .. } => id.clone(),
+        }
+    }
+
+    /// Get the `TagName` of the tag, regardless of its type.
+    pub fn name(&self) -> TagName {
+        match self {
+            Self::Light { name, .. } => name.clone(),
+            Self::Annotated { name, .. } => name.clone(),
+        }
+    }
 }
 
 impl<'repo> TryFrom<git2::Tag<'repo>> for Tag {
@@ -261,12 +289,44 @@ impl<'repo> TryFrom<git2::Tag<'repo>> for Tag {
             .transpose()?
             .map(|message| message.into());
 
-        Ok(Tag {
+        Ok(Tag::Annotated {
             id,
             name,
             tagger,
             message,
         })
+    }
+}
+
+impl<'repo> TryFrom<git2::Reference<'repo>> for Tag {
+    type Error = Error;
+
+    fn try_from(reference: git2::Reference) -> Result<Self, Self::Error> {
+        let name = TagName::try_from(reference.shorthand_bytes())?;
+
+        if !reference.is_tag() {
+            return Err(Error::NotTag(name));
+        }
+
+        match reference.peel_to_tag() {
+            Ok(tag) => Ok(Tag::try_from(tag)?),
+            Err(err) => {
+                // If we get an error peeling to a tag _BUT_ we also have confirmed the
+                // reference is a tag, that means we have a lightweight tag,
+                // i.e. a commit SHA and name.
+                if err.class() == git2::ErrorClass::Object
+                    && err.code() == git2::ErrorCode::InvalidSpec
+                {
+                    let commit = reference.peel_to_commit()?;
+                    Ok(Tag::Light {
+                        id: commit.id(),
+                        name,
+                    })
+                } else {
+                    Err(err.into())
+                }
+            },
+        }
     }
 }
 
@@ -334,7 +394,7 @@ impl RevObject {
                 Ok(commit)
             },
             RevObject::Tag(tag) => {
-                let object = repo.find_tag(tag.id)?.into_object();
+                let object = repo.find_tag(tag.id())?.into_object();
                 let commit = object.peel_to_commit()?;
                 Ok(commit)
             },
