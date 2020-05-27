@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::vcs::git::object::{BranchName, Namespace, Oid, TagName};
+use crate::vcs::git::object::{BranchName, Oid, TagName};
 use regex::Regex;
 use std::{fmt, str};
 use thiserror::Error;
@@ -146,73 +146,6 @@ impl str::FromStr for Ref {
                 }
             },
         )
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RefGlob {
-    /// When calling `.to_string()` this will display as the glob `refs/tags/*`.
-    Tag,
-    /// When calling `.to_string()` this will display as the glob
-    /// `refs/heads/*`.
-    LocalBranch,
-    /// When calling `.to_string()` this will display as the either the glob:
-    ///     * `refs/remotes/**/*`
-    ///     * `refs/remotes/{remote}/*`
-    RemoteBranch {
-        /// If `remote` is `None` then the `**` wildcard will be used, otherwise
-        /// the provided remote name will be used.
-        remote: Option<String>,
-    },
-    /// When calling `.to_string()` this will display as the glob
-    /// `refs/{heads,remotes}/**`.
-    Branch,
-    /// When calling `.to_string()` this will display as the glob
-    /// `refs/namespaces/{namespace}` followed by the glob of the
-    /// `ref_glob`.
-    ///
-    /// Note that namespaces can be nested.
-    Namespace {
-        /// The name value of the namespace.
-        namespace: Namespace,
-        ref_glob: Box<RefGlob>,
-    },
-}
-
-impl RefGlob {
-    pub fn from_branch_type(branch_type: git2::BranchType) -> Self {
-        match branch_type {
-            git2::BranchType::Remote => Self::RemoteBranch { remote: None },
-            git2::BranchType::Local => Self::LocalBranch,
-        }
-    }
-
-    pub fn namespace(namespace: Namespace, ref_glob: RefGlob) -> Self {
-        Self::Namespace {
-            namespace,
-            ref_glob: Box::new(ref_glob),
-        }
-    }
-}
-
-impl fmt::Display for RefGlob {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Tag => write!(f, "refs/tags/*"),
-            Self::LocalBranch => write!(f, "refs/heads/*"),
-            Self::RemoteBranch { remote } => {
-                write!(f, "refs/remotes/")?;
-                match remote {
-                    None => write!(f, "**/*"),
-                    Some(remote) => write!(f, "{}/*", remote),
-                }
-            },
-            Self::Branch => write!(f, "refs/{{remotes,heads}}/**"),
-            Self::Namespace {
-                namespace,
-                ref_glob,
-            } => write!(f, "refs/namespaces/{}/{}", namespace, ref_glob),
-        }
     }
 }
 
