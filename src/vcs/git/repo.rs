@@ -23,7 +23,8 @@ use crate::{
     vcs::{
         git::{
             error::*,
-            object::{Branch, BranchName, Commit, RevObject, Signature, TagName},
+            object::{Branch, Commit, Namespace, RevObject, Signature, Tag},
+            reference::glob::RefGlob,
         },
         VCS,
     },
@@ -60,6 +61,15 @@ pub struct RepositoryRef<'a> {
 unsafe impl<'a> Send for RepositoryRef<'a> {}
 
 impl<'a> RepositoryRef<'a> {
+    /// What is the current namespace we're browsing in.
+    pub fn which_namespace(&self) -> Result<Option<Namespace>, Error> {
+        Ok(self
+            .repo_ref
+            .namespace_bytes()
+            .map(Namespace::try_from)
+            .transpose()?)
+    }
+
     /// List the branches within a repository, filtering out ones that do not
     /// parse correctly.
     ///
@@ -67,20 +77,15 @@ impl<'a> RepositoryRef<'a> {
     ///
     /// * [`Error::Git`]
     pub fn list_branches(&self, filter: Option<BranchType>) -> Result<Vec<Branch>, Error> {
-        self.repo_ref
-            .branches(filter)
-            .map_err(Error::from)
-            .and_then(|mut branches| {
-                branches.try_fold(vec![], |mut acc, branch| {
-                    let (branch, branch_type) = branch?;
-                    let name = BranchName::try_from(branch.name_bytes()?)?;
-                    let branch = Branch {
-                        name,
-                        locality: branch_type,
-                    };
-                    acc.push(branch);
-                    Ok(acc)
-                })
+        let ref_glob = filter.map_or(RefGlob::Branch, RefGlob::from_branch_type);
+
+        ref_glob
+            .references(&self)?
+            .iter()
+            .try_fold(vec![], |mut acc, reference| {
+                let branch = Branch::try_from(reference?)?;
+                acc.push(branch);
+                Ok(acc)
             })
     }
 
@@ -90,12 +95,15 @@ impl<'a> RepositoryRef<'a> {
     /// # Errors
     ///
     /// * [`Error::Git`]
-    pub fn list_tags(&self) -> Result<Vec<TagName>, Error> {
-        let tags = self.repo_ref.tag_names(None)?;
-        Ok(tags
-            .into_iter()
-            .filter_map(|tag| tag.map(TagName::new))
-            .collect())
+    pub fn list_tags(&self) -> Result<Vec<Tag>, Error> {
+        RefGlob::Tag
+            .references(&self)?
+            .iter()
+            .try_fold(vec![], |mut acc, reference| {
+                let tag = Tag::try_from(reference?)?;
+                acc.push(tag);
+                Ok(acc)
+            })
     }
 
     /// Create a [`RevObject`] given a
