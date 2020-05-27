@@ -33,11 +33,8 @@ fn checkout(curr_dir: &Path, branch: &str) -> ExitStatus {
         .unwrap_or_else(|_| panic!("Failed to execute `git submodule update {}`", git_checkout))
 }
 
-fn setup_namespace(curr_dir: &Path, namespace: &str) -> ExitStatus {
-    let namespace = format!(
-        "git update-ref refs/namespaces/{}/refs/heads/master refs/heads/dev",
-        namespace
-    );
+fn setup_namespace(curr_dir: &Path, namespace: &str, target: &str) -> ExitStatus {
+    let namespace = format!("git update-ref {} {}", namespace, target);
     Command::new("git")
         .arg("submodule")
         .arg("foreach")
@@ -68,10 +65,24 @@ fn main() {
     let master_status = checkout(curr_dir, "master");
     assert!(master_status.success(), "failed to checkout master");
 
-    let namespace_ststaus = setup_namespace(curr_dir, "golden");
+    let golden_status = setup_namespace(
+        curr_dir,
+        "refs/namespaces/golden/refs/heads/master",
+        "refs/heads/dev",
+    );
     assert!(
-        namespace_ststaus.success(),
+        golden_status.success(),
         "failed to set up 'golden' namespace"
+    );
+
+    let silver_status = setup_namespace(
+        curr_dir,
+        "refs/namespaces/golden/refs/namespaces/silver/refs/heads/master",
+        "refs/remotes/origin/dev",
+    );
+    assert!(
+        silver_status.success(),
+        "failed to set up 'golden/silver' namespace"
     );
 
     // Tell the build script that we should re-run this if git-platinum changes.
