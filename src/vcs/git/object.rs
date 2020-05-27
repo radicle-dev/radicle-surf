@@ -259,8 +259,8 @@ impl Tag {
     /// Get the `Oid` of the tag, regardless of its type.
     pub fn id(&self) -> Oid {
         match self {
-            Self::Light { id, .. } => id.clone(),
-            Self::Annotated { id, .. } => id.clone(),
+            Self::Light { id, .. } => *id,
+            Self::Annotated { id, .. } => *id,
         }
     }
 
@@ -417,20 +417,22 @@ impl Signature {
 /// [`super::Browser`].
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Namespace {
-    pub(super) value: String,
+    /// Since namespaces can be nested we have a vector of strings.
+    /// This means that the namespaces `"foo/bar"` is represented as
+    /// `vec!["foo", "bar"]`.
+    pub(super) values: Vec<String>,
 }
 
 impl fmt::Display for Namespace {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.value)
+        write!(f, "{}", self.values.join("/"))
     }
 }
 
 impl From<&str> for Namespace {
     fn from(namespace: &str) -> Namespace {
-        Self {
-            value: namespace.to_string(),
-        }
+        let values = namespace.split('/').map(|n| n.to_string()).collect();
+        Self { values }
     }
 }
 
@@ -438,8 +440,6 @@ impl TryFrom<&[u8]> for Namespace {
     type Error = str::Utf8Error;
 
     fn try_from(namespace: &[u8]) -> Result<Self, Self::Error> {
-        str::from_utf8(namespace).map(|n| Self {
-            value: n.to_string(),
-        })
+        str::from_utf8(namespace).map(Namespace::from)
     }
 }
