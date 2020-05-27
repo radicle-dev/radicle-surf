@@ -84,6 +84,7 @@ pub use crate::{
         Oid,
         RevObject,
         Signature,
+        Tag,
         TagName,
     },
 };
@@ -187,8 +188,8 @@ impl<'a> Browser<'a> {
     /// `Browser` and give you back a new `Browser` for that particular
     /// namespace. The `revision` provided will kick-off the history for
     /// this `Browser`.
-    pub fn switch_namespace(self, namespace: Namespace, revision: &str) -> Result<Self, Error> {
-        self.repository.switch_namespace(&namespace.value)?;
+    pub fn switch_namespace(self, namespace: &Namespace, revision: &str) -> Result<Self, Error> {
+        self.repository.switch_namespace(&namespace.to_string())?;
         let history = self.repository.get_history(revision.to_string())?;
         Ok(Browser {
             snapshot: self.snapshot,
@@ -484,7 +485,7 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Branch, BranchType, BranchName, Browser, Repository};
+    /// use radicle_surf::vcs::git::{Branch, BranchType, BranchName, Browser, Namespace, Repository};
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -505,6 +506,14 @@ impl<'a> Browser<'a> {
     ///     Branch::remote(BranchName::new("origin/dev")),
     ///     Branch::remote(BranchName::new("origin/master")),
     /// ]);
+    ///
+    /// // We can also switch namespaces and list the branches in that namespace.
+    /// let golden = browser.switch_namespace(&Namespace::from("golden"), "master")?;
+    ///
+    /// let branches = golden.list_branches(Some(BranchType::Local))?;
+    /// assert_eq!(branches, vec![
+    ///     Branch::local(BranchName::new("namespaces/golden/refs/heads/master")),
+    /// ]);
     /// #
     /// # Ok(())
     /// # }
@@ -523,7 +532,7 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Browser, Repository, TagName};
+    /// use radicle_surf::vcs::git::{Browser, Oid, Repository, Tag, TagName};
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -535,18 +544,33 @@ impl<'a> Browser<'a> {
     /// assert_eq!(
     ///     tags,
     ///     vec![
-    ///         TagName::new("v0.1.0"),
-    ///         TagName::new("v0.2.0"),
-    ///         TagName::new("v0.3.0"),
-    ///         TagName::new("v0.4.0"),
-    ///         TagName::new("v0.5.0")
+    ///         Tag::Light {
+    ///             id: Oid::from_str("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3")?,
+    ///             name: TagName::new("v0.1.0"),
+    ///         },
+    ///         Tag::Light {
+    ///             id: Oid::from_str("2429f097664f9af0c5b7b389ab998b2199ffa977")?,
+    ///             name: TagName::new("v0.2.0")
+    ///         },
+    ///         Tag::Light {
+    ///             id: Oid::from_str("19bec071db6474af89c866a1bd0e4b1ff76e2b97")?,
+    ///             name: TagName::new("v0.3.0")
+    ///         },
+    ///         Tag::Light {
+    ///             id: Oid::from_str("91b69e00cd8e5a07e20942e9e4457d83ce7a3ff1")?,
+    ///             name: TagName::new("v0.4.0")
+    ///         },
+    ///         Tag::Light {
+    ///             id: Oid::from_str("80ded66281a4de2889cc07293a8f10947c6d57fe")?,
+    ///             name: TagName::new("v0.5.0")
+    ///         },
     ///     ]
     /// );
     /// #
     /// # Ok(())
     /// # }
     /// ```
-    pub fn list_tags(&self) -> Result<Vec<TagName>, Error> {
+    pub fn list_tags(&self) -> Result<Vec<Tag>, Error> {
         self.repository.list_tags()
     }
 
@@ -870,6 +894,63 @@ mod tests {
         let browser = Browser::new(&repo).unwrap();
 
         browser.get_directory().unwrap();
+    }
+
+    #[cfg(test)]
+    mod namespace {
+        use super::*;
+        use pretty_assertions::assert_eq;
+
+        #[test]
+        fn golden_namespace() -> Result<(), Error> {
+            let repo = Repository::new("./data/git-platinum")?;
+            let browser = Browser::new(&repo)?;
+            let history = browser.history.clone();
+
+            assert_eq!(browser.which_namespace(), Ok(None));
+
+            let golden_browser = browser.switch_namespace(&Namespace::from("golden"), "master")?;
+
+            assert_eq!(
+                golden_browser.which_namespace(),
+                Ok(Some(Namespace::from("golden")))
+            );
+            assert_eq!(history, golden_browser.history);
+
+            let branches: Vec<Branch> = vec![Branch::local(BranchName::new(
+                "namespaces/golden/refs/heads/master",
+            ))];
+
+            assert_eq!(branches, golden_browser.list_branches(None)?);
+
+            Ok(())
+        }
+
+        #[test]
+        fn silver_namespace() -> Result<(), Error> {
+            let repo = Repository::new("./data/git-platinum")?;
+            let browser = Browser::new(&repo)?;
+            let history = browser.history.clone();
+
+            assert_eq!(browser.which_namespace(), Ok(None));
+
+            let silver_browser =
+                browser.switch_namespace(&Namespace::from("golden/silver"), "master")?;
+
+            assert_eq!(
+                silver_browser.which_namespace(),
+                Ok(Some(Namespace::from("golden/silver")))
+            );
+            assert_eq!(history, silver_browser.history);
+
+            let branches: Vec<Branch> = vec![Branch::local(BranchName::new(
+                "namespaces/golden/refs/namespaces/silver/refs/heads/master",
+            ))];
+
+            assert_eq!(branches, silver_browser.list_branches(None)?);
+
+            Ok(())
+        }
     }
 
     #[cfg(test)]
