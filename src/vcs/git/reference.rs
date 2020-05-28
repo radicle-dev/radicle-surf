@@ -20,7 +20,7 @@ use regex::Regex;
 use std::{fmt, str};
 use thiserror::Error;
 
-pub mod glob;
+pub(super) mod glob;
 
 /// TODO(finto): This isn't used currently, but it could be a better way of
 /// passing around references.
