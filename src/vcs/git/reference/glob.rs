@@ -120,7 +120,10 @@ impl fmt::Display for RefGlob {
             // Note: the glob below would be used, but libgit doesn't care for union globs.
             // write!(f, "refs/{{remotes/**/*,heads/*}}")
             Self::Branch => panic!(
-                "unfortunately, libgit does not support union of globs\notherwise this would display refs/{{remotes/**/*,heads/*}}"
+                "fatal: `Display` should not be called on `RefGlob::Branch`. Since this `enum` is
+                private to the repository, it should not be called from the outside.
+                Unfortunately, libgit does not support union of globs
+                otherwise this would display refs/{{remotes/**/*,heads/*}}"
             ),
         }
     }
