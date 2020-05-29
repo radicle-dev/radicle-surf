@@ -1,5 +1,5 @@
 env:
-  DOCKER_IMAGE: "gcr.io/opensourcecoin/radicle-surf-build@sha256:24252f659024808246d8c4d674f19d8d923688cd5f857f4a607fe8dbf42c491c"
+  DOCKER_IMAGE: "gcr.io/opensourcecoin/radicle-surf-build@sha256:7d8c307ecc842440895af08ae035905302fc0327d335fd11361ea2e94b5e8797"
   DOCKER_FILE: .buildkite/docker/rust-nightly/Dockerfile
 
 steps:
