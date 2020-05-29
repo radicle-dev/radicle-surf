@@ -68,7 +68,7 @@ fn main() {
     let golden_status = setup_namespace(
         curr_dir,
         "refs/namespaces/golden/refs/heads/master",
-        "refs/heads/dev",
+        "refs/heads/master",
     );
     assert!(
         golden_status.success(),
@@ -78,7 +78,7 @@ fn main() {
     let silver_status = setup_namespace(
         curr_dir,
         "refs/namespaces/golden/refs/namespaces/silver/refs/heads/master",
-        "refs/remotes/origin/dev",
+        "refs/heads/dev",
     );
     assert!(
         silver_status.success(),
