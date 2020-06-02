@@ -84,6 +84,7 @@ pub use crate::{
         Oid,
         RevObject,
         Signature,
+        Stats,
         Tag,
         TagName,
     },
@@ -847,6 +848,18 @@ impl<'a> Browser<'a> {
         let rev = self.repository.rev(revspec)?;
         let commit = rev.into_commit(&self.repository.repo_ref)?;
         self.repository.revision_branches(&commit.id())
+    }
+
+    // 1) write a doctest
+    // 2) try to complete the struct
+    // can prob get commit & contr count from browser history
+    pub fn get_stats(&self) -> Result<Stats, Error> {
+        let branch_count = self.list_branches(None)?.len();
+        Ok(Stats {
+            branch_count,
+            commit_count: todo!(),
+            contributor_count: todo!(),
+        })
     }
 
     /// Do a pre-order TreeWalk of the given commit. This turns a Tree

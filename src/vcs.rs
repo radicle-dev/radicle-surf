@@ -214,7 +214,7 @@ pub trait VCS<A, Error> {
     /// The way to identify a History.
     type HistoryId;
 
-    /// The way to identify an artifact.
+    /// The way to identify an artefact.
     type ArtefactId;
 
     /// Find a History in a Repo given a way to identify it
@@ -223,6 +223,6 @@ pub trait VCS<A, Error> {
     /// Find all histories in a Repo
     fn get_histories(&self) -> Result<Vec<History<A>>, Error>;
 
-    /// Identify artifacts of a Repository
-    fn get_identifier(artifact: &A) -> Self::ArtefactId;
+    /// Identify artefacts of a Repository
+    fn get_identifier(artefact: &A) -> Self::ArtefactId;
 }

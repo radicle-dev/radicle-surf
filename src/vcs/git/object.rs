@@ -126,6 +126,12 @@ impl BranchName {
     }
 }
 
+pub struct Stats {
+    pub commit_count: usize,
+    pub branch_count: usize,
+    pub contributor_count: usize,
+}
+
 /// The static information of a `git2::Branch`.
 ///
 /// **Note**: The `PartialOrd` and `Ord` implementations compare on `BranchName`
