@@ -16,7 +16,7 @@ regex = "1.3"
 thiserror = "1.0"
 
 [dependencies.git2]
-version = ">= 0.10"
+version = ">= 0.12"
 default-features = false
 features = []
 
