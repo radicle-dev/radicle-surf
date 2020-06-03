@@ -850,9 +850,31 @@ impl<'a> Browser<'a> {
         self.repository.revision_branches(&commit.id())
     }
 
-    // 1) write a doctest
-    // 2) try to complete the struct
-    // can prob get commit & contr count from browser history
+    /// Get the [`Stats`] of the underlying [`Repository`].
+    ///
+    /// # Errors
+    ///
+    /// * [`error::Error::Git`]
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use radicle_surf::vcs::git::{Browser, Repository};
+    /// # use std::error::Error;
+    ///
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let repo = Repository::new("./data/git-platinum")?;
+    /// let mut browser = Browser::new(&repo)?;
+    ///
+    /// let stats = browser.get_stats()?;
+    ///
+    /// // there should be 5 branches (local & remote)
+    /// assert!(stats.branch_count == 5);
+    ///
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn get_stats(&self) -> Result<Stats, Error> {
         let branch_count = self.list_branches(None)?.len();
         Ok(Stats {

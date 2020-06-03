@@ -126,9 +126,13 @@ impl BranchName {
     }
 }
 
+/// Stats for a repository
 pub struct Stats {
+    /// Number of commits
     pub commit_count: usize,
+    /// Number of branches (local & remote)
     pub branch_count: usize,
+    /// Number of contributors
     pub contributor_count: usize,
 }
 
