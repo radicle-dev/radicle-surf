@@ -869,17 +869,23 @@ impl<'a> Browser<'a> {
     /// let stats = browser.get_stats()?;
     ///
     /// // there should be 5 branches (local & remote)
-    /// assert!(stats.branch_count == 5);
+    /// assert_eq!(stats.branch_count, 5);
     ///
+    /// // there should be 14 commits
+    /// assert_eq!(stats.commit_count, 14);
     ///
     /// # Ok(())
     /// # }
     /// ```
     pub fn get_stats(&self) -> Result<Stats, Error> {
+        let history = self.repository.head()?;
+
         let branch_count = self.list_branches(None)?.len();
+        let commit_count = history.iter().count();
+
         Ok(Stats {
             branch_count,
-            commit_count: todo!(),
+            commit_count,
             contributor_count: todo!(),
         })
     }
