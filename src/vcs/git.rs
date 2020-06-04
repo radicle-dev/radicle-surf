@@ -874,6 +874,9 @@ impl<'a> Browser<'a> {
     /// // there should be 14 commits
     /// assert_eq!(stats.commit_count, 14);
     ///
+    /// // 4 contributors: Alexander Simmerl, Fintan Halpenny, FintanH, Rudolfs Ošiņš
+    /// assert_eq!(stats.contributor_count, 4);
+    ///
     /// # Ok(())
     /// # }
     /// ```
@@ -882,11 +885,17 @@ impl<'a> Browser<'a> {
 
         let branch_count = self.list_branches(None)?.len();
         let commit_count = history.iter().count();
+        let mut contributors: Vec<String> =
+            history.iter().cloned().map(|x| x.author.name).collect();
+        contributors.sort();
+        contributors.dedup();
+
+        let contributor_count = contributors.iter().count();
 
         Ok(Stats {
             branch_count,
             commit_count,
-            contributor_count: todo!(),
+            contributor_count,
         })
     }
 
