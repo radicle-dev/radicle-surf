@@ -823,7 +823,7 @@ impl<'a> Browser<'a> {
         let history = self.repository.head()?;
 
         let branch_count = self.list_branches(Some(BranchType::Local))?.len();
-        let commit_count = history.iter().count();
+        let commit_count = history.len();
 
         let mut contributors = history
             .iter()
