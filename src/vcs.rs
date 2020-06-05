@@ -55,6 +55,11 @@ impl<A> History<A> {
         self.0.len()
     }
 
+    /// Check if `History` is empty
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     /// Given that the `History` is topological order from most
     /// recent artifact to least recent, `find_suffix` gets returns
     /// the history up until the point of the given artifact.
