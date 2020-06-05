@@ -50,6 +50,11 @@ impl<A> History<A> {
         self.0.first()
     }
 
+    /// Get the length of `History` (aka the artefacts count)
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
     /// Given that the `History` is topological order from most
     /// recent artifact to least recent, `find_suffix` gets returns
     /// the history up until the point of the given artifact.
