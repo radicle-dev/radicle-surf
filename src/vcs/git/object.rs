@@ -130,7 +130,7 @@ impl BranchName {
 pub struct Stats {
     /// Number of commits
     pub commit_count: usize,
-    /// Number of branches (local & remote)
+    /// Number of local branches
     pub branch_count: usize,
     /// Number of contributors
     pub contributor_count: usize,
