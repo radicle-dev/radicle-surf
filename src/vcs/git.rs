@@ -868,8 +868,8 @@ impl<'a> Browser<'a> {
     ///
     /// let stats = browser.get_stats()?;
     ///
-    /// // there should be 5 branches (local & remote)
-    /// assert_eq!(stats.branch_count, 5);
+    /// // there should be 2 local branches
+    /// assert_eq!(stats.branch_count, 2);
     ///
     /// // there should be 14 commits
     /// assert_eq!(stats.commit_count, 14);
@@ -883,14 +883,18 @@ impl<'a> Browser<'a> {
     pub fn get_stats(&self) -> Result<Stats, Error> {
         let history = self.repository.head()?;
 
-        let branch_count = self.list_branches(None)?.len();
+        let branch_count = self.list_branches(Some(BranchType::Local))?.len();
         let commit_count = history.iter().count();
-        let mut contributors: Vec<String> =
-            history.iter().cloned().map(|x| x.author.name).collect();
+
+        let mut contributors = history
+            .iter()
+            .cloned()
+            .map(|x| x.author.name)
+            .collect::<Vec<_>>();
         contributors.sort();
         contributors.dedup();
 
-        let contributor_count = contributors.iter().count();
+        let contributor_count = contributors.len();
 
         Ok(Stats {
             branch_count,
