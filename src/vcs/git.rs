@@ -820,7 +820,7 @@ impl<'a> Browser<'a> {
     /// # }
     /// ```
     pub fn get_stats(&self) -> Result<Stats, Error> {
-        let history = self.repository.head()?;
+        let history = self.repository.head().unwrap();
 
         let branch_count = self.list_branches(Some(BranchType::Local))?.len();
         let commit_count = history.len();
