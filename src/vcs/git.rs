@@ -820,12 +820,11 @@ impl<'a> Browser<'a> {
     /// # }
     /// ```
     pub fn get_stats(&self) -> Result<Stats, Error> {
-        let history = self.repository.head().unwrap();
-
         let branch_count = self.list_branches(Some(BranchType::Local))?.len();
-        let commit_count = history.len();
+        let commit_count = self.history.len();
 
-        let mut contributors = history
+        let mut contributors = self
+            .history
             .iter()
             .cloned()
             .map(|x| x.author.name)
