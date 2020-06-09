@@ -184,6 +184,52 @@ impl<'a> Browser<'a> {
         })
     }
 
+    /// Create a new `Browser` that starts in a given `namespace`.
+    ///
+    /// # Errors
+    ///
+    /// * [`error::Error::Git`]
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use radicle_surf::vcs::git::{Browser, Repository, Branch, BranchName, Namespace};
+    /// # use std::error::Error;
+    ///
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let repo = Repository::new("./data/git-platinum")?;
+    /// let browser = Browser::new_with_namespace(&repo, &Namespace::from("golden"), "master")?;
+    ///
+    /// assert_eq!(
+    ///     browser.list_branches(None)?,
+    ///     vec![Branch::local(BranchName::new("namespaces/golden/refs/heads/master"))]
+    /// );
+    /// #
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn new_with_namespace(
+        repository: impl Into<RepositoryRef<'a>>,
+        namespace: &Namespace,
+        revision: &str,
+    ) -> Result<Self, Error> {
+        let repository = repository.into();
+        // This is a bit weird, the references don't seem to all be present unless we
+        // make a call to `references` o_O.
+        let _ = repository.repo_ref.references()?;
+        repository.switch_namespace(&namespace.to_string())?;
+        let history = repository.get_history(revision.to_string())?;
+        let snapshot = Box::new(|repository: &RepositoryRef<'a>, history: &History| {
+            let tree = Self::get_tree(&repository.repo_ref, history.0.first())?;
+            Ok(directory::Directory::from_hash_map(tree))
+        });
+        Ok(vcs::Browser {
+            snapshot,
+            history,
+            repository,
+        })
+    }
+
     /// Switch the namespace you are browsing in. This will consume the previous
     /// `Browser` and give you back a new `Browser` for that particular
     /// namespace. The `revision` provided will kick-off the history for
