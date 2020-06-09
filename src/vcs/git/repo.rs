@@ -24,7 +24,7 @@ use crate::{
         git::{
             error::*,
             object::{Branch, Commit, Namespace, RevObject, Signature, Tag},
-            reference::glob::RefGlob,
+            reference::{glob::RefGlob, Ref},
         },
         VCS,
     },
@@ -125,7 +125,7 @@ impl<'a> RepositoryRef<'a> {
     /// * [`Error::Git`]
     /// * [`Error::RevParseFailure`]
     pub fn rev(&self, spec: &str) -> Result<RevObject, Error> {
-        RevObject::from_revparse(&self.repo_ref, spec)
+        RevObject::from_revparse(&self, spec)
     }
 
     /// Create a [`History`] given a
@@ -136,8 +136,22 @@ impl<'a> RepositoryRef<'a> {
     /// * [`Error::Git`]
     /// * [`Error::RevParseFailure`]
     pub fn revspec(&self, spec: &str) -> Result<History, Error> {
-        let rev = self.rev(spec)?;
-        let commit = rev.into_commit(&self.repo_ref)?;
+        let commit = if let Some(namespace) = self.which_namespace()? {
+            let references = Ref::from_namespace_str(&namespace, spec);
+            match Ref::try_find_commit(references, self) {
+                Some(commit) => commit,
+                None => {
+                    return Err(Error::NamespaceRevParseFailure {
+                        namespace,
+                        rev: spec.to_string(),
+                    })
+                },
+            }
+        } else {
+            let rev = self.rev(spec)?;
+            rev.into_commit(&self.repo_ref)?
+        };
+
         self.commit_to_history(commit)
     }
 
