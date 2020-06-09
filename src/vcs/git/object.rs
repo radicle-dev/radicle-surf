@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::vcs::git::error::*;
+use crate::vcs::git::{error::*, repo::RepositoryRef};
 pub use git2::{BranchType, Oid};
 use std::{cmp::Ordering, convert::TryFrom, fmt, str};
 
@@ -358,8 +358,8 @@ impl RevObject {
     ///
     /// * `Error::Git` if the `revspec` provided fails to parse
     /// * `Error::RevParseFailure` if conversion to a target object fail.
-    pub fn from_revparse(repo: &git2::Repository, spec: &str) -> Result<Self, Error> {
-        let (object, optional_ref) = repo.revparse_ext(spec)?;
+    pub fn from_revparse<'a>(repo: &RepositoryRef<'a>, spec: &str) -> Result<Self, Error> {
+        let (object, optional_ref) = repo.repo_ref.revparse_ext(spec)?;
 
         let tag = object.into_tag().map(Tag::try_from);
         match tag {

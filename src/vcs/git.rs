@@ -899,7 +899,7 @@ mod tests {
     #[cfg(test)]
     mod namespace {
         use super::*;
-        use pretty_assertions::assert_eq;
+        use pretty_assertions::{assert_eq, assert_ne};
 
         #[test]
         fn golden_namespace() -> Result<(), Error> {
@@ -941,7 +941,7 @@ mod tests {
                 silver_browser.which_namespace(),
                 Ok(Some(Namespace::from("golden/silver")))
             );
-            assert_eq!(history, silver_browser.history);
+            assert_ne!(history, silver_browser.history);
 
             let branches: Vec<Branch> = vec![Branch::local(BranchName::new(
                 "namespaces/golden/refs/namespaces/silver/refs/heads/master",

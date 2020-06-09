@@ -21,7 +21,7 @@
 use crate::{
     diff,
     file_system,
-    vcs::git::object::{BranchName, TagName},
+    vcs::git::object::{BranchName, Namespace, TagName},
 };
 use std::str;
 use thiserror::Error;
@@ -44,6 +44,15 @@ pub enum Error {
     /// commit object.
     #[error("provided revspec '{rev}' could not be parsed into a git object")]
     RevParseFailure {
+        /// The provided revspec that failed to parse.
+        rev: String,
+    },
+    /// A `revspec` was provided that could not be found in the given
+    /// `namespace`.
+    #[error("provided revspec '{rev}' could not be parsed into a git object in the namespace '{namespace}'")]
+    NamespaceRevParseFailure {
+        /// The namespace we are in when attempting to fetch the `rev`.
+        namespace: Namespace,
         /// The provided revspec that failed to parse.
         rev: String,
     },

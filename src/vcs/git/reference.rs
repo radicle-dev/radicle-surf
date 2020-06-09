@@ -15,7 +15,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::vcs::git::object::{BranchName, Oid, TagName};
+use crate::vcs::git::{
+    object::{BranchName, Namespace, Oid, TagName},
+    repo::RepositoryRef,
+};
 use regex::Regex;
 use std::{fmt, str};
 use thiserror::Error;
@@ -60,6 +63,83 @@ pub enum Ref {
         /// moi/refs/remotes/origin/master`.
         reference: Box<Ref>,
     },
+}
+
+impl Ref {
+    /// We try and build a `Ref` based off of whether we have a list of
+    /// namespaces or not.
+    pub(crate) fn from_namespace_str(
+        Namespace { values: namespaces }: &Namespace,
+        spec: &str,
+    ) -> Vec<Result<Ref, git2::Error>> {
+        let maybe_commit = Oid::from_str(spec).map(|sha| Self::Commit { sha });
+
+        let tag = Self::Tag {
+            name: TagName::new(spec),
+        };
+
+        let local_branch = Self::LocalBranch {
+            name: BranchName::new(spec),
+        };
+
+        let remote_branch = Self::RemoteBranch {
+            remote: "**".to_string(),
+            name: BranchName::new(spec),
+        };
+
+        if namespaces.is_empty() {
+            vec![Ok(tag), Ok(local_branch), Ok(remote_branch), maybe_commit]
+        } else {
+            let mut ref_namespaces = vec![tag, local_branch, remote_branch];
+            for namespace in namespaces.iter().rev() {
+                for ref_namespace in ref_namespaces.iter_mut() {
+                    *ref_namespace = Self::Namespace {
+                        namespace: namespace.clone(),
+                        reference: Box::new(ref_namespace.clone()),
+                    };
+                }
+            }
+            let mut ref_namespaces: Vec<Result<Ref, git2::Error>> =
+                ref_namespaces.into_iter().map(Ok).collect();
+            ref_namespaces.push(maybe_commit);
+
+            ref_namespaces
+        }
+    }
+
+    /// We try to find a [`git2::Commit`] based off of a `Ref` by either finding
+    /// the commit by SHA, or turning the ref into a fully qualified ref
+    /// (e.g. refs/remotes/**/master).
+    pub(crate) fn find_ref<'a>(
+        &self,
+        repo: &RepositoryRef<'a>,
+    ) -> Result<git2::Commit<'a>, git2::Error> {
+        match self {
+            Self::Commit { sha } => repo.repo_ref.find_commit(*sha),
+            other => {
+                let refglob = other.to_string();
+                repo.repo_ref
+                    .find_reference(&refglob)
+                    .and_then(|reference| reference.peel_to_commit())
+            },
+        }
+    }
+
+    /// Given a list of `Ref`s, make a best effort to try find a
+    /// [`git2::Commit`] by probing each `Ref` until we get a commit.
+    /// Otherwise, we couldn't find it.
+    pub(crate) fn try_find_commit<'a>(
+        references: Vec<Result<Self, git2::Error>>,
+        repo: &RepositoryRef<'a>,
+    ) -> Option<git2::Commit<'a>> {
+        for reference in references {
+            match reference.and_then(|reference| reference.find_ref(repo)) {
+                Ok(commit) => return Some(commit),
+                Err(_) => continue,
+            }
+        }
+        None
+    }
 }
 
 impl fmt::Display for Ref {
