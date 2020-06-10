@@ -328,22 +328,19 @@ impl<'a> RepositoryRef<'a> {
     }
 
     pub(crate) fn revision_branches(&self, oid: &Oid) -> Result<Vec<Branch>, Error> {
-        let branches = self
-            .repo_ref
-            .branches(Some(BranchType::Local))?
-            .collect::<Result<Vec<(git2::Branch, BranchType)>, git2::Error>>()?;
+        let references = RefGlob::LocalBranch.references(self)?;
 
         let mut contained_branches = vec![];
 
-        branches.into_iter().try_for_each(|(branch, locality)| {
-            self.reachable_from(&branch.get(), &oid)
-                .and_then(|contains| {
-                    if contains {
-                        let branch = Branch::from_git_branch(branch, locality)?;
-                        contained_branches.push(branch);
-                    }
-                    Ok(())
-                })
+        references.iter().try_for_each(|reference| {
+            let reference = reference?;
+            self.reachable_from(&reference, &oid).and_then(|contains| {
+                if contains {
+                    let branch = Branch::try_from(reference)?;
+                    contained_branches.push(branch);
+                }
+                Ok(())
+            })
         })?;
 
         Ok(contained_branches)

@@ -838,7 +838,7 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Browser, Repository, Branch, BranchName, Oid};
+    /// use radicle_surf::vcs::git::{Browser, Repository, Branch, BranchName, Namespace, Oid};
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -860,6 +860,14 @@ impl<'a> Browser<'a> {
     ///         Branch::local(BranchName::new("dev")),
     ///         Branch::local(BranchName::new("master")),
     ///     ]
+    /// );
+    ///
+    /// let golden_browser = browser.switch_namespace(&Namespace::from("golden"), "master")?;
+    ///
+    /// let branches = golden_browser.revision_branches("27acd68c7504755aa11023300890bb85bbd69d45")?;
+    /// assert_eq!(
+    ///     branches,
+    ///     vec![Branch::local(BranchName::new("banana"))]
     /// );
     /// #
     /// # Ok(())
