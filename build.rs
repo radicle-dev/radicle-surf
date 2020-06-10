@@ -65,14 +65,24 @@ fn main() {
     let master_status = checkout(curr_dir, "master");
     assert!(master_status.success(), "failed to checkout master");
 
-    let golden_status = setup_namespace(
+    let golden_master = setup_namespace(
         curr_dir,
         "refs/namespaces/golden/refs/heads/master",
         "refs/heads/master",
     );
     assert!(
-        golden_status.success(),
-        "failed to set up 'golden' namespace"
+        golden_master.success(),
+        "failed to set up 'golden' master branch namespace"
+    );
+
+    let golden_banana = setup_namespace(
+        curr_dir,
+        "refs/namespaces/golden/refs/heads/banana",
+        "refs/heads/dev",
+    );
+    assert!(
+        golden_banana.success(),
+        "failed to set up 'golden' banana branch in namespace"
     );
 
     let golden_tag_v1 = setup_namespace(
