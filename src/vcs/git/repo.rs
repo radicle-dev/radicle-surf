@@ -140,11 +140,14 @@ impl<'a> RepositoryRef<'a> {
             let references = Ref::from_namespace_str(&namespace, spec);
             match Ref::try_find_commit(references, self) {
                 Some(commit) => commit,
-                None => {
-                    return Err(Error::NamespaceRevParseFailure {
-                        namespace,
-                        rev: spec.to_string(),
-                    })
+                None => match Oid::from_str(spec).and_then(|oid| self.repo_ref.find_commit(oid)) {
+                    Ok(commit) => commit,
+                    Err(_) => {
+                        return Err(Error::NamespaceRevParseFailure {
+                            namespace,
+                            rev: spec.to_string(),
+                        })
+                    },
                 },
             }
         } else {

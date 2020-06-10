@@ -110,7 +110,12 @@ impl TryFrom<&[u8]> for BranchName {
     type Error = str::Utf8Error;
 
     fn try_from(name: &[u8]) -> Result<Self, Self::Error> {
-        str::from_utf8(name).map(|name| Self(String::from(name)))
+        let name = str::from_utf8(name)?;
+        let short_name = match git_ext::try_extract_refname(name) {
+            Ok(stripped) => stripped,
+            Err(original) => original,
+        };
+        Ok(Self(String::from(short_name)))
     }
 }
 
@@ -193,7 +198,7 @@ impl<'repo> TryFrom<git2::Reference<'repo>> for Branch {
         let is_remote = reference.is_remote();
         let is_tag = reference.is_tag();
         let is_note = reference.is_note();
-        let name = BranchName::try_from(reference.shorthand_bytes())?;
+        let name = BranchName::try_from(reference.name_bytes())?;
 
         // Best effort to not return tags or notes. Assuming everything after that is a
         // branch.
@@ -226,7 +231,12 @@ impl TryFrom<&[u8]> for TagName {
     type Error = str::Utf8Error;
 
     fn try_from(name: &[u8]) -> Result<Self, Self::Error> {
-        str::from_utf8(name).map(|name| Self(String::from(name)))
+        let name = str::from_utf8(name)?;
+        let short_name = match git_ext::try_extract_refname(name) {
+            Ok(stripped) => stripped,
+            Err(original) => original,
+        };
+        Ok(Self(String::from(short_name)))
     }
 }
 
@@ -312,7 +322,7 @@ impl<'repo> TryFrom<git2::Reference<'repo>> for Tag {
     type Error = Error;
 
     fn try_from(reference: git2::Reference) -> Result<Self, Self::Error> {
-        let name = TagName::try_from(reference.shorthand_bytes())?;
+        let name = TagName::try_from(reference.name_bytes())?;
 
         if !git_ext::is_tag(&reference) {
             return Err(Error::NotTag(name));
@@ -455,6 +465,18 @@ impl TryFrom<&[u8]> for Namespace {
 }
 
 pub(super) mod git_ext {
+    /// Try to strip any refs/namespaces, refs/heads, refs/remotes, and
+    /// refs/tags. If this fails we return the original string.
+    pub fn try_extract_refname(spec: &str) -> Result<&str, &str> {
+        let re =
+            regex::Regex::new(r"(refs/namespaces/.*)*(refs/heads/|refs/remotes/|refs/tags/)(.*)")
+                .unwrap();
+
+        re.captures(spec)
+            .and_then(|c| c.get(3).map(|m| m.as_str()))
+            .ok_or(spec)
+    }
+
     /// [`git2::Reference::is_tag`] just does a check for the prefix of `tags/`.
     /// This issue with that is, as soon as we're in 'namespaces' ref that
     /// is a tag it will say that it's not a tag. Instead we do a regex check on

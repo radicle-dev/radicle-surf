@@ -16,7 +16,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::vcs::git::{
-    object::{BranchName, Namespace, Oid, TagName},
+    object::{BranchName, Namespace, TagName},
     repo::RepositoryRef,
 };
 use regex::Regex;
@@ -25,8 +25,6 @@ use thiserror::Error;
 
 pub(super) mod glob;
 
-/// TODO(finto): This isn't used currently, but it could be a better way of
-/// passing around references.
 /// A structured way of referring to a git reference.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Ref {
@@ -46,11 +44,6 @@ pub enum Ref {
         remote: String,
         /// The name of the branch, e.g. `master`.
         name: BranchName,
-    },
-    /// A git commit.
-    Commit {
-        /// The SHA value of the commit.
-        sha: Oid,
     },
     /// A git namespace, which can be found under `.git/refs/namespaces/`.
     ///
@@ -84,8 +77,6 @@ impl Ref {
         Namespace { values: namespaces }: &Namespace,
         spec: &str,
     ) -> Vec<Result<Ref, git2::Error>> {
-        let maybe_commit = Oid::from_str(spec).map(|sha| Self::Commit { sha });
-
         let tag = Self::Tag {
             name: TagName::new(spec),
         };
@@ -100,7 +91,7 @@ impl Ref {
         };
 
         if namespaces.is_empty() {
-            vec![Ok(tag), Ok(local_branch), Ok(remote_branch), maybe_commit]
+            vec![Ok(tag), Ok(local_branch), Ok(remote_branch)]
         } else {
             let mut ref_namespaces = vec![tag, local_branch, remote_branch];
             for namespace in namespaces.iter().rev() {
@@ -111,43 +102,17 @@ impl Ref {
                     };
                 }
             }
-            let mut ref_namespaces: Vec<Result<Ref, git2::Error>> =
-                ref_namespaces.into_iter().map(Ok).collect();
-            ref_namespaces.push(maybe_commit);
-
-            ref_namespaces
+            ref_namespaces.into_iter().map(Ok).collect()
         }
     }
 
-    /// We try to find a [`git2::Commit`] based off of a `Ref` by either finding
-    /// the commit by SHA, or turning the ref into a fully qualified ref
-    /// (e.g. refs/remotes/**/master).
+    /// We try to find a [`git2::Reference`] based off of a `Ref` by turning the
+    /// ref into a fully qualified ref (e.g. refs/remotes/**/master).
     pub(crate) fn find_ref<'a>(
         &self,
         repo: &RepositoryRef<'a>,
-    ) -> Result<git2::Commit<'a>, git2::Error> {
-        match self {
-            Self::Commit { sha } => repo.repo_ref.find_commit(*sha),
-            other => {
-                let refglob = other.to_string();
-                repo.repo_ref
-                    .find_reference(&refglob)
-                    .and_then(|reference| reference.peel_to_commit())
-            },
-        }
-    }
-
-    pub(crate) fn find_ref_todo<'a>(
-        &self,
-        repo: &RepositoryRef<'a>,
     ) -> Result<git2::Reference<'a>, git2::Error> {
-        match self {
-            Self::Commit { sha: _sha } => todo!(),
-            other => {
-                let refglob = other.to_string();
-                repo.repo_ref.find_reference(&refglob)
-            },
-        }
+        repo.repo_ref.find_reference(&self.to_string())
     }
 
     /// Given a list of `Ref`s, make a best effort to try find a
@@ -159,7 +124,7 @@ impl Ref {
     ) -> Option<git2::Commit<'a>> {
         for reference in references {
             match reference.and_then(|reference| reference.find_ref(repo)) {
-                Ok(commit) => return Some(commit),
+                Ok(reference) => return reference.peel_to_commit().ok(),
                 Err(_) => continue,
             }
         }
@@ -177,7 +142,6 @@ impl fmt::Display for Ref {
                 namespace,
                 reference,
             } => write!(f, "refs/namespaces/{}/{}", namespace, reference),
-            Self::Commit { sha } => write!(f, "{}", sha.to_string()),
         }
     }
 }
@@ -204,13 +168,9 @@ impl str::FromStr for Ref {
             )
             .unwrap();
         }
-        REF.captures(reference).map_or_else(
-            || {
-                Ok(Self::Commit {
-                    sha: Oid::from_str(reference)?,
-                })
-            },
-            |cap| {
+        REF.captures(reference)
+            .ok_or_else(|| ParseError::MalformedRef(reference.to_string()))
+            .and_then(|cap| {
                 // Get the capture match for the prefix, i.e. 'refs/*'.
                 // If we don't have a capture, we fall back to the reference string
                 // in case it's a commit SHA.
@@ -249,8 +209,7 @@ impl str::FromStr for Ref {
                     },
                     _ => Err(ParseError::MalformedRef(reference.to_string())),
                 }
-            },
-        )
+            })
     }
 }
 
@@ -304,13 +263,6 @@ mod tests {
                         name: TagName::new("v1.0.0")
                     })
                 })
-            })
-        );
-
-        assert_eq!(
-            Ref::from_str("3c78ee34dfc5fd4ae0cc7dd92d5a00a55197ba23"),
-            Ok(Ref::Commit {
-                sha: Oid::from_str("3c78ee34dfc5fd4ae0cc7dd92d5a00a55197ba23").unwrap()
             })
         );
 

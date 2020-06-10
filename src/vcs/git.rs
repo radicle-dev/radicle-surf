@@ -201,9 +201,15 @@ impl<'a> Browser<'a> {
     /// let repo = Repository::new("./data/git-platinum")?;
     /// let browser = Browser::new_with_namespace(&repo, &Namespace::from("golden"), "master")?;
     ///
+    /// let mut branches = browser.list_branches(None)?;
+    /// branches.sort();
+    ///
     /// assert_eq!(
-    ///     browser.list_branches(None)?,
-    ///     vec![Branch::local(BranchName::new("namespaces/golden/refs/heads/master"))]
+    ///     branches,
+    ///     vec![
+    ///         Branch::local(BranchName::new("banana")),
+    ///         Branch::local(BranchName::new("master")),
+    ///     ]
     /// );
     /// #
     /// # Ok(())
@@ -347,7 +353,7 @@ impl<'a> Browser<'a> {
                 name: branch_name.clone(),
             }
             .namespaced(&namespace)
-            .find_ref_todo(&self.repository),
+            .find_ref(&self.repository),
             None => self
                 .repository
                 .repo_ref
@@ -410,7 +416,7 @@ impl<'a> Browser<'a> {
                 name: tag_name.clone(),
             }
             .namespaced(&namespace)
-            .find_ref_todo(&self.repository),
+            .find_ref(&self.repository),
             None => self
                 .repository
                 .repo_ref
@@ -569,9 +575,12 @@ impl<'a> Browser<'a> {
     /// // We can also switch namespaces and list the branches in that namespace.
     /// let golden = browser.switch_namespace(&Namespace::from("golden"), "master")?;
     ///
-    /// let branches = golden.list_branches(Some(BranchType::Local))?;
+    /// let mut branches = golden.list_branches(Some(BranchType::Local))?;
+    /// branches.sort();
+    ///
     /// assert_eq!(branches, vec![
-    ///     Branch::local(BranchName::new("namespaces/golden/refs/heads/master")),
+    ///     Branch::local(BranchName::new("banana")),
+    ///     Branch::local(BranchName::new("master")),
     /// ]);
     /// #
     /// # Ok(())
@@ -633,11 +642,11 @@ impl<'a> Browser<'a> {
     /// assert_eq!(branches, vec![
     ///     Tag::Light {
     ///         id: Oid::from_str("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3")?,
-    ///         name: TagName::new("namespaces/golden/refs/tags/v0.1.0"),
+    ///         name: TagName::new("v0.1.0"),
     ///     },
     ///     Tag::Light {
     ///         id: Oid::from_str("2429f097664f9af0c5b7b389ab998b2199ffa977")?,
-    ///         name: TagName::new("namespaces/golden/refs/tags/v0.2.0")
+    ///         name: TagName::new("v0.2.0")
     ///     },
     /// ]);
     /// #
@@ -1084,9 +1093,7 @@ mod tests {
             );
             assert_ne!(history, silver_browser.history);
 
-            let branches: Vec<Branch> = vec![Branch::local(BranchName::new(
-                "namespaces/golden/refs/namespaces/silver/refs/heads/master",
-            ))];
+            let branches: Vec<Branch> = vec![Branch::local(BranchName::new("master"))];
 
             assert_eq!(branches, silver_browser.list_branches(None)?);
 
