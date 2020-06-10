@@ -578,7 +578,7 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Browser, Oid, Repository, Tag, TagName};
+    /// use radicle_surf::vcs::git::{Browser, Namespace, Oid, Repository, Tag, TagName};
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -612,6 +612,21 @@ impl<'a> Browser<'a> {
     ///         },
     ///     ]
     /// );
+    ///
+    /// // We can also switch namespaces and list the branches in that namespace.
+    /// let golden = browser.switch_namespace(&Namespace::from("golden"), "master")?;
+    ///
+    /// let branches = golden.list_tags()?;
+    /// assert_eq!(branches, vec![
+    ///     Tag::Light {
+    ///         id: Oid::from_str("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3")?,
+    ///         name: TagName::new("namespaces/golden/refs/tags/v0.1.0"),
+    ///     },
+    ///     Tag::Light {
+    ///         id: Oid::from_str("2429f097664f9af0c5b7b389ab998b2199ffa977")?,
+    ///         name: TagName::new("namespaces/golden/refs/tags/v0.2.0")
+    ///     },
+    /// ]);
     /// #
     /// # Ok(())
     /// # }

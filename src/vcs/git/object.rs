@@ -304,7 +304,7 @@ impl<'repo> TryFrom<git2::Reference<'repo>> for Tag {
     fn try_from(reference: git2::Reference) -> Result<Self, Self::Error> {
         let name = TagName::try_from(reference.shorthand_bytes())?;
 
-        if !reference.is_tag() {
+        if git_ext::is_tag(&reference) {
             return Err(Error::NotTag(name));
         }
 
@@ -441,5 +441,18 @@ impl TryFrom<&[u8]> for Namespace {
 
     fn try_from(namespace: &[u8]) -> Result<Self, Self::Error> {
         str::from_utf8(namespace).map(Namespace::from)
+    }
+}
+
+mod git_ext {
+    /// [`git2::Reference::is_tag`] just does a check for the prefix of `tags/`.
+    /// This issue with that is, as soon as we're in 'namespaces' ref that
+    /// is a tag it will say that it's not a tag. So we work around that by
+    /// splitting the path and checking that a portion of it is a 'tags'
+    /// path.
+    pub(super) fn is_tag(reference: &git2::Reference) -> bool {
+        let name = reference.name_bytes();
+        // split on '/' and check if a portion of the path is equal to 'tags'.
+        name.rsplit(|c| c == &218).any(|path| path == b"tags")
     }
 }

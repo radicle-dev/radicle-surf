@@ -75,6 +75,26 @@ fn main() {
         "failed to set up 'golden' namespace"
     );
 
+    let golden_tag_v1 = setup_namespace(
+        curr_dir,
+        "refs/namespaces/golden/refs/tags/v0.1.0",
+        "refs/tags/v0.1.0",
+    );
+    assert!(
+        golden_tag_v1.success(),
+        "failed to set up 'golden' tag v0.1.0 namespace"
+    );
+
+    let golden_tag_v2 = setup_namespace(
+        curr_dir,
+        "refs/namespaces/golden/refs/tags/v0.2.0",
+        "refs/tags/v0.2.0",
+    );
+    assert!(
+        golden_tag_v2.success(),
+        "failed to set up 'golden' tag v0.2.0 namespace"
+    );
+
     let silver_status = setup_namespace(
         curr_dir,
         "refs/namespaces/golden/refs/namespaces/silver/refs/heads/master",
