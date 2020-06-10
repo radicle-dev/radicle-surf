@@ -105,6 +105,6 @@ fn main() {
         "failed to set up 'golden/silver' namespace"
     );
 
-    // Tell the build script that we should re-run this if git-platinum changes.
-    println!("cargo:rerun-if-changed=data/git-platinum");
+    // Tell the build script that we should re-run if this script changes.
+    println!("cargo:rerun-if-changed=build.rs");
 }
