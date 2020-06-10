@@ -24,7 +24,7 @@ use radicle_surf::{
 fn last_commit_comparison(c: &mut Criterion) {
     let repo = Repository::new("./data/git-platinum")
         .expect("Could not retrieve ./data/git-platinum as git repository");
-    let browser = Browser::new(&repo).expect("Could not initialise Browser");
+    let browser = Browser::new(&repo, "master").expect("Could not initialise Browser");
 
     let mut group = c.benchmark_group("Last Commit");
     for path in [
