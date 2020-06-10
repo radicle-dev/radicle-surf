@@ -342,18 +342,25 @@ impl<'a> Browser<'a> {
     /// # }
     /// ```
     pub fn branch(&mut self, branch_name: BranchName) -> Result<(), Error> {
-        let name = branch_name.name();
-        let is_branch = self
-            .repository
-            .repo_ref
-            .resolve_reference_from_short_name(name)
-            .map(|reference| reference.is_branch() || reference.is_remote())?;
+        let reference = match self.which_namespace()? {
+            Some(namespace) => Ref::LocalBranch {
+                name: branch_name.clone(),
+            }
+            .namespaced(&namespace)
+            .find_ref_todo(&self.repository),
+            None => self
+                .repository
+                .repo_ref
+                .resolve_reference_from_short_name(branch_name.name()),
+        }?;
+
+        let is_branch = object::git_ext::is_branch(&reference) || reference.is_remote();
 
         if !is_branch {
             return Err(Error::NotBranch(branch_name));
         }
 
-        let branch = self.get_history(name.to_string())?;
+        let branch = self.repository.to_history(&reference)?;
         self.set(branch);
         Ok(())
     }
@@ -398,18 +405,23 @@ impl<'a> Browser<'a> {
     /// # }
     /// ```
     pub fn tag(&mut self, tag_name: TagName) -> Result<(), Error> {
-        let name = tag_name.name();
+        let reference = match self.which_namespace()? {
+            Some(namespace) => Ref::Tag {
+                name: tag_name.clone(),
+            }
+            .namespaced(&namespace)
+            .find_ref_todo(&self.repository),
+            None => self
+                .repository
+                .repo_ref
+                .resolve_reference_from_short_name(tag_name.name()),
+        }?;
 
-        if !self
-            .repository
-            .repo_ref
-            .resolve_reference_from_short_name(name)?
-            .is_tag()
-        {
+        if !object::git_ext::is_tag(&reference) {
             return Err(Error::NotTag(tag_name));
         }
 
-        let tag = self.get_history(name.to_string())?;
+        let tag = self.repository.to_history(&reference)?;
         self.set(tag);
         Ok(())
     }
@@ -1016,6 +1028,20 @@ mod tests {
         use pretty_assertions::{assert_eq, assert_ne};
 
         #[test]
+        fn switch_to_banana() -> Result<(), Error> {
+            let repo = Repository::new("./data/git-platinum")?;
+            let mut browser =
+                Browser::new_with_namespace(&repo, &Namespace::from("golden"), "master")?;
+            let history = browser.history.clone();
+
+            browser.branch(BranchName::new("banana"))?;
+
+            assert_ne!(history, browser.history);
+
+            Ok(())
+        }
+
+        #[test]
         fn golden_namespace() -> Result<(), Error> {
             let repo = Repository::new("./data/git-platinum")?;
             let browser = Browser::new(&repo)?;
@@ -1031,9 +1057,10 @@ mod tests {
             );
             assert_eq!(history, golden_browser.history);
 
-            let branches: Vec<Branch> = vec![Branch::local(BranchName::new(
-                "namespaces/golden/refs/heads/master",
-            ))];
+            let branches: Vec<Branch> = vec![
+                Branch::local(BranchName::new("banana")),
+                Branch::local(BranchName::new("master")),
+            ];
 
             assert_eq!(branches, golden_browser.list_branches(None)?);
 

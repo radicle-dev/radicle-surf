@@ -454,14 +454,23 @@ impl TryFrom<&[u8]> for Namespace {
     }
 }
 
-mod git_ext {
+pub(super) mod git_ext {
     /// [`git2::Reference::is_tag`] just does a check for the prefix of `tags/`.
     /// This issue with that is, as soon as we're in 'namespaces' ref that
     /// is a tag it will say that it's not a tag. Instead we do a regex check on
     /// `refs/tags/.*`.
-    pub(super) fn is_tag(reference: &git2::Reference) -> bool {
+    pub fn is_tag(reference: &git2::Reference) -> bool {
         let re = regex::Regex::new(r"refs/tags/.*").unwrap();
         // If we couldn't parse the name we say it's not a tag.
+        match reference.name() {
+            Some(name) => re.is_match(name),
+            None => false,
+        }
+    }
+
+    pub fn is_branch(reference: &git2::Reference) -> bool {
+        let re = regex::Regex::new(r"refs/heads/.*|refs/remotes/.*/.*").unwrap();
+        // If we couldn't parse the name we say it's not a branch.
         match reference.name() {
             Some(name) => re.is_match(name),
             None => false,

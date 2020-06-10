@@ -66,6 +66,18 @@ pub enum Ref {
 }
 
 impl Ref {
+    pub(crate) fn namespaced(self, Namespace { values: namespaces }: &Namespace) -> Self {
+        let mut ref_namespace = self.clone();
+        for namespace in namespaces.iter().rev() {
+            ref_namespace = Self::Namespace {
+                namespace: namespace.clone(),
+                reference: Box::new(self.clone()),
+            };
+        }
+
+        ref_namespace
+    }
+
     /// We try and build a `Ref` based off of whether we have a list of
     /// namespaces or not.
     pub(crate) fn from_namespace_str(
@@ -121,6 +133,19 @@ impl Ref {
                 repo.repo_ref
                     .find_reference(&refglob)
                     .and_then(|reference| reference.peel_to_commit())
+            },
+        }
+    }
+
+    pub(crate) fn find_ref_todo<'a>(
+        &self,
+        repo: &RepositoryRef<'a>,
+    ) -> Result<git2::Reference<'a>, git2::Error> {
+        match self {
+            Self::Commit { sha: _sha } => todo!(),
+            other => {
+                let refglob = other.to_string();
+                repo.repo_ref.find_reference(&refglob)
             },
         }
     }
