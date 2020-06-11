@@ -1026,12 +1026,14 @@ mod tests {
             );
             assert_eq!(history, golden_browser.history);
 
-            let branches: Vec<Branch> = vec![
+            let expected_branches: Vec<Branch> = vec![
                 Branch::local(BranchName::new("banana")),
                 Branch::local(BranchName::new("master")),
             ];
+            let mut branches = golden_browser.list_branches(None)?;
+            branches.sort();
 
-            assert_eq!(branches, golden_browser.list_branches(None)?);
+            assert_eq!(expected_branches, branches);
 
             Ok(())
         }
@@ -1053,9 +1055,11 @@ mod tests {
             );
             assert_ne!(history, silver_browser.history);
 
-            let branches: Vec<Branch> = vec![Branch::local(BranchName::new("master"))];
+            let expected_branches: Vec<Branch> = vec![Branch::local(BranchName::new("master"))];
+            let mut branches = silver_browser.list_branches(None)?;
+            branches.sort();
 
-            assert_eq!(branches, silver_browser.list_branches(None)?);
+            assert_eq!(expected_branches, branches);
 
             Ok(())
         }
