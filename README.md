@@ -26,12 +26,15 @@ keep our documentation and doc-tests up to date.
 ```rust
 use radicle_surf::vcs::git;
 use radicle_surf::file_system::{Label, Path, SystemType};
+use radicle_surf::file_system::unsound;
+use pretty_assertions::assert_eq;
+use std::str::FromStr;
 
 // We're going to point to this repo.
-let repo = git::Repository::new(".")?;
+let repo = git::Repository::new("./data/git-platinum")?;
 
-// Here we initialise a new Browser for the git repo.
-let mut browser = git::Browser::new(repo)?;
+// Here we initialise a new Broswer for a the git repo.
+let mut browser = git::Browser::new(&repo, "master")?;
 
 // Set the history to a particular commit
 let commit = git::Oid::from_str("80ded66281a4de2889cc07293a8f10947c6d57fe")?;
@@ -40,42 +43,32 @@ browser.commit(commit)?;
 // Get the snapshot of the directory for our current HEAD of history.
 let directory = browser.get_directory()?;
 
-// Let's get a Path to the lib.rs file
-let lib = unsound::path::new("src/lib.rs");
+// Let's get a Path to the memory.rs file
+let memory = unsound::path::new("src/memory.rs");
 
 // And assert that we can find it!
-assert!(directory.find_file(&lib).is_some());
+assert!(directory.find_file(memory).is_some());
 
 let root_contents = directory.list_directory();
-root_contents.sort();
 
 assert_eq!(root_contents, vec![
-  SystemType::directory(".buildkite".into()),
-  SystemType::directory(".docker".into()),
-  SystemType::directory(".git".into()),
-  SystemType::file(".gitignore".into()),
-  SystemType::file(".gitmodules".into()),
-  SystemType::file(".rustfmt.toml".into()),
-  SystemType::file(".rust-toolchain".into()),
-  SystemType::file("Cargo.toml".into()),
-  SystemType::file("README.md".into()),
-  SystemType::directory("data".into()),
-  SystemType::directory("docs".into()),
-  SystemType::directory("examples".into()),
-  SystemType::directory("src".into()),
+    SystemType::file(unsound::label::new(".i-am-well-hidden")),
+    SystemType::file(unsound::label::new(".i-too-am-hidden")),
+    SystemType::file(unsound::label::new("README.md")),
+    SystemType::directory(unsound::label::new("bin")),
+    SystemType::directory(unsound::label::new("src")),
+    SystemType::directory(unsound::label::new("text")),
+    SystemType::directory(unsound::label::new("this")),
 ]);
 
 let src = directory
-  .find_directory(&Path::new(unsound::label::new("src")))
-  .expect("failed to find src");
-
+    .find_directory(Path::new(unsound::label::new("src")))
+    .expect("failed to find src");
 let src_contents = src.list_directory();
-src_contents.sort();
 
 assert_eq!(src_contents, vec![
-  SystemType::directory("diff".into()),
-  SystemType::directory("file_system".into()),
-  SystemType::file("lib.rs".into()),
-  SystemType::directory("vcs".into()),
+    SystemType::file(unsound::label::new("Eval.hs")),
+    SystemType::file(unsound::label::new("Folder.svelte")),
+    SystemType::file(unsound::label::new("memory.rs")),
 ]);
 ```
