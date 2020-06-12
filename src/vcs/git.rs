@@ -609,6 +609,40 @@ impl<'a> Browser<'a> {
         self.repository.list_tags()
     }
 
+    /// List the namespaces within a `Browser`, filtering out ones that do not
+    /// parse correctly.
+    ///
+    /// # Errors
+    ///
+    /// * [`Error::Git`]
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use radicle_surf::vcs::git::{Branch, BranchType, BranchName, Browser, Namespace, Repository};
+    /// # use std::error::Error;
+    ///
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let repo = Repository::new("./data/git-platinum")?;
+    /// let mut browser = Browser::new(&repo, "master")?;
+    ///
+    /// let mut namespaces = browser.list_namespaces()?;
+    /// namespaces.sort();
+    ///
+    /// assert_eq!(namespaces, vec![
+    ///     Namespace::from("golden"),
+    ///     Namespace::from("golden/silver"),
+    /// ]);
+    ///
+    ///
+    /// #
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn list_namespaces(&self) -> Result<Vec<Namespace>, Error> {
+        self.repository.list_namespaces()
+    }
+
     /// Given a [`crate::file_system::Path`] to a file, return the last
     /// [`Commit`] that touched that file or directory.
     ///

@@ -24,7 +24,7 @@ pub enum RefGlob {
     /// the glob `refs/tags/*`.
     Tag,
     /// When calling [`RefGlob::references`] this will return the references via
-    /// the glob `refs/heds/*`.
+    /// the glob `refs/heads/*`.
     LocalBranch,
     /// When calling [`RefGlob::references`] this will return the references via
     /// either of the following globs:
@@ -38,6 +38,8 @@ pub enum RefGlob {
     /// When calling [`RefGlob::references`] this will return the references via
     /// the globs `refs/heads/*` and `refs/remotes/**/*`.
     Branch,
+    /// refs/namespaces/**
+    Namespace,
 }
 
 /// Iterator chaining multiple [`git2::References`]
@@ -125,6 +127,7 @@ impl fmt::Display for RefGlob {
                 Unfortunately, libgit does not support union of globs
                 otherwise this would display refs/{{remotes/**/*,heads/*}}"
             ),
+            Self::Namespace => write!(f, "refs/namespaces/**"),
         }
     }
 }
