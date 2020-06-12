@@ -31,7 +31,7 @@ use crate::{
 };
 use git2::{BranchType, Oid};
 use nonempty::NonEmpty;
-use std::{convert::TryFrom, str};
+use std::{collections::HashSet, convert::TryFrom, str};
 
 /// This is for flagging to the `file_history` function that it should
 /// stop at the first (i.e. Last) commit it finds for a file.
@@ -115,6 +115,24 @@ impl<'a> RepositoryRef<'a> {
                 acc.push(tag);
                 Ok(acc)
             })
+    }
+
+    /// List the namespaces within a repository, filtering out ones that do not
+    /// parse correctly.
+    ///
+    /// # Errors
+    ///
+    /// * [`Error::Git`]
+    pub fn list_namespaces(&self) -> Result<Vec<Namespace>, Error> {
+        let namespaces: Result<HashSet<Namespace>, Error> = RefGlob::Namespace
+            .references(&self)?
+            .iter()
+            .try_fold(HashSet::new(), |mut acc, reference| {
+                let namespace = Namespace::try_from(reference?)?;
+                acc.insert(namespace);
+                Ok(acc)
+            });
+        Ok(namespaces?.into_iter().collect())
     }
 
     /// Create a [`RevObject`] given a

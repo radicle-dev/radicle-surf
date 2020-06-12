@@ -427,7 +427,7 @@ impl Signature {
 
 /// A `Namespace` value allows us to switch the git namespace of
 /// [`super::Browser`].
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Namespace {
     /// Since namespaces can be nested we have a vector of strings.
     /// This means that the namespaces `"foo/bar"` is represented as
@@ -453,6 +453,28 @@ impl TryFrom<&[u8]> for Namespace {
 
     fn try_from(namespace: &[u8]) -> Result<Self, Self::Error> {
         str::from_utf8(namespace).map(Namespace::from)
+    }
+}
+
+impl TryFrom<git2::Reference<'_>> for Namespace {
+    type Error = str::Utf8Error;
+
+    fn try_from(reference: git2::Reference) -> Result<Self, Self::Error> {
+        let re = regex::Regex::new(r"refs/namespaces/([^/]+)/").unwrap();
+        let ref_name = str::from_utf8(reference.name_bytes())?;
+        let values = re
+            .find_iter(ref_name)
+            .map(|m| {
+                String::from(
+                    m.as_str()
+                        .trim_start_matches("refs/namespaces/")
+                        .trim_end_matches('/'),
+                )
+            })
+            .collect::<Vec<_>>()
+            .to_vec();
+
+        Ok(Namespace { values })
     }
 }
 
