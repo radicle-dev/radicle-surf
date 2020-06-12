@@ -463,7 +463,7 @@ impl Repository {
     /// # Errors
     ///
     /// * [`Error::Git`]
-    pub fn new(repo_uri: &str) -> Result<Self, Error> {
+    pub fn new(repo_uri: impl AsRef<std::path::Path>) -> Result<Self, Error> {
         git2::Repository::open(repo_uri)
             .map(Repository)
             .map_err(Error::from)
