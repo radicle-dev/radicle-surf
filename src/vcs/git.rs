@@ -488,7 +488,7 @@ impl<'a> Browser<'a> {
     }
 
     /// Get the [`Diff`] between two commits.
-    pub fn diff(&self, from: &'a git2::Commit, to: &'a git2::Commit) -> Result<Diff, Error> {
+    pub fn diff(&self, from: Oid, to: Oid) -> Result<Diff, Error> {
         self.repository.diff(from, to)
     }
 
@@ -1338,7 +1338,7 @@ mod tests {
 
             let bro = Browser::new(&repo, "master")?;
 
-            let diff = bro.diff(&parent, &commit)?;
+            let diff = bro.diff(parent.id(), commit.id())?;
 
             let expected_diff = Diff {
                 created: vec![],

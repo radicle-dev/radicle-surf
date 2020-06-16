@@ -177,7 +177,7 @@ impl<'a> RepositoryRef<'a> {
     }
 
     /// Get the [`Diff`] between two commits.
-    pub fn diff(&self, from: &'a git2::Commit, to: &'a git2::Commit) -> Result<Diff, Error> {
+    pub fn diff(&self, from: Oid, to: Oid) -> Result<Diff, Error> {
         use git2::{Delta, Patch};
 
         let mut diff = Diff::new();
@@ -407,9 +407,9 @@ impl<'a> RepositoryRef<'a> {
         commit: &git2::Commit,
     ) -> Result<Option<file_system::Path>, Error> {
         let mut parents = commit.parents();
-        let parent = parents.next();
+        let parent = parents.next().map(|c| c.id());
 
-        let diff = self.diff_commits(Some(path), parent.as_ref(), &commit)?;
+        let diff = self.diff_commits(Some(path), parent, commit.id())?;
         if let Some(_delta) = diff.deltas().next() {
             Ok(Some(path.clone()))
         } else {
@@ -420,11 +420,13 @@ impl<'a> RepositoryRef<'a> {
     fn diff_commits(
         &self,
         path: Option<&file_system::Path>,
-        old_tree: Option<&'a git2::Commit>,
-        new_tree: &'a git2::Commit,
+        from: Option<Oid>,
+        to: Oid,
     ) -> Result<git2::Diff, Error> {
-        let new_tree = new_tree.tree()?;
-        let old_tree = old_tree.map_or(Ok(None), |commit| commit.tree().map(Some))?;
+        let new_tree = self.repo_ref.find_commit(to)?.tree()?;
+        let old_tree = from.map_or(Ok(None), |oid| {
+            self.repo_ref.find_commit(oid)?.tree().map(Some)
+        })?;
 
         let mut opts = git2::DiffOptions::new();
         if let Some(path) = path {
