@@ -211,7 +211,7 @@ impl<'a> RepositoryRef<'a> {
 
                         for h in 0..patch.num_hunks() {
                             let (hunk, hunk_lines) = patch.hunk(h)?;
-                            let header = hunk.header().to_owned();
+                            let header = Line(hunk.header().to_owned());
                             let mut lines: Vec<LineDiff> = Vec::new();
 
                             for l in 0..hunk_lines {

@@ -21,6 +21,9 @@ use crate::file_system::{Directory, DirectoryContents, Path};
 use std::{cell::RefCell, cmp::Ordering, ops::Deref, rc::Rc};
 use thiserror::Error;
 
+#[cfg(feature = "serialize")]
+use serde::{ser, Serialize, Serializer};
+
 pub mod git;
 
 #[derive(Debug, Error)]
@@ -35,6 +38,11 @@ impl From<String> for DiffError {
     }
 }
 
+#[cfg_attr(
+    feature = "serialize",
+    derive(Serialize),
+    serde(rename_all = "camelCase")
+)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct Diff {
     pub created: Vec<CreateFile>,
@@ -50,24 +58,41 @@ impl Default for Diff {
     }
 }
 
+#[cfg_attr(feature = "serialize", derive(Serialize))]
 #[derive(Debug, PartialEq, Eq)]
 pub struct CreateFile(pub Path);
 
+#[cfg_attr(feature = "serialize", derive(Serialize))]
 #[derive(Debug, PartialEq, Eq)]
 pub struct DeleteFile(pub Path);
 
+#[cfg_attr(
+    feature = "serialize",
+    derive(Serialize),
+    serde(rename_all = "camelCase")
+)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct MoveFile {
     pub old_path: Path,
     pub new_path: Path,
 }
 
+#[cfg_attr(
+    feature = "serialize",
+    derive(Serialize),
+    serde(rename_all = "camelCase")
+)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct CopyFile {
     pub old_path: Path,
     pub new_path: Path,
 }
 
+#[cfg_attr(
+    feature = "serialize",
+    derive(Serialize),
+    serde(rename_all = "camelCase")
+)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct ModifiedFile {
     pub path: Path,
@@ -75,13 +100,26 @@ pub struct ModifiedFile {
 }
 
 /// A set of changes belonging to one file.
+#[cfg_attr(
+    feature = "serialize",
+    derive(Serialize),
+    serde(tag = "type", rename_all = "camelCase")
+)]
 #[derive(Debug, PartialEq, Eq)]
 pub enum FileDiff {
     Binary,
-    Plain(Vec<Hunk>),
+    #[cfg_attr(feature = "serialize", serde(rename_all = "camelCase"))]
+    Plain {
+        hunks: Vec<Hunk>,
+    },
 }
 
 /// A set of line changes.
+#[cfg_attr(
+    feature = "serialize",
+    derive(Serialize),
+    serde(rename_all = "camelCase")
+)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct Hunk {
     pub header: Line,
@@ -89,10 +127,40 @@ pub struct Hunk {
 }
 
 /// The content of a single line.
-pub type Line = Vec<u8>;
+#[derive(Debug, PartialEq, Eq)]
+pub struct Line(pub(crate) Vec<u8>);
+
+impl From<Vec<u8>> for Line {
+    fn from(v: Vec<u8>) -> Self {
+        Self(v)
+    }
+}
+
+impl From<String> for Line {
+    fn from(s: String) -> Self {
+        Self(s.into_bytes())
+    }
+}
+
+#[cfg(feature = "serialize")]
+impl Serialize for Line {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let s = std::str::from_utf8(&self.0).map_err(ser::Error::custom)?;
+
+        serializer.serialize_str(s)
+    }
+}
 
 /// Single line delta. Two of these are need to represented a modified line: one
 /// addition and one deletion. Context is also represented with this type.
+#[cfg_attr(
+    feature = "serialize",
+    derive(Serialize),
+    serde(rename_all = "camelCase")
+)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct LineDiff {
     /// Line number in old or new file.
@@ -104,6 +172,11 @@ pub struct LineDiff {
 }
 
 /// The kind or "status" of a `LineDiff`.
+#[cfg_attr(
+    feature = "serialize",
+    derive(Serialize),
+    serde(rename_all = "camelCase")
+)]
 #[derive(Debug, PartialEq, Eq)]
 pub enum LineDiffKind {
     /// Line addition.
@@ -125,26 +198,26 @@ impl From<LineDiffKind> for char {
 }
 
 impl LineDiff {
-    pub fn addition(line: Line, line_num: u32) -> Self {
+    pub fn addition(line: impl Into<Line>, line_num: u32) -> Self {
         Self {
             line_num,
-            line,
+            line: line.into(),
             kind: LineDiffKind::Addition,
         }
     }
 
-    pub fn deletion(line: Line, line_num: u32) -> Self {
+    pub fn deletion(line: impl Into<Line>, line_num: u32) -> Self {
         Self {
             line_num,
-            line,
+            line: line.into(),
             kind: LineDiffKind::Deletion,
         }
     }
 
-    pub fn context(line: Line, line_num: u32) -> Self {
+    pub fn context(line: impl Into<Line>, line_num: u32) -> Self {
         Self {
             line_num,
-            line,
+            line: line.into(),
             kind: LineDiffKind::Context,
         }
     }
@@ -354,7 +427,7 @@ impl Diff {
         // https://nest.pijul.com/pijul_org/pijul:master/1468b7281a6f3785e9#anesp4Qdq3V
         self.modified.push(ModifiedFile {
             path,
-            diff: FileDiff::Plain(hunks),
+            diff: FileDiff::Plain { hunks },
         });
     }
 
@@ -488,7 +561,7 @@ mod tests {
             copied: vec![],
             modified: vec![ModifiedFile {
                 path: Path::with_root(&[unsound::label::new("banana.rs")]),
-                diff: FileDiff::Plain(vec![]),
+                diff: FileDiff::Plain { hunks: vec![] },
             }],
         };
 
@@ -573,7 +646,7 @@ mod tests {
                     unsound::label::new("src"),
                     unsound::label::new("banana.rs"),
                 ]),
-                diff: FileDiff::Plain(vec![]),
+                diff: FileDiff::Plain { hunks: vec![] },
             }],
         };
 
