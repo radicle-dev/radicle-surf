@@ -189,16 +189,6 @@ impl Serialize for Path {
     }
 }
 
-#[cfg(feature = "serialize")]
-impl<'de> Deserialize<'de> for Path {
-    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        todo!()
-    }
-}
-
 impl Path {
     /// Create a new `Path` with a single [`Label`].
     pub fn new(label: Label) -> Path {
