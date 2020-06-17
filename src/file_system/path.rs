@@ -31,7 +31,7 @@ pub mod unsound;
 ///
 /// A `Label` should not be empty or contain `/`s. It is encouraged to use the
 /// `TryFrom` instance to create a `Label`.
-#[cfg_attr(feature = "serialize", derive(Deserialize, Serialize))]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Label {
     pub(crate) label: String,
