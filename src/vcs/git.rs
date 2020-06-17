@@ -1370,9 +1370,14 @@ mod tests {
             use file_system::*;
 
             let diff = Diff {
-                created: vec![],
+                created: vec![CreateFile(unsound::path::new("LICENSE"))],
                 deleted: vec![],
-                moved: vec![],
+                moved: vec![
+                    MoveFile {
+                        old_path: unsound::path::new("CONTRIBUTING"),
+                        new_path: unsound::path::new("CONTRIBUTING.md")
+                    }
+                ],
                 copied: vec![],
                 modified: vec![ModifiedFile {
                     path: Path::with_root(&[unsound::label::new("README.md")]),
@@ -1390,9 +1395,9 @@ mod tests {
             };
 
             let json = serde_json::json!({
-                "created": [],
+                "created": ["LICENSE"],
                 "deleted": [],
-                "moved": [],
+                "moved": [{ "oldPath": "CONTRIBUTING", "newPath": "CONTRIBUTING.md" }],
                 "copied": [],
                 "modified": [{
                     "path": "~/README.md",
