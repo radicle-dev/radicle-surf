@@ -19,6 +19,9 @@ use crate::{file_system::error, nonempty::split_last};
 use nonempty::NonEmpty;
 use std::{convert::TryFrom, ffi::CString, fmt, ops::Deref, path, str::FromStr};
 
+#[cfg(feature = "serialize")]
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
 pub mod unsound;
 
 /// `Label` is a special case of a `String` identifier for
@@ -28,6 +31,7 @@ pub mod unsound;
 ///
 /// A `Label` should not be empty or contain `/`s. It is encouraged to use the
 /// `TryFrom` instance to create a `Label`.
+#[cfg_attr(feature = "serialize", derive(Deserialize, Serialize))]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Label {
     pub(crate) label: String,
@@ -172,6 +176,26 @@ impl git2::IntoCString for Path {
             let pathspec = pathspec.trim_end_matches('/');
             pathspec.into_c_string()
         }
+    }
+}
+
+#[cfg(feature = "serialize")]
+impl Serialize for Path {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.to_string().as_str())
+    }
+}
+
+#[cfg(feature = "serialize")]
+impl<'de> Deserialize<'de> for Path {
+    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        todo!()
     }
 }
 

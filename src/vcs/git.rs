@@ -1347,19 +1347,78 @@ mod tests {
                 copied: vec![],
                 modified: vec![ModifiedFile {
                     path: Path::with_root(&[unsound::label::new("README.md")]),
-                    diff: FileDiff::Plain(
-                        vec![Hunk {
-                            header: b"@@ -1 +1,2 @@\n".to_vec(),
+                    diff: FileDiff::Plain {
+                        hunks: vec![Hunk {
+                            header: Line(b"@@ -1 +1,2 @@\n".to_vec()),
                             lines: vec![
                                 LineDiff::deletion(b"This repository is a data source for the Upstream front-end tests.\n".to_vec(), 1),
                                 LineDiff::addition(b"This repository is a data source for the Upstream front-end tests and the\n".to_vec(), 1),
                                 LineDiff::addition(b"[`radicle-surf`](https://github.com/radicle-dev/git-platinum) unit tests.\n".to_vec(), 2),
                             ]
                         }]
-                    )
+                    }
                 }]
             };
             assert_eq!(expected_diff, diff);
+
+            Ok(())
+        }
+
+        #[cfg(feature = "serialize")]
+        #[test]
+        fn test_diff_serde() -> Result<(), Error> {
+            use file_system::*;
+
+            let diff = Diff {
+                created: vec![],
+                deleted: vec![],
+                moved: vec![],
+                copied: vec![],
+                modified: vec![ModifiedFile {
+                    path: Path::with_root(&[unsound::label::new("README.md")]),
+                    diff: FileDiff::Plain {
+                        hunks: vec![Hunk {
+                            header: Line(b"@@ -1 +1,2 @@\n".to_vec()),
+                            lines: vec![
+                                LineDiff::deletion(b"This repository is a data source for the Upstream front-end tests.\n".to_vec(), 1),
+                                LineDiff::addition(b"This repository is a data source for the Upstream front-end tests and the\n".to_vec(), 1),
+                                LineDiff::addition(b"[`radicle-surf`](https://github.com/radicle-dev/git-platinum) unit tests.\n".to_vec(), 2),
+                            ]
+                        }]
+                    }
+                }]
+            };
+
+            let json = serde_json::json!({
+                "created": [],
+                "deleted": [],
+                "moved": [],
+                "copied": [],
+                "modified": [{
+                    "path": "~/README.md",
+                    "diff": {
+                        "type": "plain",
+                        "hunks": [{
+                            "header": "@@ -1 +1,2 @@\n",
+                            "lines": [
+                                { "lineNum": 1,
+                                  "line": "This repository is a data source for the Upstream front-end tests.\n",
+                                  "kind": "deletion"
+                                },
+                                { "lineNum": 1,
+                                  "line": "This repository is a data source for the Upstream front-end tests and the\n",
+                                  "kind": "addition"
+                                },
+                                { "lineNum": 2,
+                                  "line": "[`radicle-surf`](https://github.com/radicle-dev/git-platinum) unit tests.\n",
+                                  "kind": "addition"
+                                }
+                            ]
+                        }]
+                    }
+                }]
+            });
+            assert_eq!(serde_json::to_value(&diff).unwrap(), json);
 
             Ok(())
         }
