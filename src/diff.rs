@@ -148,7 +148,7 @@ impl Serialize for Line {
     where
         S: Serializer,
     {
-        let s = std::str::from_utf8(&self.0).map_err(|e| ser::Error::custom(e))?;
+        let s = std::str::from_utf8(&self.0).map_err(ser::Error::custom)?;
 
         serializer.serialize_str(s)
     }
