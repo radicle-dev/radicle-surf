@@ -128,7 +128,19 @@ pub struct Hunk {
 
 /// The content of a single line.
 #[derive(Debug, PartialEq, Eq)]
-pub struct Line(pub Vec<u8>);
+pub struct Line(pub(crate) Vec<u8>);
+
+impl From<Vec<u8>> for Line {
+    fn from(v: Vec<u8>) -> Self {
+        Self(v)
+    }
+}
+
+impl From<String> for Line {
+    fn from(s: String) -> Self {
+        Self(s.into_bytes())
+    }
+}
 
 #[cfg(feature = "serialize")]
 impl Serialize for Line {
@@ -186,26 +198,26 @@ impl From<LineDiffKind> for char {
 }
 
 impl LineDiff {
-    pub fn addition(line: Vec<u8>, line_num: u32) -> Self {
+    pub fn addition(line: impl Into<Line>, line_num: u32) -> Self {
         Self {
             line_num,
-            line: Line(line),
+            line: line.into(),
             kind: LineDiffKind::Addition,
         }
     }
 
-    pub fn deletion(line: Vec<u8>, line_num: u32) -> Self {
+    pub fn deletion(line: impl Into<Line>, line_num: u32) -> Self {
         Self {
             line_num,
-            line: Line(line),
+            line: line.into(),
             kind: LineDiffKind::Deletion,
         }
     }
 
-    pub fn context(line: Vec<u8>, line_num: u32) -> Self {
+    pub fn context(line: impl Into<Line>, line_num: u32) -> Self {
         Self {
             line_num,
-            line: Line(line),
+            line: line.into(),
             kind: LineDiffKind::Context,
         }
     }
