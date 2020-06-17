@@ -20,7 +20,7 @@ use nonempty::NonEmpty;
 use std::{convert::TryFrom, ffi::CString, fmt, ops::Deref, path, str::FromStr};
 
 #[cfg(feature = "serialize")]
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Serialize, Serializer};
 
 pub mod unsound;
 
