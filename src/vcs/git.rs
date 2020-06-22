@@ -1330,6 +1330,35 @@ mod tests {
         use crate::{diff::*, vcs::git::*};
 
         #[test]
+        fn test_initial_diff() -> Result<(), Error> {
+            use file_system::*;
+            use pretty_assertions::assert_eq;
+
+            let oid = Oid::from_str("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3")?;
+            let repo = Repository::new("./data/git-platinum")?;
+            let commit = repo.0.find_commit(oid).unwrap();
+
+            assert!(commit.parents().count() == 0);
+            assert!(commit.parent(0).is_err());
+
+            let bro = Browser::new(&repo, "master")?;
+            let diff = bro.initial_diff(oid)?;
+
+            let expected_diff = Diff {
+                created: vec![CreateFile(Path::with_root(&[unsound::label::new(
+                    "README.md",
+                )]))],
+                deleted: vec![],
+                moved: vec![],
+                copied: vec![],
+                modified: vec![],
+            };
+            assert_eq!(expected_diff, diff);
+
+            Ok(())
+        }
+
+        #[test]
         fn test_diff() -> Result<(), Error> {
             use file_system::*;
             use pretty_assertions::assert_eq;
