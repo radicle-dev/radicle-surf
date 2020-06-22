@@ -492,6 +492,11 @@ impl<'a> Browser<'a> {
         self.repository.diff(from, to)
     }
 
+    /// Get the [`Diff`] of a commit with no parents.
+    pub fn initial_diff(&self, oid: Oid) -> Result<Diff, Error> {
+        self.repository.initial_diff(oid)
+    }
+
     /// List the names of the _branches_ that are contained in the underlying
     /// [`Repository`].
     ///
