@@ -46,7 +46,7 @@ impl<'a> TryFrom<git2::DiffLine<'a>> for LineDiff {
         match (line.old_lineno(), line.new_lineno()) {
             (None, Some(n)) => Ok(Self::addition(line.content().to_owned(), n)),
             (Some(n), None) => Ok(Self::deletion(line.content().to_owned(), n)),
-            (Some(_), Some(n)) => Ok(Self::context(line.content().to_owned(), n)),
+            (Some(l), Some(r)) => Ok(Self::context(line.content().to_owned(), l, r)),
             (None, None) => Err(Error::InvalidLineDiff),
         }
     }
