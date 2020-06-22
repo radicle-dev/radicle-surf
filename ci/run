@@ -25,7 +25,7 @@ echo '--- deny: Sources'
 cargo deny check sources
 
 echo '--- Tests'
-cargo test --all
+cargo test --all --features serialize
 
 echo '--- Docs'
 cargo doc --no-deps
