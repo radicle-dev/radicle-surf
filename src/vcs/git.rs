@@ -1435,7 +1435,7 @@ mod tests {
                 "moved": [{ "oldPath": "CONTRIBUTING", "newPath": "CONTRIBUTING.md" }],
                 "copied": [],
                 "modified": [{
-                    "path": "~/README.md",
+                    "path": "README.md",
                     "diff": {
                         "type": "plain",
                         "hunks": [{
