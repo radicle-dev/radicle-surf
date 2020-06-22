@@ -159,66 +159,47 @@ impl Serialize for Line {
 #[cfg_attr(
     feature = "serialize",
     derive(Serialize),
-    serde(rename_all = "camelCase")
+    serde(tag = "type", rename_all = "camelCase")
 )]
 #[derive(Debug, PartialEq, Eq)]
-pub struct LineDiff {
-    /// Line number in old or new file.
-    pub line_num: u32,
-    /// Line content.
-    pub line: Line,
-    /// Line diff kind, eg. addition or deletion.
-    pub kind: LineDiffKind,
-}
+pub enum LineDiff {
+    /// Line added.
+    #[cfg_attr(feature = "serialize", serde(rename_all = "camelCase"))]
+    Addition { line: Line, line_num: u32 },
 
-/// The kind or "status" of a `LineDiff`.
-#[cfg_attr(
-    feature = "serialize",
-    derive(Serialize),
-    serde(rename_all = "camelCase")
-)]
-#[derive(Debug, PartialEq, Eq)]
-pub enum LineDiffKind {
-    /// Line addition.
-    Addition,
-    /// Line deletion.
-    Deletion,
+    /// Line deleted.
+    #[cfg_attr(feature = "serialize", serde(rename_all = "camelCase"))]
+    Deletion { line: Line, line_num: u32 },
+
     /// Line context.
-    Context,
-}
-
-impl From<LineDiffKind> for char {
-    fn from(kind: LineDiffKind) -> Self {
-        match kind {
-            LineDiffKind::Addition => '+',
-            LineDiffKind::Deletion => '-',
-            LineDiffKind::Context => ' ',
-        }
-    }
+    #[cfg_attr(feature = "serialize", serde(rename_all = "camelCase"))]
+    Context {
+        line: Line,
+        line_num_old: u32,
+        line_num_new: u32,
+    },
 }
 
 impl LineDiff {
     pub fn addition(line: impl Into<Line>, line_num: u32) -> Self {
-        Self {
-            line_num,
+        Self::Addition {
             line: line.into(),
-            kind: LineDiffKind::Addition,
+            line_num,
         }
     }
 
     pub fn deletion(line: impl Into<Line>, line_num: u32) -> Self {
-        Self {
-            line_num,
+        Self::Deletion {
             line: line.into(),
-            kind: LineDiffKind::Deletion,
+            line_num,
         }
     }
 
-    pub fn context(line: impl Into<Line>, line_num: u32) -> Self {
-        Self {
-            line_num,
+    pub fn context(line: impl Into<Line>, line_num_old: u32, line_num_new: u32) -> Self {
+        Self::Context {
             line: line.into(),
-            kind: LineDiffKind::Context,
+            line_num_old,
+            line_num_new,
         }
     }
 }

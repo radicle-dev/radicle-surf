@@ -1388,6 +1388,7 @@ mod tests {
                                 LineDiff::deletion(b"This repository is a data source for the Upstream front-end tests.\n".to_vec(), 1),
                                 LineDiff::addition(b"This repository is a data source for the Upstream front-end tests and the\n".to_vec(), 1),
                                 LineDiff::addition(b"[`radicle-surf`](https://github.com/radicle-dev/git-platinum) unit tests.\n".to_vec(), 2),
+                                LineDiff::context(b"\n".to_vec(), 3, 4),
                             ]
                         }]
                     }
@@ -1408,15 +1409,19 @@ mod tests {
                             "lines": [
                                 { "lineNum": 1,
                                   "line": "This repository is a data source for the Upstream front-end tests.\n",
-                                  "kind": "deletion"
+                                  "type": "deletion"
                                 },
                                 { "lineNum": 1,
                                   "line": "This repository is a data source for the Upstream front-end tests and the\n",
-                                  "kind": "addition"
+                                  "type": "addition"
                                 },
                                 { "lineNum": 2,
                                   "line": "[`radicle-surf`](https://github.com/radicle-dev/git-platinum) unit tests.\n",
-                                  "kind": "addition"
+                                  "type": "addition"
+                                },
+                                { "lineNumOld": 3, "lineNumNew": 4,
+                                  "line": "\n",
+                                  "type": "context"
                                 }
                             ]
                         }]
