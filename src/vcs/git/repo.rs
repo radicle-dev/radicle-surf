@@ -177,14 +177,13 @@ impl<'a> RepositoryRef<'a> {
 
     /// Get the [`Diff`] between two commits.
     pub fn diff(&self, from: Oid, to: Oid) -> Result<Diff, Error> {
-        let git_diff = self.diff_commits(None, Some(from), to)?;
-        Diff::try_from(git_diff)
+        self.diff_commits(None, Some(from), to)
+            .and_then(Diff::try_from)
     }
 
     /// Get the [`Diff`] of a commit with no parents.
     pub fn initial_diff(&self, oid: Oid) -> Result<Diff, Error> {
-        let git_diff = self.diff_commits(None, None, oid)?;
-        Diff::try_from(git_diff)
+        self.diff_commits(None, None, oid).and_then(Diff::try_from)
     }
 
     pub(super) fn switch_namespace(&self, namespace: &str) -> Result<(), Error> {
