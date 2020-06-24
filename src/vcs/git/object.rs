@@ -19,6 +19,9 @@ use crate::vcs::git::{error::*, repo::RepositoryRef};
 pub use git2::{BranchType, Oid};
 use std::{cmp::Ordering, convert::TryFrom, fmt, str};
 
+#[cfg(feature = "serialize")]
+use serde::Serialize;
+
 /// `Author` is the static information of a [`git2::Signature`].
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Author {
@@ -132,6 +135,11 @@ impl BranchName {
 }
 
 /// Stats for a repository
+#[cfg_attr(
+    feature = "serialize",
+    derive(Serialize),
+    serde(rename_all = "camelCase")
+)]
 pub struct Stats {
     /// Number of commits
     pub commit_count: usize,
