@@ -889,20 +889,20 @@ impl<'a> Browser<'a> {
     /// let stats = browser.get_stats()?;
     ///
     /// // there should be 2 local branches
-    /// assert_eq!(stats.branch_count, 2);
+    /// assert_eq!(stats.branches, 2);
     ///
     /// // there should be 14 commits
-    /// assert_eq!(stats.commit_count, 14);
+    /// assert_eq!(stats.commits, 14);
     ///
     /// // 4 contributors: Alexander Simmerl, Fintan Halpenny, FintanH, Rudolfs Ošiņš
-    /// assert_eq!(stats.contributor_count, 4);
+    /// assert_eq!(stats.contributors, 4);
     ///
     /// # Ok(())
     /// # }
     /// ```
     pub fn get_stats(&self) -> Result<Stats, Error> {
-        let branch_count = self.list_branches(Some(BranchType::Local))?.len();
-        let commit_count = self.history.len();
+        let branches = self.list_branches(Some(BranchType::Local))?.len();
+        let commits = self.history.len();
 
         let mut contributors = self
             .history
@@ -913,12 +913,10 @@ impl<'a> Browser<'a> {
         contributors.sort();
         contributors.dedup();
 
-        let contributor_count = contributors.len();
-
         Ok(Stats {
-            branch_count,
-            commit_count,
-            contributor_count,
+            branches,
+            commits,
+            contributors: contributors.len(),
         })
     }
 
