@@ -142,11 +142,11 @@ impl BranchName {
 )]
 pub struct Stats {
     /// Number of commits
-    pub commit_count: usize,
+    pub commits: usize,
     /// Number of local branches
-    pub branch_count: usize,
+    pub branches: usize,
     /// Number of contributors
-    pub contributor_count: usize,
+    pub contributors: usize,
 }
 
 /// The static information of a `git2::Branch`.
