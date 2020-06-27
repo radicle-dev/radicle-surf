@@ -44,7 +44,7 @@ fn setup_namespace(curr_dir: &Path, namespace: &str, target: &str) -> ExitStatus
         .unwrap_or_else(|_| panic!("Failed to execute `git submodule update {}`", namespace))
 }
 
-fn main() {
+fn setup_fixtures() {
     // Path set up for the project directory
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("Failed to get CARGO_MANIFEST_DIR");
     let curr_dir = Path::new(&manifest_dir);
@@ -114,7 +114,13 @@ fn main() {
         silver_status.success(),
         "failed to set up 'golden/silver' namespace"
     );
+}
+
+fn main() {
+    if env::var("GIT_FIXTURES").is_ok() {
+        setup_fixtures();
+    }
 
     // Tell the build script that we should re-run if this script changes.
-    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-env-changed=GIT_FIXTURES");
 }
