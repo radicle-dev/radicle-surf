@@ -25,7 +25,7 @@ echo '--- deny: Sources'
 cargo deny check sources
 
 echo '--- Tests'
-cargo test --all --features serialize
+GIT_FIXTURES=1 cargo test --all --features serialize
 
 echo '--- Docs'
 cargo doc --no-deps
