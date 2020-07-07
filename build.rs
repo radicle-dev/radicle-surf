@@ -33,7 +33,7 @@ fn checkout(curr_dir: &Path, branch: &str) -> ExitStatus {
         .unwrap_or_else(|_| panic!("Failed to execute `git submodule update {}`", git_checkout))
 }
 
-fn setup_namespace(curr_dir: &Path, namespace: &str, target: &str) -> ExitStatus {
+fn update_ref(curr_dir: &Path, namespace: &str, target: &str) -> ExitStatus {
     let namespace = format!("git update-ref {} {}", namespace, target);
     Command::new("git")
         .arg("submodule")
@@ -65,55 +65,39 @@ fn setup_fixtures() {
     let master_status = checkout(curr_dir, "master");
     assert!(master_status.success(), "failed to checkout master");
 
-    let golden_master = setup_namespace(
-        curr_dir,
-        "refs/namespaces/golden/refs/heads/master",
-        "refs/heads/master",
-    );
-    assert!(
-        golden_master.success(),
-        "failed to set up 'golden' master branch namespace"
-    );
-
-    let golden_banana = setup_namespace(
-        curr_dir,
-        "refs/namespaces/golden/refs/heads/banana",
-        "refs/heads/dev",
-    );
-    assert!(
-        golden_banana.success(),
-        "failed to set up 'golden' banana branch in namespace"
-    );
-
-    let golden_tag_v1 = setup_namespace(
-        curr_dir,
-        "refs/namespaces/golden/refs/tags/v0.1.0",
-        "refs/tags/v0.1.0",
-    );
-    assert!(
-        golden_tag_v1.success(),
-        "failed to set up 'golden' tag v0.1.0 namespace"
-    );
-
-    let golden_tag_v2 = setup_namespace(
-        curr_dir,
-        "refs/namespaces/golden/refs/tags/v0.2.0",
-        "refs/tags/v0.2.0",
-    );
-    assert!(
-        golden_tag_v2.success(),
-        "failed to set up 'golden' tag v0.2.0 namespace"
-    );
-
-    let silver_status = setup_namespace(
-        curr_dir,
-        "refs/namespaces/golden/refs/namespaces/silver/refs/heads/master",
-        "refs/heads/dev",
-    );
-    assert!(
-        silver_status.success(),
-        "failed to set up 'golden/silver' namespace"
-    );
+    for (new_rev, rev) in [
+        (
+            "refs/namespaces/golden/refs/heads/master",
+            "refs/heads/master",
+        ),
+        ("refs/namespaces/golden/refs/heads/banana", "refs/heads/dev"),
+        (
+            "refs/namespaces/golden/refs/tags/v0.1.0",
+            "refs/tags/v0.1.0",
+        ),
+        (
+            "refs/namespaces/golden/refs/tags/v0.2.0",
+            "refs/tags/v0.2.0",
+        ),
+        (
+            "refs/namespaces/golden/refs/namespaces/silver/refs/heads/master",
+            "refs/heads/dev",
+        ),
+        (
+            "refs/remotes/banana/pineapple",
+            "refs/remotes/origin/master",
+        ),
+    ]
+    .iter()
+    {
+        let update_rev = update_ref(curr_dir, new_rev, rev);
+        assert!(
+            update_rev.success(),
+            "failed to set up '{} -> {}'",
+            new_rev,
+            rev
+        );
+    }
 }
 
 fn main() {
