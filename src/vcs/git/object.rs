@@ -106,7 +106,7 @@ pub struct Commit {
 }
 
 impl<'repo> TryFrom<git2::Commit<'repo>> for Commit {
-    type Error = str::Utf8Error;
+    type Error = Error;
 
     fn try_from(commit: git2::Commit) -> Result<Self, Self::Error> {
         let id = commit.id();
@@ -114,7 +114,7 @@ impl<'repo> TryFrom<git2::Commit<'repo>> for Commit {
         let committer = Author::try_from(commit.committer())?;
         let message_raw = commit.message_bytes();
         let message = str::from_utf8(message_raw)?.into();
-        let summary_raw = commit.summary_bytes().expect("TODO");
+        let summary_raw = commit.summary_bytes().ok_or(Error::MissingSummary)?;
         let summary = str::from_utf8(summary_raw)?.into();
         let parents = commit.parent_ids().collect();
 

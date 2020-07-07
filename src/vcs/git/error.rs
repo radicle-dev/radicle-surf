@@ -63,6 +63,10 @@ pub enum Error {
     /// name is not in UTF-8 form and parsing of it as such fails.
     #[error(transparent)]
     Utf8Error(#[from] str::Utf8Error),
+    /// When trying to get the summary for a [`git2::Commit`] some action
+    /// failed.
+    #[error("an error occurred trying to get a commit's summary")]
+    MissingSummary,
     /// An error that comes from performing a [`crate::file_system`] operation.
     #[error(transparent)]
     FileSystem(#[from] file_system::Error),
