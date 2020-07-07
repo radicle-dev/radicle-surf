@@ -15,7 +15,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::vcs::git::{error, object::Namespace, repo::RepositoryRef};
+use crate::vcs::git::{
+    error,
+    object::{BranchType, Namespace},
+    repo::RepositoryRef,
+};
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -42,6 +46,15 @@ pub enum RefGlob {
     Namespace,
 }
 
+impl From<BranchType> for RefGlob {
+    fn from(other: BranchType) -> Self {
+        match other {
+            BranchType::Remote { name } => Self::RemoteBranch { remote: name },
+            BranchType::Local => Self::LocalBranch,
+        }
+    }
+}
+
 /// Iterator chaining multiple [`git2::References`]
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 pub struct References<'a> {
@@ -55,13 +68,6 @@ impl<'a> References<'a> {
 }
 
 impl RefGlob {
-    pub fn from_branch_type(branch_type: git2::BranchType) -> Self {
-        match branch_type {
-            git2::BranchType::Remote => Self::RemoteBranch { remote: None },
-            git2::BranchType::Local => Self::LocalBranch,
-        }
-    }
-
     pub fn references<'a>(&self, repo: &RepositoryRef<'a>) -> Result<References<'a>, error::Error> {
         let namespace = repo
             .which_namespace()?

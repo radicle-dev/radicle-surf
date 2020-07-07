@@ -22,13 +22,13 @@ use crate::{
     vcs::{
         git::{
             error::*,
-            object::{Branch, Commit, Namespace, RevObject, Signature, Tag},
+            object::{Branch, BranchType, Commit, Namespace, RevObject, Signature, Tag},
             reference::{glob::RefGlob, Ref},
         },
         VCS,
     },
 };
-use git2::{BranchType, Oid};
+use git2::Oid;
 use nonempty::NonEmpty;
 use std::{collections::HashSet, convert::TryFrom, str};
 
@@ -87,7 +87,7 @@ impl<'a> RepositoryRef<'a> {
     ///
     /// * [`Error::Git`]
     pub fn list_branches(&self, filter: Option<BranchType>) -> Result<Vec<Branch>, Error> {
-        let ref_glob = filter.map_or(RefGlob::Branch, RefGlob::from_branch_type);
+        let ref_glob = filter.map_or(RefGlob::Branch, RefGlob::from);
 
         ref_glob
             .references(&self)?

@@ -35,6 +35,9 @@ pub enum Error {
     /// or that a tag or commit was provided by accident.
     #[error("provided branch name does not exist: {0}")]
     NotBranch(BranchName),
+    /// We tried to convert a name into its remote and branch name parts.
+    #[error("could not parse '{0}' into a remote name and branch name")]
+    ParseRemoteBranch(BranchName),
     /// The user tried to fetch a tag, but the name provided does not
     /// exist as a tag. This could mean that the tag does not exist
     /// or that a branch or commit was provided by accident.
