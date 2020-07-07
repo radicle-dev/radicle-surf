@@ -519,14 +519,29 @@ impl<'a> Browser<'a> {
     /// // 'master' exists in the list of branches
     /// assert!(branches.contains(&Branch::local(BranchName::new("master"))));
     ///
-    /// // Filter the branches by `Remote`.
-    /// let mut branches = browser.list_branches(Some(BranchType::Remote))?;
+    /// // Filter the branches by `Remote` 'origin'.
+    /// let mut branches = browser.list_branches(Some(BranchType::Remote {
+    ///     name: Some("origin".to_string())
+    /// }))?;
     /// branches.sort();
     ///
     /// assert_eq!(branches, vec![
-    ///     Branch::remote(BranchName::new("origin/HEAD")),
-    ///     Branch::remote(BranchName::new("origin/dev")),
-    ///     Branch::remote(BranchName::new("origin/master")),
+    ///     Branch::remote(BranchName::new("HEAD"), "origin".to_string()),
+    ///     Branch::remote(BranchName::new("dev"), "origin".to_string()),
+    ///     Branch::remote(BranchName::new("master"), "origin".to_string()),
+    /// ]);
+    ///
+    /// // Filter the branches by all `Remote`s.
+    /// let mut branches = browser.list_branches(Some(BranchType::Remote {
+    ///     name: None
+    /// }))?;
+    /// branches.sort();
+    ///
+    /// assert_eq!(branches, vec![
+    ///     Branch::remote(BranchName::new("HEAD"), "origin".to_string()),
+    ///     Branch::remote(BranchName::new("dev"), "origin".to_string()),
+    ///     Branch::remote(BranchName::new("master"), "origin".to_string()),
+    ///     Branch::remote(BranchName::new("pineapple"), "banana".to_string()),
     /// ]);
     ///
     /// // We can also switch namespaces and list the branches in that namespace.
@@ -1469,6 +1484,7 @@ mod tests {
     #[cfg(test)]
     mod threading {
         use crate::vcs::git::*;
+        use pretty_assertions::assert_eq;
         use std::sync::{Mutex, MutexGuard};
 
         #[test]
@@ -1482,11 +1498,12 @@ mod tests {
             assert_eq!(
                 branches,
                 vec![
+                    Branch::remote(BranchName::new("HEAD"), "origin".to_string()),
+                    Branch::remote(BranchName::new("dev"), "origin".to_string()),
                     Branch::local(BranchName::new("dev")),
+                    Branch::remote(BranchName::new("master"), "origin".to_string()),
                     Branch::local(BranchName::new("master")),
-                    Branch::remote(BranchName::new("origin/HEAD")),
-                    Branch::remote(BranchName::new("origin/dev")),
-                    Branch::remote(BranchName::new("origin/master")),
+                    Branch::remote(BranchName::new("pineapple"), "banana".to_string()),
                 ]
             );
 

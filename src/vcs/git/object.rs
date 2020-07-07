@@ -15,12 +15,43 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::vcs::git::{error::*, repo::RepositoryRef};
-pub use git2::{BranchType, Oid};
+use crate::vcs::git::{error::Error, repo::RepositoryRef};
+pub use git2::Oid;
 use std::{cmp::Ordering, convert::TryFrom, fmt, str};
 
 #[cfg(feature = "serialize")]
 use serde::Serialize;
+
+/// The branch type we want to filter on.
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
+pub enum BranchType {
+    /// Local branches that are under `refs/heads/*`
+    Local,
+    /// Remote branches that are under `refs/remotes/<name>/*` if the name is
+    /// provided, otherwise `refs/remotes/**/*`.
+    Remote {
+        /// Name of the remote.
+        name: Option<String>,
+    },
+}
+
+impl From<BranchType> for git2::BranchType {
+    fn from(other: BranchType) -> Self {
+        match other {
+            BranchType::Local => git2::BranchType::Local,
+            BranchType::Remote { .. } => git2::BranchType::Remote,
+        }
+    }
+}
+
+impl From<git2::BranchType> for BranchType {
+    fn from(other: git2::BranchType) -> Self {
+        match other {
+            git2::BranchType::Local => BranchType::Local,
+            git2::BranchType::Remote => BranchType::Remote { name: None },
+        }
+    }
+}
 
 /// `Author` is the static information of a [`git2::Signature`].
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -175,10 +206,10 @@ impl Ord for Branch {
 
 impl Branch {
     /// Helper to create a remote `Branch` with a name
-    pub fn remote(name: BranchName) -> Self {
+    pub fn remote(name: BranchName, remote: String) -> Self {
         Branch {
             name,
-            locality: BranchType::Remote,
+            locality: BranchType::Remote { name: Some(remote) },
         }
     }
 
@@ -206,10 +237,22 @@ impl<'repo> TryFrom<git2::Reference<'repo>> for Branch {
             return Err(Error::NotBranch(name));
         }
 
-        let locality = if is_remote {
-            BranchType::Remote
+        let (name, locality) = if is_remote {
+            let mut split = name.0.split('/');
+            let remote_name = split
+                .next()
+                .ok_or_else(|| Error::ParseRemoteBranch(name.clone()))?;
+            let name = split
+                .next()
+                .ok_or_else(|| Error::ParseRemoteBranch(name.clone()))?;
+            (
+                BranchName(name.to_string()),
+                BranchType::Remote {
+                    name: Some(remote_name.to_string()),
+                },
+            )
         } else {
-            BranchType::Local
+            (name, BranchType::Local)
         };
 
         Ok(Branch { name, locality })
@@ -408,7 +451,7 @@ impl RevObject {
         match self {
             RevObject::Branch(branch) => {
                 let reference = repo
-                    .find_branch(&branch.name.0, branch.locality)?
+                    .find_branch(&branch.name.0, branch.locality.into())?
                     .into_reference();
                 let commit = reference.peel_to_commit()?;
                 Ok(commit)
