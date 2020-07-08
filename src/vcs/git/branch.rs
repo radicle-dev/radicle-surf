@@ -76,7 +76,7 @@ impl TryFrom<&[u8]> for BranchName {
 impl BranchName {
     /// Create a new `BranchName`.
     pub fn new(name: &str) -> Self {
-        BranchName(name.into())
+        Self(name.into())
     }
 
     /// Access the string value of the `BranchName`.
@@ -111,18 +111,30 @@ impl Ord for Branch {
 
 impl Branch {
     /// Helper to create a remote `Branch` with a name
-    pub fn remote(name: BranchName, remote: String) -> Self {
-        Branch {
-            name,
+    pub fn remote(name: String, remote: String) -> Self {
+        Self {
+            name: BranchName(name),
             locality: BranchType::Remote { name: Some(remote) },
         }
     }
 
     /// Helper to create a remote `Branch` with a name
-    pub fn local(name: BranchName) -> Self {
-        Branch {
-            name,
+    pub fn local(name: String) -> Self {
+        Self {
+            name: BranchName(name),
             locality: BranchType::Local,
+        }
+    }
+
+    /// Get the name of the `Branch`.
+    pub fn name(&self) -> String {
+        let branch_name = self.name.0.clone();
+        match self.locality {
+            BranchType::Local => branch_name,
+            BranchType::Remote { ref name } => match name {
+                None => branch_name,
+                Some(remote_name) => format!("{}/{}", remote_name, branch_name),
+            },
         }
     }
 }
@@ -142,7 +154,7 @@ impl<'repo> TryFrom<git2::Reference<'repo>> for Branch {
             return Err(Error::NotBranch(name));
         }
 
-        let (name, locality) = if is_remote {
+        if is_remote {
             let mut split = name.0.split('/');
             let remote_name = split
                 .next()
@@ -150,16 +162,17 @@ impl<'repo> TryFrom<git2::Reference<'repo>> for Branch {
             let name = split
                 .next()
                 .ok_or_else(|| Error::ParseRemoteBranch(name.clone()))?;
-            (
-                BranchName(name.to_string()),
-                BranchType::Remote {
+            Ok(Self {
+                name: BranchName(name.to_string()),
+                locality: BranchType::Remote {
                     name: Some(remote_name.to_string()),
                 },
-            )
+            })
         } else {
-            (name, BranchType::Local)
-        };
-
-        Ok(Branch { name, locality })
+            Ok(Self {
+                name,
+                locality: BranchType::Local,
+            })
+        }
     }
 }
