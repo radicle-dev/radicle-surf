@@ -79,76 +79,26 @@ pub enum Ref {
 }
 
 impl Ref {
-    pub(crate) fn namespaced(self, Namespace { values: namespaces }: &Namespace) -> Self {
+    /// Add a [`Namespace`] to a `Ref`.
+    pub fn namespaced(self, Namespace { values: namespaces }: Namespace) -> Self {
         let mut ref_namespace = self.clone();
-        for namespace in namespaces.iter().rev() {
+        for namespace in namespaces.into_iter().rev() {
             ref_namespace = Self::Namespace {
-                namespace: namespace.clone(),
-                reference: Box::new(self.clone()),
+                namespace,
+                reference: Box::new(ref_namespace.clone()),
             };
         }
 
         ref_namespace
     }
 
-    /// We try and build a `Ref` based off of whether we have a list of
-    /// namespaces or not.
-    pub(crate) fn from_namespace_str(
-        Namespace { values: namespaces }: &Namespace,
-        spec: &str,
-    ) -> Vec<Result<Ref, git2::Error>> {
-        let tag = Self::Tag {
-            name: TagName::new(spec),
-        };
-
-        let local_branch = Self::LocalBranch {
-            name: BranchName::new(spec),
-        };
-
-        let remote_branch = Self::RemoteBranch {
-            remote: "**".to_string(),
-            name: BranchName::new(spec),
-        };
-
-        if namespaces.is_empty() {
-            vec![Ok(tag), Ok(local_branch), Ok(remote_branch)]
-        } else {
-            let mut ref_namespaces = vec![tag, local_branch, remote_branch];
-            for namespace in namespaces.iter().rev() {
-                for ref_namespace in ref_namespaces.iter_mut() {
-                    *ref_namespace = Self::Namespace {
-                        namespace: namespace.clone(),
-                        reference: Box::new(ref_namespace.clone()),
-                    };
-                }
-            }
-            ref_namespaces.into_iter().map(Ok).collect()
-        }
-    }
-
     /// We try to find a [`git2::Reference`] based off of a `Ref` by turning the
     /// ref into a fully qualified ref (e.g. refs/remotes/**/master).
-    pub(crate) fn find_ref<'a>(
+    pub fn find_ref<'a>(
         &self,
         repo: &RepositoryRef<'a>,
     ) -> Result<git2::Reference<'a>, git2::Error> {
         repo.repo_ref.find_reference(&self.to_string())
-    }
-
-    /// Given a list of `Ref`s, make a best effort to try find a
-    /// [`git2::Commit`] by probing each `Ref` until we get a commit.
-    /// Otherwise, we couldn't find it.
-    pub(crate) fn try_find_commit<'a>(
-        references: Vec<Result<Self, git2::Error>>,
-        repo: &RepositoryRef<'a>,
-    ) -> Option<git2::Commit<'a>> {
-        for reference in references {
-            match reference.and_then(|reference| reference.find_ref(repo)) {
-                Ok(reference) => return reference.peel_to_commit().ok(),
-                Err(_) => continue,
-            }
-        }
-        None
     }
 }
 
