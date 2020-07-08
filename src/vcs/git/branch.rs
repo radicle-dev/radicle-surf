@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::vcs::git::{error::Error, object::git_ext, reference::Ref};
+use crate::vcs::git::{self, error::Error, reference::Ref};
 use std::{cmp::Ordering, convert::TryFrom, fmt, str};
 
 /// The branch type we want to filter on.
@@ -65,7 +65,7 @@ impl TryFrom<&[u8]> for BranchName {
 
     fn try_from(name: &[u8]) -> Result<Self, Self::Error> {
         let name = str::from_utf8(name)?;
-        let short_name = match git_ext::try_extract_refname(name) {
+        let short_name = match git::ext::try_extract_refname(name) {
             Ok(stripped) => stripped,
             Err(original) => original,
         };

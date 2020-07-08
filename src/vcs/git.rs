@@ -63,26 +63,40 @@
 //! ```
 
 // Re-export git2 as sub-module
-pub use git2::{self, Error as Git2Error, Time};
+pub use git2::{self, Error as Git2Error, Oid, Time};
 
+/// Provides ways of selecting a particular reference/revision.
 mod reference;
 pub use reference::{Ref, Rev};
+
 mod repo;
 pub use repo::{History, Repository, RepositoryRef};
 
 pub mod error;
-mod object;
 
-mod branch;
+mod ext;
+
+/// Provides the data for talking about branches.
+pub mod branch;
 pub use branch::{Branch, BranchName, BranchType};
 
-mod tag;
+/// Provides the data for talking about tags.
+pub mod tag;
 pub use tag::{Tag, TagName};
 
-pub use crate::{
-    diff::Diff,
-    vcs::git::object::{Commit, Namespace, Oid, Signature, Stats},
-};
+/// Provides the data for talking about commits.
+pub mod commit;
+pub use commit::{Author, Commit};
+
+/// Provides the data for talking about namespaces.
+pub mod namespace;
+pub use namespace::Namespace;
+
+/// Provides the data for talking about repository statistics.
+pub mod stats;
+pub use stats::Stats;
+
+pub use crate::diff::Diff;
 
 use crate::{
     file_system,
@@ -92,6 +106,16 @@ use crate::{
 };
 use nonempty::NonEmpty;
 use std::{collections::HashMap, convert::TryFrom, str};
+
+/// The signature of a commit
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Signature(Vec<u8>);
+
+impl From<git2::Buf> for Signature {
+    fn from(other: git2::Buf) -> Self {
+        Signature((*other).into())
+    }
+}
 
 /// A [`crate::vcs::Browser`] that uses [`Repository`] as the underlying
 /// repository backend, [`git2::Commit`] as the artifact, and [`Error`] for
@@ -304,7 +328,7 @@ impl<'a> Browser<'a> {
     pub fn branch(&mut self, branch: Branch) -> Result<(), Error> {
         let name = BranchName(branch.name());
         self.set(self.repository.reference(branch, |reference| {
-            let is_branch = object::git_ext::is_branch(&reference) || reference.is_remote();
+            let is_branch = ext::is_branch(&reference) || reference.is_remote();
             if !is_branch {
                 Some(Error::NotBranch(name))
             } else {
@@ -356,7 +380,7 @@ impl<'a> Browser<'a> {
     pub fn tag(&mut self, tag_name: TagName) -> Result<(), Error> {
         let name = tag_name.clone();
         self.set(self.repository.reference(tag_name, |reference| {
-            if !object::git_ext::is_tag(&reference) {
+            if !ext::is_tag(&reference) {
                 Some(Error::NotTag(name))
             } else {
                 None
