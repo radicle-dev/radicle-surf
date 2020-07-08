@@ -873,7 +873,7 @@ impl<'a> Browser<'a> {
     /// # }
     /// ```
     pub fn revision_branches(&self, rev: impl Into<Rev>) -> Result<Vec<Branch>, Error> {
-        let commit = self.repository.into_commit(&rev.into())?;
+        let commit = self.repository.rev_to_commit(&rev.into())?;
         self.repository.revision_branches(&commit.id())
     }
 
