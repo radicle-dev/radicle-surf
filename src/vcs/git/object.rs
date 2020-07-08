@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::vcs::git::{branch::Branch, error::Error, repo::RepositoryRef, tag::Tag};
+use crate::vcs::git::error::Error;
 pub use git2::Oid;
 use std::{convert::TryFrom, fmt, str};
 
@@ -111,79 +111,6 @@ pub struct Stats {
     pub branches: usize,
     /// Number of contributors
     pub contributors: usize,
-}
-
-/// A `RevObject` encapsulates the idea of providing a "revspec" to git and
-/// getting back the desired object.
-///
-/// `RevObject` can in turn be used by [`rev`](type.Browser.html#method.rev) to
-/// set the [`crate::vcs::git::Browser`]'s [`crate::vcs::git::History`] with the
-/// object.
-///
-/// See here for the [specifying revision](https://git-scm.com/docs/git-rev-parse.html#_specifying_revisions).
-pub enum RevObject {
-    /// A [`Branch`] revision.
-    Branch(Branch),
-    /// A [`Tag`] revision.
-    Tag(Tag),
-    /// A [`Commit`] revision.
-    Commit(Commit),
-}
-
-impl RevObject {
-    /// Create a `RevObject` by calling
-    /// [`revparse_ext`](https://docs.rs/git2/0.11.0/git2/struct.Repository.html#method.revparse_ext)
-    /// and attempting to turn the resulting `Object` into a [`Tag`] or a
-    /// [`Commit`]. If this fails we attempt to see if the
-    /// [`git2::Reference`] is present and is a [`Branch`].
-    ///
-    /// # Errors
-    ///
-    /// * `Error::Git` if the `revspec` provided fails to parse
-    /// * `Error::RevParseFailure` if conversion to a target object fail.
-    pub fn from_revparse<'a>(repo: &RepositoryRef<'a>, spec: &str) -> Result<Self, Error> {
-        let (object, optional_ref) = repo.repo_ref.revparse_ext(spec)?;
-
-        let tag = object.into_tag().map(Tag::try_from);
-        match tag {
-            Ok(tag) => Ok(RevObject::Tag(tag?)),
-            Err(object) => {
-                let commit = object.into_commit().map(Commit::try_from);
-                match commit {
-                    Ok(commit) => Ok(RevObject::Commit(commit?)),
-                    Err(_object) => match optional_ref {
-                        Some(reference) => Branch::try_from(reference).map(RevObject::Branch),
-                        None => Err(Error::RevParseFailure {
-                            rev: spec.to_string(),
-                        }),
-                    },
-                }
-            },
-        }
-    }
-
-    /// Peel back a `RevObject` into a [`git2::Commit`].
-    ///
-    /// In the case of the `RevObject` itself being a [`Commit`] it is trivial.
-    /// In the case of the `RevObject` being a [`Tag`] or [`Branch`], we first
-    /// get the object/reference and then get the commit it points to.
-    pub(crate) fn into_commit(self, repo: &git2::Repository) -> Result<git2::Commit, Error> {
-        match self {
-            RevObject::Branch(branch) => {
-                let reference = repo
-                    .find_branch(&branch.name.0, branch.locality.into())?
-                    .into_reference();
-                let commit = reference.peel_to_commit()?;
-                Ok(commit)
-            },
-            RevObject::Tag(tag) => {
-                let object = repo.find_tag(tag.id())?.into_object();
-                let commit = object.peel_to_commit()?;
-                Ok(commit)
-            },
-            RevObject::Commit(commit) => Ok(repo.find_commit(commit.id)?),
-        }
-    }
 }
 
 /// The signature of a commit

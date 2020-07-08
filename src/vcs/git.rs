@@ -431,7 +431,7 @@ impl<'a> Browser<'a> {
     /// let repo = Repository::new("./data/git-platinum")?;
     /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
     ///
-    /// browser.revspec("refs/remotes/origin/dev")?;
+    /// browser.rev(Branch::remote("dev", "origin"))?;
     ///
     /// let directory = browser.get_directory()?;
     /// let mut directory_contents = directory.list_directory();
@@ -444,24 +444,8 @@ impl<'a> Browser<'a> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn revspec(&mut self, rev: impl Into<Rev>) -> Result<(), Error> {
+    pub fn rev(&mut self, rev: impl Into<Rev>) -> Result<(), Error> {
         let history = self.get_history(rev.into())?;
-        self.set(history);
-        Ok(())
-    }
-
-    /// Set a `Browser`'s `History` based on a [`RevObject`].
-    ///
-    /// # Errors
-    ///
-    /// * [`error::Error::Git`]
-    ///
-    /// This is useful if you already have a [`RevObject`], but
-    /// [`revspec`](#method.revspec) would be a more common function to use.
-    pub fn rev(&mut self, rev: RevObject) -> Result<(), Error> {
-        let repository = &self.repository;
-        let commit = rev.into_commit(&repository.repo_ref)?;
-        let history = repository.commit_to_history(commit)?;
         self.set(history);
         Ok(())
     }
@@ -1123,7 +1107,7 @@ mod tests {
         fn _master() -> Result<(), Error> {
             let repo = Repository::new("./data/git-platinum")?;
             let mut browser = Browser::new(&repo, Branch::local("master"))?;
-            browser.revspec(Branch::remote("master", "origin"))?;
+            browser.rev(Branch::remote("master", "origin"))?;
 
             let commit1 = Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
             assert!(
@@ -1162,7 +1146,7 @@ mod tests {
         fn commit() -> Result<(), Error> {
             let repo = Repository::new("./data/git-platinum")?;
             let mut browser = Browser::new(&repo, Branch::local("master"))?;
-            browser.revspec(Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?)?;
+            browser.rev(Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?)?;
 
             let commit1 = Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
             assert!(browser
@@ -1181,7 +1165,7 @@ mod tests {
         fn commit_parents() -> Result<(), Error> {
             let repo = Repository::new("./data/git-platinum")?;
             let mut browser = Browser::new(&repo, Branch::local("master"))?;
-            browser.revspec(Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?)?;
+            browser.rev(Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?)?;
             let commit = browser.history.first();
 
             assert_eq!(
@@ -1196,7 +1180,7 @@ mod tests {
         fn commit_short() -> Result<(), Error> {
             let repo = Repository::new("./data/git-platinum")?;
             let mut browser = Browser::new(&repo, Branch::local("master"))?;
-            browser.revspec(browser.oid("3873745c8")?)?;
+            browser.rev(browser.oid("3873745c8")?)?;
 
             let commit1 = Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
             assert!(browser
@@ -1215,7 +1199,7 @@ mod tests {
         fn tag() -> Result<(), Error> {
             let repo = Repository::new("./data/git-platinum")?;
             let mut browser = Browser::new(&repo, Branch::local("master"))?;
-            browser.revspec(TagName::new("v0.2.0"))?;
+            browser.rev(TagName::new("v0.2.0"))?;
 
             let commit1 = Oid::from_str("2429f097664f9af0c5b7b389ab998b2199ffa977")?;
             assert_eq!(browser.history.first().id, commit1);
