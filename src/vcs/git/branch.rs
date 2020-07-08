@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::vcs::git::{error::Error, object::git_ext};
+use crate::vcs::git::{error::Error, object::git_ext, reference::Ref};
 use std::{cmp::Ordering, convert::TryFrom, fmt, str};
 
 /// The branch type we want to filter on.
@@ -109,19 +109,33 @@ impl Ord for Branch {
     }
 }
 
+impl From<Branch> for Ref {
+    fn from(other: Branch) -> Self {
+        match other.locality {
+            BranchType::Local => Self::LocalBranch { name: other.name },
+            BranchType::Remote { name } => Self::RemoteBranch {
+                name: other.name,
+                remote: name.unwrap_or("**".to_string()),
+            },
+        }
+    }
+}
+
 impl Branch {
     /// Helper to create a remote `Branch` with a name
-    pub fn remote(name: String, remote: String) -> Self {
+    pub fn remote(name: &str, remote: &str) -> Self {
         Self {
-            name: BranchName(name),
-            locality: BranchType::Remote { name: Some(remote) },
+            name: BranchName(name.to_string()),
+            locality: BranchType::Remote {
+                name: Some(remote.to_string()),
+            },
         }
     }
 
     /// Helper to create a remote `Branch` with a name
-    pub fn local(name: String) -> Self {
+    pub fn local(name: &str) -> Self {
         Self {
-            name: BranchName(name),
+            name: BranchName(name.to_string()),
             locality: BranchType::Local,
         }
     }
