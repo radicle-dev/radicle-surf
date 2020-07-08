@@ -115,7 +115,7 @@ impl From<Branch> for Ref {
             BranchType::Local => Self::LocalBranch { name: other.name },
             BranchType::Remote { name } => Self::RemoteBranch {
                 name: other.name,
-                remote: name.unwrap_or("**".to_string()),
+                remote: name.unwrap_or_else(|| "**".to_string()),
             },
         }
     }

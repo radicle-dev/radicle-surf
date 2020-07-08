@@ -171,7 +171,7 @@ impl<'a> RepositoryRef<'a> {
         Ok(self.repo_ref.revparse_single(oid)?.id())
     }
 
-    pub(super) fn into_commit(&self, rev: &Rev) -> Result<git2::Commit, Error> {
+    pub(super) fn rev_to_commit(&self, rev: &Rev) -> Result<git2::Commit, Error> {
         match rev {
             Rev::Oid(oid) => Ok(self.repo_ref.find_commit(*oid)?),
             Rev::Ref(reference) => Ok(reference.find_ref(&self)?.peel_to_commit()?),

@@ -81,7 +81,7 @@ pub enum Ref {
 impl Ref {
     /// Add a [`Namespace`] to a `Ref`.
     pub fn namespaced(self, Namespace { values: namespaces }: Namespace) -> Self {
-        let mut ref_namespace = self.clone();
+        let mut ref_namespace = self;
         for namespace in namespaces.into_iter().rev() {
             ref_namespace = Self::Namespace {
                 namespace,
