@@ -197,7 +197,6 @@ impl<'a> Browser<'a> {
         rev: impl Into<Ref>,
     ) -> Result<Self, Error> {
         self.repository.switch_namespace(&namespace.to_string())?;
-        println!("WUT WUT: {:?}", self.which_namespace()?);
         let history = self.get_history(Rev::from(rev))?;
         Ok(Browser {
             snapshot: self.snapshot,
@@ -451,7 +450,31 @@ impl<'a> Browser<'a> {
         Ok(())
     }
 
-    /// Parse an [`Oid`] from the given string.
+    /// Parse an [`Oid`] from the given string. This is useful if we have a
+    /// shorthand version of the `Oid`, as opposed to the full one.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use radicle_surf::vcs::git::{Branch, Browser, Oid, Repository};
+    /// use std::str::FromStr;
+    /// # use std::error::Error;
+    ///
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let repo = Repository::new("./data/git-platinum")?;
+    /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
+    ///
+    /// // Set to the initial commit
+    /// let commit = Oid::from_str("e24124b7538658220b5aaf3b6ef53758f0a106dc")?;
+    ///
+    /// assert_eq!(
+    ///     commit,
+    ///     browser.oid("e24124b")?,
+    /// );
+    /// #
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn oid(&self, oid: &str) -> Result<Oid, Error> {
         self.repository.oid(oid)
     }
