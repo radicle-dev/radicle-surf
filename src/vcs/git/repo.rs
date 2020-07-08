@@ -22,8 +22,10 @@ use crate::{
     vcs::{
         git::{
             error::*,
-            object::{Branch, BranchType, Commit, Namespace, RevObject, Signature, Tag},
+            object::{Commit, Namespace, RevObject, Signature, Tag},
             reference::{glob::RefGlob, Ref},
+            Branch,
+            BranchType,
         },
         VCS,
     },

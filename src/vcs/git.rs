@@ -73,21 +73,12 @@ pub use repo::{History, Repository, RepositoryRef};
 pub mod error;
 mod object;
 
+mod branch;
+pub use branch::{Branch, BranchName, BranchType};
+
 pub use crate::{
     diff::Diff,
-    vcs::git::object::{
-        Branch,
-        BranchName,
-        BranchType,
-        Commit,
-        Namespace,
-        Oid,
-        RevObject,
-        Signature,
-        Stats,
-        Tag,
-        TagName,
-    },
+    vcs::git::object::{Commit, Namespace, Oid, RevObject, Signature, Stats, Tag, TagName},
 };
 
 use crate::{
