@@ -81,7 +81,7 @@ pub use tag::{Tag, TagName};
 
 pub use crate::{
     diff::Diff,
-    vcs::git::object::{Commit, Namespace, Oid, RevObject, Signature, Stats},
+    vcs::git::object::{Commit, Namespace, Oid, Signature, Stats},
 };
 
 use crate::{
@@ -111,7 +111,7 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Browser, Repository};
+    /// use radicle_surf::vcs::git::{Browser, Branch, Repository};
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -197,6 +197,7 @@ impl<'a> Browser<'a> {
         rev: impl Into<Ref>,
     ) -> Result<Self, Error> {
         self.repository.switch_namespace(&namespace.to_string())?;
+        println!("WUT WUT: {:?}", self.which_namespace()?);
         let history = self.get_history(Rev::from(rev))?;
         Ok(Browser {
             snapshot: self.snapshot,
@@ -225,7 +226,7 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Browser, Repository};
+    /// use radicle_surf::vcs::git::{Browser, Repository, Branch};
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -326,7 +327,7 @@ impl<'a> Browser<'a> {
     /// ```
     /// use nonempty::NonEmpty;
     /// use radicle_surf::vcs::History;
-    /// use radicle_surf::vcs::git::{TagName, Browser, Oid, Repository};
+    /// use radicle_surf::vcs::git::{TagName, Branch, Browser, Oid, Repository};
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -377,7 +378,7 @@ impl<'a> Browser<'a> {
     /// ```
     /// use radicle_surf::file_system::{Label, SystemType};
     /// use radicle_surf::file_system::unsound;
-    /// use radicle_surf::vcs::git::{Browser, Oid, Repository};
+    /// use radicle_surf::vcs::git::{Branch, Browser, Oid, Repository};
     /// use std::str::FromStr;
     /// # use std::error::Error;
     ///
@@ -423,7 +424,7 @@ impl<'a> Browser<'a> {
     /// ```
     /// use radicle_surf::file_system::{Label, SystemType};
     /// use radicle_surf::file_system::unsound;
-    /// use radicle_surf::vcs::git::{Browser, Oid, Repository};
+    /// use radicle_surf::vcs::git::{Browser, Branch, Oid, Repository};
     /// use std::str::FromStr;
     /// # use std::error::Error;
     ///
@@ -540,7 +541,7 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Browser, Namespace, Oid, Repository, Tag, TagName};
+    /// use radicle_surf::vcs::git::{Branch, Browser, Namespace, Oid, Repository, Tag, TagName};
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -642,7 +643,7 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Browser, Oid, Repository};
+    /// use radicle_surf::vcs::git::{Branch, Browser, Oid, Repository};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     /// use radicle_surf::file_system::unsound;
     /// use std::str::FromStr;
@@ -691,7 +692,7 @@ impl<'a> Browser<'a> {
     ///
     /// ```
     /// use nonempty::NonEmpty;
-    /// use radicle_surf::vcs::git::{Browser, Oid, Repository};
+    /// use radicle_surf::vcs::git::{Branch, Browser, Oid, Repository};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     /// use radicle_surf::file_system::unsound;
     /// use std::str::FromStr;
@@ -761,7 +762,7 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Browser, Repository, Oid, error};
+    /// use radicle_surf::vcs::git::{Branch, Browser, Repository, Oid, error};
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -820,14 +821,14 @@ impl<'a> Browser<'a> {
     /// let browser = Browser::new(&repo, Branch::local("master"))?;
     ///
     ///
-    /// let branches = browser.revision_branches("27acd68c7504755aa11023300890bb85bbd69d45")?;
+    /// let branches = browser.revision_branches(Oid::from_str("27acd68c7504755aa11023300890bb85bbd69d45")?)?;
     /// assert_eq!(
     ///     branches,
     ///     vec![Branch::local("dev")]
     /// );
     ///
     /// // TODO(finto): I worry that this test will fail as other branches get added
-    /// let branches = browser.revision_branches("1820cb07c1a890016ca5578aa652fd4d4c38967e")?;
+    /// let branches = browser.revision_branches(Oid::from_str("1820cb07c1a890016ca5578aa652fd4d4c38967e")?)?;
     /// assert_eq!(
     ///     branches,
     ///     vec![
@@ -839,7 +840,7 @@ impl<'a> Browser<'a> {
     /// let golden_browser = browser.switch_namespace(&Namespace::from("golden"),
     /// Branch::local("master"))?;
     ///
-    /// let branches = golden_browser.revision_branches("27acd68c7504755aa11023300890bb85bbd69d45")?;
+    /// let branches = golden_browser.revision_branches(Oid::from_str("27acd68c7504755aa11023300890bb85bbd69d45")?)?;
     /// assert_eq!(
     ///     branches,
     ///     vec![Branch::local("banana")]
@@ -848,9 +849,8 @@ impl<'a> Browser<'a> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn revision_branches(&self, revspec: &str) -> Result<Vec<Branch>, Error> {
-        let rev = self.repository.rev(revspec)?;
-        let commit = rev.into_commit(&self.repository.repo_ref)?;
+    pub fn revision_branches(&self, rev: impl Into<Rev>) -> Result<Vec<Branch>, Error> {
+        let commit = self.repository.into_commit(&rev.into())?;
         self.repository.revision_branches(&commit.id())
     }
 
@@ -863,7 +863,7 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Browser, Repository};
+    /// use radicle_surf::vcs::git::{Branch, Browser, Repository};
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {

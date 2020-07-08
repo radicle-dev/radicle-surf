@@ -22,7 +22,7 @@ use crate::{
     vcs::{
         git::{
             error::*,
-            object::{Commit, Namespace, RevObject, Signature},
+            object::{Commit, Namespace, Signature},
             reference::{glob::RefGlob, Ref, Rev},
             Branch,
             BranchType,
@@ -137,47 +137,6 @@ impl<'a> RepositoryRef<'a> {
         Ok(namespaces?.into_iter().collect())
     }
 
-    /// Create a [`RevObject`] given a
-    /// [`revspec`](https://git-scm.com/docs/git-rev-parse#_specifying_revisions) string.
-    ///
-    /// # Errors
-    ///
-    /// * [`Error::Git`]
-    /// * [`Error::RevParseFailure`]
-    pub fn rev(&self, spec: &str) -> Result<RevObject, Error> {
-        RevObject::from_revparse(&self, spec)
-    }
-
-    /// Create a [`History`] given a
-    /// [`revspec`](https://git-scm.com/docs/git-rev-parse#_specifying_revisions) string.
-    ///
-    /// # Errors
-    ///
-    /// * [`Error::Git`]
-    /// * [`Error::RevParseFailure`]
-    pub fn revspec(&self, spec: &str) -> Result<History, Error> {
-        let commit = if let Some(namespace) = self.which_namespace()? {
-            let references = Ref::from_namespace_str(&namespace, spec);
-            match Ref::try_find_commit(references, self) {
-                Some(commit) => commit,
-                None => match Oid::from_str(spec).and_then(|oid| self.repo_ref.find_commit(oid)) {
-                    Ok(commit) => commit,
-                    Err(_) => {
-                        return Err(Error::NamespaceRevParseFailure {
-                            namespace,
-                            rev: spec.to_string(),
-                        })
-                    },
-                },
-            }
-        } else {
-            let rev = self.rev(spec)?;
-            rev.into_commit(&self.repo_ref)?
-        };
-
-        self.commit_to_history(commit)
-    }
-
     pub(super) fn reference<R, P>(&self, reference: R, check: P) -> Result<History, Error>
     where
         R: Into<Ref>,
@@ -185,7 +144,7 @@ impl<'a> RepositoryRef<'a> {
     {
         let reference = match self.which_namespace()? {
             None => reference.into(),
-            Some(namespace) => reference.into().namespaced(&namespace),
+            Some(namespace) => reference.into().namespaced(namespace),
         }
         .find_ref(&self)?;
 
@@ -210,6 +169,13 @@ impl<'a> RepositoryRef<'a> {
     /// Parse an [`Oid`] from the given string.
     pub fn oid(&self, oid: &str) -> Result<Oid, Error> {
         Ok(self.repo_ref.revparse_single(oid)?.id())
+    }
+
+    pub(super) fn into_commit(&self, rev: &Rev) -> Result<git2::Commit, Error> {
+        match rev {
+            Rev::Oid(oid) => Ok(self.repo_ref.find_commit(*oid)?),
+            Rev::Ref(reference) => Ok(reference.find_ref(&self)?.peel_to_commit()?),
+        }
     }
 
     pub(super) fn switch_namespace(&self, namespace: &str) -> Result<(), Error> {
