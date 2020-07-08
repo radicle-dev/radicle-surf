@@ -15,10 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::vcs::git::{
-    object::{BranchName, Namespace, TagName},
-    repo::RepositoryRef,
-};
+use crate::vcs::git::{repo::RepositoryRef, BranchName, Namespace, TagName};
 use regex::Regex;
 use std::{fmt, str};
 use thiserror::Error;
