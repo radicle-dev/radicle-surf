@@ -146,8 +146,8 @@ impl<'a> Browser<'a> {
     /// assert_eq!(
     ///     branches,
     ///     vec![
-    ///         Branch::local(BranchName::new("banana")),
-    ///         Branch::local(BranchName::new("master")),
+    ///         Branch::local("banana"),
+    ///         Branch::local("master"),
     ///     ]
     /// );
     /// #
@@ -249,7 +249,7 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{BranchName, Browser, Repository};
+    /// use radicle_surf::vcs::git::{Branch, Browser, Repository};
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -257,7 +257,7 @@ impl<'a> Browser<'a> {
     /// let mut browser = Browser::new(&repo, "master")?;
     ///
     /// // ensure we're on 'master'
-    /// browser.branch(BranchName::new("master"));
+    /// browser.branch(Branch::local("master"));
     ///
     /// let directory = browser.get_directory();
     ///
@@ -269,7 +269,7 @@ impl<'a> Browser<'a> {
     /// ```
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{BranchName, Browser, Repository};
+    /// use radicle_surf::vcs::git::{Branch, Browser, Repository};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     /// use radicle_surf::file_system::unsound;
     /// # use std::error::Error;
@@ -277,7 +277,7 @@ impl<'a> Browser<'a> {
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
     /// let mut browser = Browser::new(&repo, "master")?;
-    /// browser.branch(BranchName::new("origin/dev"))?;
+    /// browser.branch(Branch::remote("dev", "origin"))?;
     ///
     /// let directory = browser.get_directory()?;
     /// let mut directory_contents = directory.list_directory();
@@ -290,23 +290,18 @@ impl<'a> Browser<'a> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn branch(&mut self, branch_name: BranchName) -> Result<(), Error> {
+    pub fn branch(&mut self, branch: Branch) -> Result<(), Error> {
+        let name = BranchName(branch.name().clone());
+        let reference: Ref = branch.into();
         let reference = match self.which_namespace()? {
-            Some(namespace) => Ref::LocalBranch {
-                name: branch_name.clone(),
-            }
-            .namespaced(&namespace)
-            .find_ref(&self.repository),
-            None => self
-                .repository
-                .repo_ref
-                .resolve_reference_from_short_name(branch_name.name()),
+            Some(namespace) => reference.namespaced(&namespace).find_ref(&self.repository),
+            None => reference.find_ref(&self.repository),
         }?;
 
         let is_branch = object::git_ext::is_branch(&reference) || reference.is_remote();
 
         if !is_branch {
-            return Err(Error::NotBranch(branch_name));
+            return Err(Error::NotBranch(name));
         }
 
         let branch = self.repository.to_history(&reference)?;
@@ -508,7 +503,7 @@ impl<'a> Browser<'a> {
     /// let branches = browser.list_branches(None)?;
     ///
     /// // 'master' exists in the list of branches
-    /// assert!(branches.contains(&Branch::local(BranchName::new("master"))));
+    /// assert!(branches.contains(&Branch::local("master")));
     ///
     /// // Filter the branches by `Remote` 'origin'.
     /// let mut branches = browser.list_branches(Some(BranchType::Remote {
@@ -517,9 +512,9 @@ impl<'a> Browser<'a> {
     /// branches.sort();
     ///
     /// assert_eq!(branches, vec![
-    ///     Branch::remote(BranchName::new("HEAD"), "origin".to_string()),
-    ///     Branch::remote(BranchName::new("dev"), "origin".to_string()),
-    ///     Branch::remote(BranchName::new("master"), "origin".to_string()),
+    ///     Branch::remote("HEAD", "origin"),
+    ///     Branch::remote("dev", "origin"),
+    ///     Branch::remote("master", "origin"),
     /// ]);
     ///
     /// // Filter the branches by all `Remote`s.
@@ -529,10 +524,10 @@ impl<'a> Browser<'a> {
     /// branches.sort();
     ///
     /// assert_eq!(branches, vec![
-    ///     Branch::remote(BranchName::new("HEAD"), "origin".to_string()),
-    ///     Branch::remote(BranchName::new("dev"), "origin".to_string()),
-    ///     Branch::remote(BranchName::new("master"), "origin".to_string()),
-    ///     Branch::remote(BranchName::new("pineapple"), "banana".to_string()),
+    ///     Branch::remote("HEAD", "origin"),
+    ///     Branch::remote("dev", "origin"),
+    ///     Branch::remote("master", "origin"),
+    ///     Branch::remote("pineapple", "banana"),
     /// ]);
     ///
     /// // We can also switch namespaces and list the branches in that namespace.
@@ -542,8 +537,8 @@ impl<'a> Browser<'a> {
     /// branches.sort();
     ///
     /// assert_eq!(branches, vec![
-    ///     Branch::local(BranchName::new("banana")),
-    ///     Branch::local(BranchName::new("master")),
+    ///     Branch::local("banana"),
+    ///     Branch::local("master"),
     /// ]);
     /// #
     /// # Ok(())
@@ -846,7 +841,7 @@ impl<'a> Browser<'a> {
     /// let branches = browser.revision_branches("27acd68c7504755aa11023300890bb85bbd69d45")?;
     /// assert_eq!(
     ///     branches,
-    ///     vec![Branch::local(BranchName::new("dev"))]
+    ///     vec![Branch::local("dev")]
     /// );
     ///
     /// // TODO(finto): I worry that this test will fail as other branches get added
@@ -854,8 +849,8 @@ impl<'a> Browser<'a> {
     /// assert_eq!(
     ///     branches,
     ///     vec![
-    ///         Branch::local(BranchName::new("dev")),
-    ///         Branch::local(BranchName::new("master")),
+    ///         Branch::local("dev"),
+    ///         Branch::local("master"),
     ///     ]
     /// );
     ///
@@ -864,7 +859,7 @@ impl<'a> Browser<'a> {
     /// let branches = golden_browser.revision_branches("27acd68c7504755aa11023300890bb85bbd69d45")?;
     /// assert_eq!(
     ///     branches,
-    ///     vec![Branch::local(BranchName::new("banana"))]
+    ///     vec![Branch::local("banana")]
     /// );
     /// #
     /// # Ok(())
@@ -1046,7 +1041,7 @@ mod tests {
                 Browser::new_with_namespace(&repo, &Namespace::from("golden"), "master")?;
             let history = browser.history.clone();
 
-            browser.branch(BranchName::new("banana"))?;
+            browser.branch(Branch::local("banana"))?;
 
             assert_ne!(history, browser.history);
 
@@ -1069,10 +1064,8 @@ mod tests {
             );
             assert_eq!(history, golden_browser.history);
 
-            let expected_branches: Vec<Branch> = vec![
-                Branch::local(BranchName::new("banana")),
-                Branch::local(BranchName::new("master")),
-            ];
+            let expected_branches: Vec<Branch> =
+                vec![Branch::local("banana"), Branch::local("master")];
             let mut branches = golden_browser.list_branches(None)?;
             branches.sort();
 
@@ -1098,7 +1091,7 @@ mod tests {
             );
             assert_ne!(history, silver_browser.history);
 
-            let expected_branches: Vec<Branch> = vec![Branch::local(BranchName::new("master"))];
+            let expected_branches: Vec<Branch> = vec![Branch::local("master")];
             let mut branches = silver_browser.list_branches(None)?;
             branches.sort();
 
@@ -1489,12 +1482,12 @@ mod tests {
             assert_eq!(
                 branches,
                 vec![
-                    Branch::remote(BranchName::new("HEAD"), "origin".to_string()),
-                    Branch::remote(BranchName::new("dev"), "origin".to_string()),
-                    Branch::local(BranchName::new("dev")),
-                    Branch::remote(BranchName::new("master"), "origin".to_string()),
-                    Branch::local(BranchName::new("master")),
-                    Branch::remote(BranchName::new("pineapple"), "banana".to_string()),
+                    Branch::remote("HEAD", "origin"),
+                    Branch::remote("dev", "origin"),
+                    Branch::local("dev"),
+                    Branch::remote("master", "origin"),
+                    Branch::local("master"),
+                    Branch::remote("pineapple", "banana"),
                 ]
             );
 
