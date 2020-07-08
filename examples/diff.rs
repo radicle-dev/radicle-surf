@@ -31,7 +31,8 @@ use radicle_surf::{
 fn main() {
     let options = get_options_or_exit();
     let repo = init_repository_or_exit(&options.path_to_repo);
-    let mut browser = git::Browser::new(&repo, "master").expect("failed to create browser:");
+    let mut browser =
+        git::Browser::new(&repo, git::Branch::local("master")).expect("failed to create browser:");
 
     match options.head_revision {
         HeadRevision::HEAD => {

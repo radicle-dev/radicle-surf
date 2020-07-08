@@ -23,7 +23,7 @@ use crate::{
         git::{
             error::*,
             object::{Commit, Namespace, RevObject, Signature},
-            reference::{glob::RefGlob, Ref},
+            reference::{glob::RefGlob, Ref, Rev},
             Branch,
             BranchType,
             Tag,
@@ -178,6 +178,24 @@ impl<'a> RepositoryRef<'a> {
         self.commit_to_history(commit)
     }
 
+    pub(super) fn reference<R, P>(&self, reference: R, check: P) -> Result<History, Error>
+    where
+        R: Into<Ref>,
+        P: FnOnce(&git2::Reference) -> Option<Error>,
+    {
+        let reference = match self.which_namespace()? {
+            None => reference.into(),
+            Some(namespace) => reference.into().namespaced(&namespace),
+        }
+        .find_ref(&self)?;
+
+        if let Some(err) = check(&reference) {
+            return Err(err);
+        }
+
+        Ok(self.to_history(&reference)?)
+    }
+
     /// Get the [`Diff`] between two commits.
     pub fn diff(&self, from: Oid, to: Oid) -> Result<Diff, Error> {
         self.diff_commits(None, Some(from), to)
@@ -187,6 +205,11 @@ impl<'a> RepositoryRef<'a> {
     /// Get the [`Diff`] of a commit with no parents.
     pub fn initial_diff(&self, oid: Oid) -> Result<Diff, Error> {
         self.diff_commits(None, None, oid).and_then(Diff::try_from)
+    }
+
+    /// Parse an [`Oid`] from the given string.
+    pub fn oid(&self, oid: &str) -> Result<Oid, Error> {
+        Ok(self.repo_ref.revparse_single(oid)?.id())
     }
 
     pub(super) fn switch_namespace(&self, namespace: &str) -> Result<(), Error> {
@@ -366,11 +389,17 @@ impl<'a> RepositoryRef<'a> {
 }
 
 impl<'a> VCS<Commit, Error> for RepositoryRef<'a> {
-    type HistoryId = String;
+    type HistoryId = Rev;
     type ArtefactId = Oid;
 
     fn get_history(&self, history_id: Self::HistoryId) -> Result<History, Error> {
-        self.revspec(&history_id)
+        match history_id {
+            Rev::Ref(reference) => self.reference(reference, |_| None),
+            Rev::Oid(oid) => {
+                let commit = self.get_commit(oid)?;
+                self.commit_to_history(commit)
+            },
+        }
     }
 
     fn get_histories(&self) -> Result<Vec<History>, Error> {
