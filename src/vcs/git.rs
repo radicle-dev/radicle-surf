@@ -76,9 +76,12 @@ mod object;
 mod branch;
 pub use branch::{Branch, BranchName, BranchType};
 
+mod tag;
+pub use tag::{Tag, TagName};
+
 pub use crate::{
     diff::Diff,
-    vcs::git::object::{Commit, Namespace, Oid, RevObject, Signature, Stats, Tag, TagName},
+    vcs::git::object::{Commit, Namespace, Oid, RevObject, Signature, Stats},
 };
 
 use crate::{
@@ -291,22 +294,15 @@ impl<'a> Browser<'a> {
     /// # }
     /// ```
     pub fn branch(&mut self, branch: Branch) -> Result<(), Error> {
-        let name = BranchName(branch.name().clone());
-        let reference: Ref = branch.into();
-        let reference = match self.which_namespace()? {
-            Some(namespace) => reference.namespaced(&namespace).find_ref(&self.repository),
-            None => reference.find_ref(&self.repository),
-        }?;
-
-        let is_branch = object::git_ext::is_branch(&reference) || reference.is_remote();
-
-        if !is_branch {
-            return Err(Error::NotBranch(name));
-        }
-
-        let branch = self.repository.to_history(&reference)?;
-        self.set(branch);
-        Ok(())
+        let name = BranchName(branch.name());
+        self.reference(branch, |reference| {
+            let is_branch = object::git_ext::is_branch(&reference) || reference.is_remote();
+            if !is_branch {
+                Some(Error::NotBranch(name))
+            } else {
+                None
+            }
+        })
     }
 
     /// Set the current `Browser`'s [`History`] to the [`TagName`] provided.
@@ -349,24 +345,33 @@ impl<'a> Browser<'a> {
     /// # }
     /// ```
     pub fn tag(&mut self, tag_name: TagName) -> Result<(), Error> {
-        let reference = match self.which_namespace()? {
-            Some(namespace) => Ref::Tag {
-                name: tag_name.clone(),
+        let name = tag_name.clone();
+        self.reference(tag_name, |reference| {
+            if !object::git_ext::is_tag(&reference) {
+                Some(Error::NotTag(name))
+            } else {
+                None
             }
-            .namespaced(&namespace)
-            .find_ref(&self.repository),
-            None => self
-                .repository
-                .repo_ref
-                .resolve_reference_from_short_name(tag_name.name()),
-        }?;
+        })
+    }
 
-        if !object::git_ext::is_tag(&reference) {
-            return Err(Error::NotTag(tag_name));
+    fn reference<R, P>(&mut self, reference: R, check: P) -> Result<(), Error>
+    where
+        R: Into<Ref>,
+        P: FnOnce(&git2::Reference) -> Option<Error>,
+    {
+        let reference = match self.which_namespace()? {
+            None => reference.into(),
+            Some(namespace) => reference.into().namespaced(&namespace),
+        }
+        .find_ref(&self.repository)?;
+
+        if let Some(err) = check(&reference) {
+            return Err(err);
         }
 
-        let tag = self.repository.to_history(&reference)?;
-        self.set(tag);
+        self.set(self.repository.to_history(&reference)?);
+
         Ok(())
     }
 
