@@ -28,7 +28,7 @@
 //!
 //! // Pin the browser to a parituclar commit.
 //! let pin_commit = Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
-//! let mut browser = Browser::new(&repo, "master")?;
+//! let mut browser = Browser::new(&repo, Branch::local("master"))?;
 //! browser.commit(pin_commit)?;
 //!
 //! let directory = browser.get_directory()?;
@@ -66,7 +66,7 @@
 pub use git2::{self, Error as Git2Error, Time};
 
 mod reference;
-pub use reference::Ref;
+pub use reference::{Ref, Rev};
 mod repo;
 pub use repo::{History, Repository, RepositoryRef};
 
@@ -116,14 +116,17 @@ impl<'a> Browser<'a> {
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let browser = Browser::new(&repo, "master")?;
+    /// let browser = Browser::new(&repo, Branch::local("master"))?;
     /// #
     /// # Ok(())
     /// # }
     /// ```
-    pub fn new(repository: impl Into<RepositoryRef<'a>>, revspec: &str) -> Result<Self, Error> {
+    pub fn new(
+        repository: impl Into<RepositoryRef<'a>>,
+        rev: impl Into<Rev>,
+    ) -> Result<Self, Error> {
         let repository = repository.into();
-        let history = repository.get_history(revspec.to_string())?;
+        let history = repository.get_history(rev.into())?;
         Ok(Self::init(repository, history))
     }
 
@@ -141,7 +144,8 @@ impl<'a> Browser<'a> {
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let browser = Browser::new_with_namespace(&repo, &Namespace::from("golden"), "master")?;
+    /// let browser = Browser::new_with_namespace(&repo, &Namespace::from("golden"),
+    /// Branch::local("master"))?;
     ///
     /// let mut branches = browser.list_branches(None)?;
     /// branches.sort();
@@ -160,14 +164,14 @@ impl<'a> Browser<'a> {
     pub fn new_with_namespace(
         repository: impl Into<RepositoryRef<'a>>,
         namespace: &Namespace,
-        revspec: &str,
+        rev: impl Into<Rev>,
     ) -> Result<Self, Error> {
         let repository = repository.into();
         // This is a bit weird, the references don't seem to all be present unless we
         // make a call to `references` o_O.
         let _ = repository.repo_ref.references()?;
         repository.switch_namespace(&namespace.to_string())?;
-        let history = repository.get_history(revspec.to_string())?;
+        let history = repository.get_history(rev.into())?;
         Ok(Self::init(repository, history))
     }
 
@@ -187,9 +191,13 @@ impl<'a> Browser<'a> {
     /// `Browser` and give you back a new `Browser` for that particular
     /// namespace. The `revision` provided will kick-off the history for
     /// this `Browser`.
-    pub fn switch_namespace(self, namespace: &Namespace, revision: &str) -> Result<Self, Error> {
+    pub fn switch_namespace(
+        self,
+        namespace: &Namespace,
+        rev: impl Into<Ref>,
+    ) -> Result<Self, Error> {
         self.repository.switch_namespace(&namespace.to_string())?;
-        let history = self.repository.get_history(revision.to_string())?;
+        let history = self.get_history(Rev::from(rev))?;
         Ok(Browser {
             snapshot: self.snapshot,
             repository: self.repository,
@@ -222,7 +230,7 @@ impl<'a> Browser<'a> {
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(&repo, "master")?;
+    /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
     ///
     /// // ensure we're at HEAD
     /// browser.head();
@@ -257,7 +265,7 @@ impl<'a> Browser<'a> {
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(&repo, "master")?;
+    /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
     ///
     /// // ensure we're on 'master'
     /// browser.branch(Branch::local("master"));
@@ -279,7 +287,7 @@ impl<'a> Browser<'a> {
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(&repo, "master")?;
+    /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
     /// browser.branch(Branch::remote("dev", "origin"))?;
     ///
     /// let directory = browser.get_directory()?;
@@ -295,14 +303,15 @@ impl<'a> Browser<'a> {
     /// ```
     pub fn branch(&mut self, branch: Branch) -> Result<(), Error> {
         let name = BranchName(branch.name());
-        self.reference(branch, |reference| {
+        self.set(self.repository.reference(branch, |reference| {
             let is_branch = object::git_ext::is_branch(&reference) || reference.is_remote();
             if !is_branch {
                 Some(Error::NotBranch(name))
             } else {
                 None
             }
-        })
+        })?);
+        Ok(())
     }
 
     /// Set the current `Browser`'s [`History`] to the [`TagName`] provided.
@@ -322,7 +331,7 @@ impl<'a> Browser<'a> {
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(&repo, "master")?;
+    /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
     ///
     /// // Switch to "v0.3.0"
     /// browser.tag(TagName::new("v0.3.0"))?;
@@ -346,32 +355,13 @@ impl<'a> Browser<'a> {
     /// ```
     pub fn tag(&mut self, tag_name: TagName) -> Result<(), Error> {
         let name = tag_name.clone();
-        self.reference(tag_name, |reference| {
+        self.set(self.repository.reference(tag_name, |reference| {
             if !object::git_ext::is_tag(&reference) {
                 Some(Error::NotTag(name))
             } else {
                 None
             }
-        })
-    }
-
-    fn reference<R, P>(&mut self, reference: R, check: P) -> Result<(), Error>
-    where
-        R: Into<Ref>,
-        P: FnOnce(&git2::Reference) -> Option<Error>,
-    {
-        let reference = match self.which_namespace()? {
-            None => reference.into(),
-            Some(namespace) => reference.into().namespaced(&namespace),
-        }
-        .find_ref(&self.repository)?;
-
-        if let Some(err) = check(&reference) {
-            return Err(err);
-        }
-
-        self.set(self.repository.to_history(&reference)?);
-
+        })?);
         Ok(())
     }
 
@@ -393,7 +383,7 @@ impl<'a> Browser<'a> {
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(&repo, "master")?;
+    /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
     ///
     /// // Set to the initial commit
     /// let commit = Oid::from_str("e24124b7538658220b5aaf3b6ef53758f0a106dc")?;
@@ -417,9 +407,7 @@ impl<'a> Browser<'a> {
     /// # }
     /// ```
     pub fn commit(&mut self, oid: Oid) -> Result<(), Error> {
-        let commit = self.repository.get_commit(oid)?;
-        let history = self.repository.commit_to_history(commit)?;
-        self.set(history);
+        self.set(self.get_history(Rev::Oid(oid))?);
         Ok(())
     }
 
@@ -441,7 +429,7 @@ impl<'a> Browser<'a> {
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(&repo, "master")?;
+    /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
     ///
     /// browser.revspec("refs/remotes/origin/dev")?;
     ///
@@ -456,8 +444,8 @@ impl<'a> Browser<'a> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn revspec(&mut self, spec: &str) -> Result<(), Error> {
-        let history = self.get_history(spec.to_string())?;
+    pub fn revspec(&mut self, rev: impl Into<Rev>) -> Result<(), Error> {
+        let history = self.get_history(rev.into())?;
         self.set(history);
         Ok(())
     }
@@ -476,6 +464,11 @@ impl<'a> Browser<'a> {
         let history = repository.commit_to_history(commit)?;
         self.set(history);
         Ok(())
+    }
+
+    /// Parse an [`Oid`] from the given string.
+    pub fn oid(&self, oid: &str) -> Result<Oid, Error> {
+        self.repository.oid(oid)
     }
 
     /// Get the [`Diff`] between two commits.
@@ -503,7 +496,7 @@ impl<'a> Browser<'a> {
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(&repo, "master")?;
+    /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
     ///
     /// let branches = browser.list_branches(None)?;
     ///
@@ -536,7 +529,7 @@ impl<'a> Browser<'a> {
     /// ]);
     ///
     /// // We can also switch namespaces and list the branches in that namespace.
-    /// let golden = browser.switch_namespace(&Namespace::from("golden"), "master")?;
+    /// let golden = browser.switch_namespace(&Namespace::from("golden"), Branch::local("master"))?;
     ///
     /// let mut branches = golden.list_branches(Some(BranchType::Local))?;
     /// branches.sort();
@@ -568,7 +561,7 @@ impl<'a> Browser<'a> {
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(&repo, "master")?;
+    /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
     ///
     /// let tags = browser.list_tags()?;
     ///
@@ -599,7 +592,7 @@ impl<'a> Browser<'a> {
     /// );
     ///
     /// // We can also switch namespaces and list the branches in that namespace.
-    /// let golden = browser.switch_namespace(&Namespace::from("golden"), "master")?;
+    /// let golden = browser.switch_namespace(&Namespace::from("golden"), Branch::local("master"))?;
     ///
     /// let branches = golden.list_tags()?;
     /// assert_eq!(branches, vec![
@@ -635,7 +628,7 @@ impl<'a> Browser<'a> {
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(&repo, "master")?;
+    /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
     ///
     /// let mut namespaces = browser.list_namespaces()?;
     /// namespaces.sort();
@@ -673,7 +666,7 @@ impl<'a> Browser<'a> {
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(&repo, "master")?;
+    /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
     ///
     /// // Clamp the Browser to a particular commit
     /// let commit = Oid::from_str("d6880352fc7fda8f521ae9b7357668b17bb5bad5")?;
@@ -722,7 +715,7 @@ impl<'a> Browser<'a> {
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(&repo, "master")?;
+    /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
     ///
     /// // Clamp the Browser to a particular commit
     /// let commit = Oid::from_str("223aaf87d6ea62eef0014857640fd7c8dd0f80b5")?;
@@ -789,7 +782,7 @@ impl<'a> Browser<'a> {
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(&repo, "master")?;
+    /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
     ///
     /// let commit_with_signature_oid = Oid::from_str(
     ///     "e24124b7538658220b5aaf3b6ef53758f0a106dc"
@@ -840,7 +833,7 @@ impl<'a> Browser<'a> {
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let browser = Browser::new(&repo, "master")?;
+    /// let browser = Browser::new(&repo, Branch::local("master"))?;
     ///
     ///
     /// let branches = browser.revision_branches("27acd68c7504755aa11023300890bb85bbd69d45")?;
@@ -859,7 +852,8 @@ impl<'a> Browser<'a> {
     ///     ]
     /// );
     ///
-    /// let golden_browser = browser.switch_namespace(&Namespace::from("golden"), "master")?;
+    /// let golden_browser = browser.switch_namespace(&Namespace::from("golden"),
+    /// Branch::local("master"))?;
     ///
     /// let branches = golden_browser.revision_branches("27acd68c7504755aa11023300890bb85bbd69d45")?;
     /// assert_eq!(
@@ -890,7 +884,7 @@ impl<'a> Browser<'a> {
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(&repo, "master")?;
+    /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
     ///
     /// let stats = browser.get_stats()?;
     ///
@@ -1029,7 +1023,7 @@ mod tests {
     // An issue with submodules, see: https://github.com/radicle-dev/radicle-surf/issues/54
     fn test_submodule_failure() {
         let repo = Repository::new(".").unwrap();
-        let browser = Browser::new(&repo, "master").unwrap();
+        let browser = Browser::new(&repo, Branch::local("master")).unwrap();
 
         browser.get_directory().unwrap();
     }
@@ -1042,8 +1036,11 @@ mod tests {
         #[test]
         fn switch_to_banana() -> Result<(), Error> {
             let repo = Repository::new("./data/git-platinum")?;
-            let mut browser =
-                Browser::new_with_namespace(&repo, &Namespace::from("golden"), "master")?;
+            let mut browser = Browser::new_with_namespace(
+                &repo,
+                &Namespace::from("golden"),
+                Branch::local("master"),
+            )?;
             let history = browser.history.clone();
 
             browser.branch(Branch::local("banana"))?;
@@ -1056,12 +1053,13 @@ mod tests {
         #[test]
         fn golden_namespace() -> Result<(), Error> {
             let repo = Repository::new("./data/git-platinum")?;
-            let browser = Browser::new(&repo, "master")?;
+            let browser = Browser::new(&repo, Branch::local("master"))?;
             let history = browser.history.clone();
 
             assert_eq!(browser.which_namespace(), Ok(None));
 
-            let golden_browser = browser.switch_namespace(&Namespace::from("golden"), "master")?;
+            let golden_browser =
+                browser.switch_namespace(&Namespace::from("golden"), Branch::local("master"))?;
 
             assert_eq!(
                 golden_browser.which_namespace(),
@@ -1082,13 +1080,13 @@ mod tests {
         #[test]
         fn silver_namespace() -> Result<(), Error> {
             let repo = Repository::new("./data/git-platinum")?;
-            let browser = Browser::new(&repo, "master")?;
+            let browser = Browser::new(&repo, Branch::local("master"))?;
             let history = browser.history.clone();
 
             assert_eq!(browser.which_namespace(), Ok(None));
 
-            let silver_browser =
-                browser.switch_namespace(&Namespace::from("golden/silver"), "master")?;
+            let silver_browser = browser
+                .switch_namespace(&Namespace::from("golden/silver"), Branch::local("master"))?;
 
             assert_eq!(
                 silver_browser.which_namespace(),
@@ -1108,7 +1106,7 @@ mod tests {
 
     #[cfg(test)]
     mod rev {
-        use super::{Browser, Error, Oid, Repository};
+        use super::{Branch, Browser, Error, Oid, Repository, TagName};
 
         // **FIXME**: This seems to break occasionally on
         // buildkite. For some reason the commit
@@ -1124,8 +1122,8 @@ mod tests {
         #[test]
         fn _master() -> Result<(), Error> {
             let repo = Repository::new("./data/git-platinum")?;
-            let mut browser = Browser::new(&repo, "master")?;
-            browser.revspec("master")?;
+            let mut browser = Browser::new(&repo, Branch::local("master"))?;
+            browser.revspec(Branch::remote("master", "origin"))?;
 
             let commit1 = Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
             assert!(
@@ -1163,8 +1161,8 @@ mod tests {
         #[test]
         fn commit() -> Result<(), Error> {
             let repo = Repository::new("./data/git-platinum")?;
-            let mut browser = Browser::new(&repo, "master")?;
-            browser.revspec("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
+            let mut browser = Browser::new(&repo, Branch::local("master"))?;
+            browser.revspec(Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?)?;
 
             let commit1 = Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
             assert!(browser
@@ -1182,8 +1180,8 @@ mod tests {
         #[test]
         fn commit_parents() -> Result<(), Error> {
             let repo = Repository::new("./data/git-platinum")?;
-            let mut browser = Browser::new(&repo, "master")?;
-            browser.revspec("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
+            let mut browser = Browser::new(&repo, Branch::local("master"))?;
+            browser.revspec(Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?)?;
             let commit = browser.history.first();
 
             assert_eq!(
@@ -1197,8 +1195,8 @@ mod tests {
         #[test]
         fn commit_short() -> Result<(), Error> {
             let repo = Repository::new("./data/git-platinum")?;
-            let mut browser = Browser::new(&repo, "master")?;
-            browser.revspec("3873745c8")?;
+            let mut browser = Browser::new(&repo, Branch::local("master"))?;
+            browser.revspec(browser.oid("3873745c8")?)?;
 
             let commit1 = Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
             assert!(browser
@@ -1216,8 +1214,8 @@ mod tests {
         #[test]
         fn tag() -> Result<(), Error> {
             let repo = Repository::new("./data/git-platinum")?;
-            let mut browser = Browser::new(&repo, "master")?;
-            browser.revspec("v0.2.0")?;
+            let mut browser = Browser::new(&repo, Branch::local("master"))?;
+            browser.revspec(TagName::new("v0.2.0"))?;
 
             let commit1 = Oid::from_str("2429f097664f9af0c5b7b389ab998b2199ffa977")?;
             assert_eq!(browser.history.first().id, commit1);
@@ -1230,14 +1228,15 @@ mod tests {
     mod last_commit {
         use crate::{
             file_system::{unsound, Path},
-            vcs::git::{Browser, Oid, Repository},
+            vcs::git::{Branch, Browser, Oid, Repository},
         };
 
         #[test]
         fn readme_missing_and_memory() {
             let repo = Repository::new("./data/git-platinum")
                 .expect("Could not retrieve ./data/git-platinum as git repository");
-            let mut browser = Browser::new(&repo, "master").expect("Could not initialise Browser");
+            let mut browser =
+                Browser::new(&repo, Branch::local("master")).expect("Could not initialise Browser");
 
             // Set the browser history to the initial commit
             let commit = Oid::from_str("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3")
@@ -1270,7 +1269,8 @@ mod tests {
         fn folder_svelte() {
             let repo = Repository::new("./data/git-platinum")
                 .expect("Could not retrieve ./data/git-platinum as git repository");
-            let mut browser = Browser::new(&repo, "master").expect("Could not initialise Browser");
+            let mut browser =
+                Browser::new(&repo, Branch::local("master")).expect("Could not initialise Browser");
 
             // Check that last commit is the actual last commit even if head commit differs.
             let commit = Oid::from_str("19bec071db6474af89c866a1bd0e4b1ff76e2b97")
@@ -1292,7 +1292,8 @@ mod tests {
         fn nest_directory() {
             let repo = Repository::new("./data/git-platinum")
                 .expect("Could not retrieve ./data/git-platinum as git repository");
-            let mut browser = Browser::new(&repo, "master").expect("Could not initialise Browser");
+            let mut browser =
+                Browser::new(&repo, Branch::local("master")).expect("Could not initialise Browser");
 
             // Check that last commit is the actual last commit even if head commit differs.
             let commit = Oid::from_str("19bec071db6474af89c866a1bd0e4b1ff76e2b97")
@@ -1316,7 +1317,8 @@ mod tests {
         fn root() {
             let repo = Repository::new("./data/git-platinum")
                 .expect("Could not retrieve ./data/git-platinum as git repository");
-            let browser = Browser::new(&repo, "master").expect("Could not initialise Browser");
+            let browser =
+                Browser::new(&repo, Branch::local("master")).expect("Could not initialise Browser");
 
             let root_last_commit_id = browser
                 .last_commit(Path::root())
@@ -1343,7 +1345,7 @@ mod tests {
             assert!(commit.parents().count() == 0);
             assert!(commit.parent(0).is_err());
 
-            let bro = Browser::new(&repo, "master")?;
+            let bro = Browser::new(&repo, Branch::local("master"))?;
             let diff = bro.initial_diff(oid)?;
 
             let expected_diff = Diff {
@@ -1372,7 +1374,7 @@ mod tests {
                 .unwrap();
             let parent = commit.parent(0)?;
 
-            let bro = Browser::new(&repo, "master")?;
+            let bro = Browser::new(&repo, Branch::local("master"))?;
 
             let diff = bro.diff(parent.id(), commit.id())?;
 
@@ -1480,7 +1482,7 @@ mod tests {
         fn basic_test() -> Result<(), Error> {
             let shared_repo = Mutex::new(Repository::new("./data/git-platinum")?);
             let locked_repo: MutexGuard<Repository> = shared_repo.lock().unwrap();
-            let bro = Browser::new(&*locked_repo, "master")?;
+            let bro = Browser::new(&*locked_repo, Branch::local("master"))?;
             let mut branches = bro.list_branches(None)?;
             branches.sort();
 

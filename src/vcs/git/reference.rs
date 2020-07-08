@@ -22,6 +22,29 @@ use thiserror::Error;
 
 pub(super) mod glob;
 
+/// A revision within the repository.
+pub enum Rev {
+    /// A reference to a branch or tag.
+    Ref(Ref),
+    /// A particular commit identifier.
+    Oid(git2::Oid),
+}
+
+impl<R> From<R> for Rev
+where
+    R: Into<Ref>,
+{
+    fn from(other: R) -> Self {
+        Self::Ref(other.into())
+    }
+}
+
+impl From<git2::Oid> for Rev {
+    fn from(other: git2::Oid) -> Self {
+        Self::Oid(other)
+    }
+}
+
 /// A structured way of referring to a git reference.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Ref {
