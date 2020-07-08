@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::vcs::git::{error, object::Namespace, repo::RepositoryRef, BranchType};
+use crate::vcs::git::{error, repo::RepositoryRef, BranchType, Namespace};
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

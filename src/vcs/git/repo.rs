@@ -22,10 +22,12 @@ use crate::{
     vcs::{
         git::{
             error::*,
-            object::{Commit, Namespace, Signature},
             reference::{glob::RefGlob, Ref, Rev},
             Branch,
             BranchType,
+            Commit,
+            Namespace,
+            Signature,
             Tag,
         },
         VCS,
@@ -252,7 +254,7 @@ impl<'a> RepositoryRef<'a> {
                     Err(error.into())
                 }
             },
-            Ok(sig) => Ok(Some(Signature::from_buf(sig.0))),
+            Ok(sig) => Ok(Some(Signature::from(sig.0))),
         }
     }
 

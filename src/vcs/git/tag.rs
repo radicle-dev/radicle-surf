@@ -15,11 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::vcs::git::{
-    error::Error,
-    object::{git_ext, Author},
-    reference::Ref,
-};
+use crate::vcs::git::{self, error::Error, reference::Ref, Author};
 use git2::Oid;
 use std::{convert::TryFrom, fmt, str};
 
@@ -39,7 +35,7 @@ impl TryFrom<&[u8]> for TagName {
 
     fn try_from(name: &[u8]) -> Result<Self, Self::Error> {
         let name = str::from_utf8(name)?;
-        let short_name = match git_ext::try_extract_refname(name) {
+        let short_name = match git::ext::try_extract_refname(name) {
             Ok(stripped) => stripped,
             Err(original) => original,
         };
@@ -137,7 +133,7 @@ impl<'repo> TryFrom<git2::Reference<'repo>> for Tag {
     fn try_from(reference: git2::Reference) -> Result<Self, Self::Error> {
         let name = TagName::try_from(reference.name_bytes())?;
 
-        if !git_ext::is_tag(&reference) {
+        if !git::ext::is_tag(&reference) {
             return Err(Error::NotTag(name));
         }
 

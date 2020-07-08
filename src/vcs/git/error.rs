@@ -21,7 +21,7 @@
 use crate::{
     diff,
     file_system,
-    vcs::git::{object::Namespace, BranchName, TagName},
+    vcs::git::{BranchName, Namespace, TagName},
 };
 use std::str;
 use thiserror::Error;
