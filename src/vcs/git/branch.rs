@@ -69,7 +69,7 @@ impl TryFrom<&[u8]> for BranchName {
             Ok(stripped) => stripped,
             Err(original) => original,
         };
-        Ok(Self(String::from(short_name)))
+        Ok(Self(short_name))
     }
 }
 
