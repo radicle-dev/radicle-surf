@@ -59,6 +59,10 @@ pub enum Error {
         /// The provided revspec that failed to parse.
         rev: String,
     },
+    /// When parsing a namespace we may come across one that was an empty
+    /// string.
+    #[error("tried parsing the namespace but it was empty")]
+    EmptyNamespace,
     /// A [`str::Utf8Error`] error, which usually occurs when a git object's
     /// name is not in UTF-8 form and parsing of it as such fails.
     #[error(transparent)]

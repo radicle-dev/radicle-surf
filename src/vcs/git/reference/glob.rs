@@ -15,7 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::vcs::git::{error, repo::RepositoryRef, BranchType, Namespace};
+use crate::vcs::git::{error, repo::RepositoryRef, BranchType};
+use either::Either;
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -67,17 +68,19 @@ impl RefGlob {
     pub fn references<'a>(&self, repo: &RepositoryRef<'a>) -> Result<References<'a>, error::Error> {
         let namespace = repo
             .which_namespace()?
-            .unwrap_or(Namespace { values: vec![] });
+            .map_or(Either::Left(std::iter::empty()), |namespace| {
+                Either::Right(namespace.values.into_iter())
+            });
         self.with_namespace_glob(namespace, repo)
     }
 
     fn with_namespace_glob<'a>(
         &self,
-        namespace: Namespace,
+        namespace: impl Iterator<Item = String>,
         repo: &RepositoryRef<'a>,
     ) -> Result<References<'a>, error::Error> {
         let mut namespace_glob = "".to_string();
-        for n in namespace.values {
+        for n in namespace {
             namespace_glob.push_str(&format!("refs/namespaces/{}/", n));
         }
 
