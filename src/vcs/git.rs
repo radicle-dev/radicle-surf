@@ -163,7 +163,7 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Browser, Repository, Branch, BranchName, Namespace};
+    /// use radicle_surf::vcs::git::{Browser, Repository, Branch, BranchType, BranchName, Namespace};
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -171,7 +171,7 @@ impl<'a> Browser<'a> {
     /// let browser = Browser::new_with_namespace(&repo, &Namespace::from("golden"),
     /// Branch::local("master"))?;
     ///
-    /// let mut branches = browser.list_branches(None)?;
+    /// let mut branches = browser.list_branches(Some(BranchType::Local))?;
     /// branches.sort();
     ///
     /// assert_eq!(
@@ -1100,7 +1100,15 @@ mod tests {
 
             let expected_branches: Vec<Branch> =
                 vec![Branch::local("banana"), Branch::local("master")];
-            let mut branches = golden_browser.list_branches(None)?;
+            let mut branches = golden_browser.list_branches(Some(BranchType::Local))?;
+            branches.sort();
+
+            assert_eq!(expected_branches, branches);
+
+            let expected_branches: Vec<Branch> = vec![Branch::remote("heelflip", "kickflip")];
+            let mut branches = golden_browser.list_branches(Some(BranchType::Remote {
+                name: Some("kickflip".to_string()),
+            }))?;
             branches.sort();
 
             assert_eq!(expected_branches, branches);

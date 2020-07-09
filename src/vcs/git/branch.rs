@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::vcs::git::{self, error::Error, reference::Ref};
+use crate::vcs::git::{self, error::Error, ext, reference::Ref};
 use std::{cmp::Ordering, convert::TryFrom, fmt, str};
 
 /// The branch type we want to filter on.
@@ -157,7 +157,7 @@ impl<'repo> TryFrom<git2::Reference<'repo>> for Branch {
     type Error = Error;
 
     fn try_from(reference: git2::Reference) -> Result<Self, Self::Error> {
-        let is_remote = reference.is_remote();
+        let is_remote = ext::is_remote(&reference);
         let is_tag = reference.is_tag();
         let is_note = reference.is_note();
         let name = BranchName::try_from(reference.name_bytes())?;
