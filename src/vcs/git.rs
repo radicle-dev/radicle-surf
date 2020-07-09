@@ -164,12 +164,16 @@ impl<'a> Browser<'a> {
     ///
     /// ```
     /// use radicle_surf::vcs::git::{Browser, Repository, Branch, BranchType, BranchName, Namespace};
+    /// use std::convert::TryFrom;
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let browser = Browser::new_with_namespace(&repo, &Namespace::from("golden"),
-    /// Branch::local("master"))?;
+    /// let browser = Browser::new_with_namespace(
+    ///     &repo,
+    ///     &Namespace::try_from("golden")?,
+    ///     Branch::local("master")
+    /// )?;
     ///
     /// let mut branches = browser.list_branches(Some(BranchType::Local))?;
     /// branches.sort();
@@ -524,6 +528,7 @@ impl<'a> Browser<'a> {
     ///
     /// ```
     /// use radicle_surf::vcs::git::{Branch, BranchType, BranchName, Browser, Namespace, Repository};
+    /// use std::convert::TryFrom;
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -561,7 +566,7 @@ impl<'a> Browser<'a> {
     /// ]);
     ///
     /// // We can also switch namespaces and list the branches in that namespace.
-    /// let golden = browser.switch_namespace(&Namespace::from("golden"), Branch::local("master"))?;
+    /// let golden = browser.switch_namespace(&Namespace::try_from("golden")?, Branch::local("master"))?;
     ///
     /// let mut branches = golden.list_branches(Some(BranchType::Local))?;
     /// branches.sort();
@@ -589,6 +594,7 @@ impl<'a> Browser<'a> {
     ///
     /// ```
     /// use radicle_surf::vcs::git::{Branch, Browser, Namespace, Oid, Repository, Tag, TagName};
+    /// use std::convert::TryFrom;
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -624,7 +630,7 @@ impl<'a> Browser<'a> {
     /// );
     ///
     /// // We can also switch namespaces and list the branches in that namespace.
-    /// let golden = browser.switch_namespace(&Namespace::from("golden"), Branch::local("master"))?;
+    /// let golden = browser.switch_namespace(&Namespace::try_from("golden")?, Branch::local("master"))?;
     ///
     /// let branches = golden.list_tags()?;
     /// assert_eq!(branches, vec![
@@ -656,6 +662,7 @@ impl<'a> Browser<'a> {
     ///
     /// ```
     /// use radicle_surf::vcs::git::{Branch, BranchType, BranchName, Browser, Namespace, Repository};
+    /// use std::convert::TryFrom;
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -666,8 +673,8 @@ impl<'a> Browser<'a> {
     /// namespaces.sort();
     ///
     /// assert_eq!(namespaces, vec![
-    ///     Namespace::from("golden"),
-    ///     Namespace::from("golden/silver"),
+    ///     Namespace::try_from("golden")?,
+    ///     Namespace::try_from("golden/silver")?,
     /// ]);
     ///
     ///
@@ -861,6 +868,7 @@ impl<'a> Browser<'a> {
     ///
     /// ```
     /// use radicle_surf::vcs::git::{Browser, Repository, Branch, BranchName, Namespace, Oid};
+    /// use std::convert::TryFrom;
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -884,7 +892,7 @@ impl<'a> Browser<'a> {
     ///     ]
     /// );
     ///
-    /// let golden_browser = browser.switch_namespace(&Namespace::from("golden"),
+    /// let golden_browser = browser.switch_namespace(&Namespace::try_from("golden")?,
     /// Branch::local("master"))?;
     ///
     /// let branches = golden_browser.revision_branches(Oid::from_str("27acd68c7504755aa11023300890bb85bbd69d45")?)?;
@@ -1069,7 +1077,7 @@ mod tests {
             let repo = Repository::new("./data/git-platinum")?;
             let mut browser = Browser::new_with_namespace(
                 &repo,
-                &Namespace::from("golden"),
+                &Namespace::try_from("golden")?,
                 Branch::local("master"),
             )?;
             let history = browser.history.clone();
@@ -1089,12 +1097,12 @@ mod tests {
 
             assert_eq!(browser.which_namespace(), Ok(None));
 
-            let golden_browser =
-                browser.switch_namespace(&Namespace::from("golden"), Branch::local("master"))?;
+            let golden_browser = browser
+                .switch_namespace(&Namespace::try_from("golden")?, Branch::local("master"))?;
 
             assert_eq!(
                 golden_browser.which_namespace(),
-                Ok(Some(Namespace::from("golden")))
+                Ok(Some(Namespace::try_from("golden")?))
             );
             assert_eq!(history, golden_browser.history);
 
@@ -1124,12 +1132,14 @@ mod tests {
 
             assert_eq!(browser.which_namespace(), Ok(None));
 
-            let silver_browser = browser
-                .switch_namespace(&Namespace::from("golden/silver"), Branch::local("master"))?;
+            let silver_browser = browser.switch_namespace(
+                &Namespace::try_from("golden/silver")?,
+                Branch::local("master"),
+            )?;
 
             assert_eq!(
                 silver_browser.which_namespace(),
-                Ok(Some(Namespace::from("golden/silver")))
+                Ok(Some(Namespace::try_from("golden/silver")?))
             );
             assert_ne!(history, silver_browser.history);
 

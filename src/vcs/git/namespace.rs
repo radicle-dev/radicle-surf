@@ -15,7 +15,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::vcs::git::error::Error;
 pub use git2::Oid;
+use nonempty::NonEmpty;
 use std::{convert::TryFrom, fmt, str};
 
 /// A `Namespace` value allows us to switch the git namespace of
@@ -25,32 +27,39 @@ pub struct Namespace {
     /// Since namespaces can be nested we have a vector of strings.
     /// This means that the namespaces `"foo/bar"` is represented as
     /// `vec!["foo", "bar"]`.
-    pub(super) values: Vec<String>,
+    pub(super) values: NonEmpty<String>,
 }
 
 impl fmt::Display for Namespace {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.values.join("/"))
+        let values: Vec<_> = self.values.clone().into();
+        write!(f, "{}", values.join("/"))
     }
 }
 
-impl From<&str> for Namespace {
-    fn from(namespace: &str) -> Namespace {
+impl TryFrom<&str> for Namespace {
+    type Error = Error;
+
+    fn try_from(namespace: &str) -> Result<Self, Self::Error> {
         let values = namespace.split('/').map(|n| n.to_string()).collect();
-        Self { values }
+        NonEmpty::from_vec(values)
+            .map(|values| Self { values })
+            .ok_or(Error::EmptyNamespace)
     }
 }
 
 impl TryFrom<&[u8]> for Namespace {
-    type Error = str::Utf8Error;
+    type Error = Error;
 
     fn try_from(namespace: &[u8]) -> Result<Self, Self::Error> {
-        str::from_utf8(namespace).map(Namespace::from)
+        str::from_utf8(namespace)
+            .map_err(Error::from)
+            .and_then(Namespace::try_from)
     }
 }
 
 impl TryFrom<git2::Reference<'_>> for Namespace {
-    type Error = str::Utf8Error;
+    type Error = Error;
 
     fn try_from(reference: git2::Reference) -> Result<Self, Self::Error> {
         let re = regex::Regex::new(r"refs/namespaces/([^/]+)/").unwrap();
@@ -64,9 +73,10 @@ impl TryFrom<git2::Reference<'_>> for Namespace {
                         .trim_end_matches('/'),
                 )
             })
-            .collect::<Vec<_>>()
-            .to_vec();
+            .collect::<Vec<_>>();
 
-        Ok(Namespace { values })
+        NonEmpty::from_vec(values)
+            .map(|values| Self { values })
+            .ok_or(Error::EmptyNamespace)
     }
 }
