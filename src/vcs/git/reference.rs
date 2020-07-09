@@ -23,6 +23,7 @@ use thiserror::Error;
 pub(super) mod glob;
 
 /// A revision within the repository.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Rev {
     /// A reference to a branch or tag.
     Ref(Ref),
