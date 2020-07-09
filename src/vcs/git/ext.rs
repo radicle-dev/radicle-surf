@@ -40,7 +40,7 @@ pub fn try_extract_refname(spec: &str) -> Result<String, String> {
 }
 
 /// [`git2::Reference::is_tag`] just does a check for the prefix of `tags/`.
-/// This issue with that is, as soon as we're in 'namespaces' ref that
+/// The issue with that is, as soon as we're in 'namespaces' ref that
 /// is a tag it will say that it's not a tag. Instead we do a regex check on
 /// `refs/tags/.*`.
 pub fn is_tag(reference: &git2::Reference) -> bool {
