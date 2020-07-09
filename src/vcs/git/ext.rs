@@ -26,17 +26,14 @@ pub fn try_extract_refname(spec: &str) -> Result<String, String> {
     re.captures(spec)
         .and_then(|c| {
             let mut result = String::new();
-            match c.get(3).map(|m| m.as_str()) {
-                Some(remote) => {
-                    result.push_str(remote);
-                    result.push_str("/");
-                },
-                None => {},
+            if let Some(remote) = c.get(3).map(|m| m.as_str()) {
+                result.push_str(remote);
+                result.push_str("/");
             }
             result.push_str(c.get(5).map(|m| m.as_str())?);
             Some(result)
         })
-        .ok_or(spec.to_string())
+        .ok_or_else(|| spec.to_string())
 }
 
 /// [`git2::Reference::is_tag`] just does a check for the prefix of `tags/`.
