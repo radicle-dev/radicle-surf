@@ -80,7 +80,7 @@ fn setup_fixtures() {
             "refs/tags/v0.2.0",
         ),
         (
-            "refs/namespaces/golden/refs/remotes/kickflip/refs/heads/heelflip",
+            "refs/namespaces/golden/refs/remotes/kickflip/heads/heelflip",
             "refs/heads/dev",
         ),
         (

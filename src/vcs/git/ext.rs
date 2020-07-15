@@ -18,10 +18,8 @@
 /// Try to strip any refs/namespaces, refs/heads, refs/remotes, and
 /// refs/tags. If this fails we return the original string.
 pub fn try_extract_refname(spec: &str) -> Result<String, String> {
-    let re = regex::Regex::new(
-        r"(refs/namespaces/.*?/)*(refs/remotes/(.*?)/)?(refs/heads/|refs/tags/)?(.*)",
-    )
-    .unwrap();
+    let re = regex::Regex::new(r"(refs/namespaces/.*?/)*refs/(remotes/(.*?)/)?(heads/|tags/)?(.*)")
+        .unwrap();
 
     re.captures(spec)
         .and_then(|c| {
@@ -106,7 +104,7 @@ mod tests {
         );
 
         assert_eq!(
-            try_extract_refname("refs/namespaces/golden/refs/remotes/kickflip/refs/heads/heelflip"),
+            try_extract_refname("refs/namespaces/golden/refs/remotes/kickflip/heads/heelflip"),
             Ok("kickflip/heelflip".to_string())
         );
     }
