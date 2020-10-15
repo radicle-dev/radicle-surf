@@ -20,13 +20,7 @@ The `build.rs` file takes care of setting up the submodule `data/git-platinum`. 
 `radicle-surf` all that is necessary is running:
 
 ```bash
-$ cargo build
-```
-
-and
-
-```bash
-$ cargo test
+$ GIT_FIXTURES=1 cargo test
 ```
 
 For the full list of commands that get executed on CI you can checkout the [ci/run](./ci/run) script.
