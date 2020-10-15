@@ -259,11 +259,13 @@ impl<'a> RepositoryRef<'a> {
     }
 
     pub(crate) fn revision_branches(&self, oid: &Oid) -> Result<Vec<Branch>, Error> {
-        let references = RefGlob::LocalBranch.references(self)?;
+        let local = RefGlob::LocalBranch.references(self)?;
+        let remote = RefGlob::RemoteBranch { remote: None }.references(self)?;
+        let mut references = local.iter().chain(remote.iter());
 
         let mut contained_branches = vec![];
 
-        references.iter().try_for_each(|reference| {
+        references.try_for_each(|reference| {
             let reference = reference?;
             self.reachable_from(&reference, &oid).and_then(|contains| {
                 if contains {
