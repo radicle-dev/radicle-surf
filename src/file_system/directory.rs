@@ -308,7 +308,7 @@ impl Directory {
     ///
     /// assert_eq!(root_iter.next(), Some(DirectoryContents::Directory(test_dir)));
     /// ```
-    pub fn iter<'a>(&'a self) -> impl Iterator<Item = DirectoryContents> + 'a {
+    pub fn iter(&self) -> impl Iterator<Item = DirectoryContents> + '_ {
         let mut empty_iter = None;
         let mut trees_iter = None;
         match &self.sub_directories.0 {

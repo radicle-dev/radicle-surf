@@ -26,7 +26,7 @@ pub fn try_extract_refname(spec: &str) -> Result<String, String> {
             let mut result = String::new();
             if let Some(remote) = c.get(3).map(|m| m.as_str()) {
                 result.push_str(remote);
-                result.push_str("/");
+                result.push('/');
             }
             result.push_str(c.get(5).map(|m| m.as_str())?);
             Some(result)

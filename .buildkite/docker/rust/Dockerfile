@@ -20,7 +20,7 @@ RUN set -eux; \
 
 # Rust toolchain
 # Make sure this is in sync with rust-toolchain!
-ENV RUST_VERSION=nightly-2020-05-11 \
+ENV RUST_VERSION=nightly-2020-10-15 \
     CARGO_HOME=/usr/local/cargo \
     PATH=/usr/local/cargo/bin:$PATH \
     RUSTUP_HOME=/usr/local/rustup \
@@ -38,7 +38,7 @@ RUN set -eux; \
     cargo --version; \
     rustc --version; \
     rustup component add clippy rustfmt; \
-    cargo install sccache cargo-deb cargo-deny; \
+    cargo install sccache cargo-deny; \
     rm -rf /usr/local/cargo/registry; \
     rm /usr/local/cargo/.package-cache;
 
