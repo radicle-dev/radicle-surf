@@ -109,15 +109,6 @@ fn main() {
         setup_fixtures();
     }
 
-    for entry in glob::glob("./.git/modules/data/git-platinum/refs/**/*")
-        .expect("Failed to read glob pattern")
-    {
-        match entry {
-            Ok(path) => println!("{:?}", path.display()),
-            Err(e) => println!("{:?}", e),
-        }
-    }
-
     // Tell the build script that we should re-run if this script changes.
     println!("cargo:rerun-if-env-changed=GIT_FIXTURES");
 }
