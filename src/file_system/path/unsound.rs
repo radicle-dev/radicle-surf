@@ -26,7 +26,7 @@
 //!
 //! On the other hand, if we do not control the data coming in we should use the
 //! more "sound" method of the [`std::convert::TryFrom`] instance for
-//! [`crate::file_system::path::Label`] and [`crate::file_system::path::Path`]
+//! [`crate::file_system::Label`] and [`crate::file_system::Path`]
 //! to ensure we have valid data to use for further operations.
 
 pub mod path {
