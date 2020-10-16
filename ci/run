@@ -25,8 +25,7 @@ echo '--- deny: Sources'
 cargo deny check sources
 
 echo '--- Tests'
-GIT_FIXTURES=1 cargo test -vv --verbose --all --features serialize
-echo $(cat ./target/debug/build/radicle-surf-*/output)
+GIT_FIXTURES=1 cargo test --all --features serialize
 
 echo '--- Docs'
 cargo doc --no-deps
