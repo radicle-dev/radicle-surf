@@ -98,7 +98,9 @@ impl<'a> RepositoryRef<'a> {
             .references(&self)?
             .iter()
             .try_fold(vec![], |mut acc, reference| {
-                let branch = Branch::try_from(reference?)?;
+                let reference = reference?;
+                println!("REF: {:?}", reference.name());
+                let branch = Branch::try_from(reference)?;
                 acc.push(branch);
                 Ok(acc)
             })
