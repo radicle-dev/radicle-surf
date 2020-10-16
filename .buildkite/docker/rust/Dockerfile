@@ -38,11 +38,9 @@ RUN set -eux; \
     cargo --version; \
     rustc --version; \
     rustup component add clippy rustfmt; \
-    cargo install sccache cargo-deny; \
+    cargo install cargo-deny; \
     rm -rf /usr/local/cargo/registry; \
     rm /usr/local/cargo/.package-cache;
 
 VOLUME /cache
-ENV SCCACHE_DIR=/cache/sccache \
-    RUSTC_WRAPPER=sccache \
-    CARGO_HOME=/cache/cargo
+ENV CARGO_HOME=/cache/cargo
