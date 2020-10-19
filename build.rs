@@ -22,7 +22,7 @@ use std::{
 };
 
 fn checkout(curr_dir: &Path, branch: &str) -> ExitStatus {
-    let git_checkout = format!("git checkout -f {}", branch);
+    let git_checkout = format!("git checkout {}", branch);
 
     Command::new("git")
         .arg("submodule")
@@ -49,24 +49,11 @@ fn setup_fixtures() {
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("Failed to get CARGO_MANIFEST_DIR");
     let curr_dir = Path::new(&manifest_dir);
 
-    // Run `git submodule update --init`
-    let init = Command::new("git")
-        .arg("submodule")
-        .arg("update")
-        .arg("--init")
-        .current_dir(&curr_dir)
-        .status()
-        .expect("Failed to execute `git submodule update --init`");
-    assert!(init.success(), "init of submodule failed");
-
     let dev_status = checkout(curr_dir, "dev");
     assert!(dev_status.success(), "failed to checkout dev");
 
     let master_status = checkout(curr_dir, "master");
     assert!(master_status.success(), "failed to checkout master");
-
-    let pinned = checkout(curr_dir, "223aaf87d6ea62eef0014857640fd7c8dd0f80b5");
-    assert!(pinned.success(), "failed to pin to commit");
 
     for (new_rev, rev) in [
         (
