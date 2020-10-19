@@ -1360,6 +1360,29 @@ mod tests {
         }
 
         #[test]
+        fn backslash() {
+            let repo = Repository::new("./data/git-platinum")
+                .expect("Could not retrieve ./data/git-platinum as git repository");
+            let mut browser =
+                Browser::new(&repo, Branch::local("master")).expect("Could not initialise Browser");
+
+            // Check that last commit is the actual last commit even if head commit differs.
+            let commit = Oid::from_str("a0dd9122d33dff2a35f564d564db127152c88e02")
+                .expect("Failed to parse SHA");
+            browser.commit(commit).unwrap();
+
+            let expected_commit_id =
+                Oid::from_str("a0dd9122d33dff2a35f564d564db127152c88e02").unwrap();
+
+            let backslash_commit_id = browser
+                .last_commit(unsound::path::new("~/special/faux\\path"))
+                .expect("Failed to get last commit")
+                .map(|commit| commit.id);
+
+            assert_eq!(backslash_commit_id, Some(expected_commit_id));
+        }
+
+        #[test]
         fn root() {
             let repo = Repository::new("./data/git-platinum")
                 .expect("Could not retrieve ./data/git-platinum as git repository");
