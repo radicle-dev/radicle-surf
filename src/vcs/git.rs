@@ -886,16 +886,17 @@ impl<'a> Browser<'a> {
     /// );
     ///
     /// // TODO(finto): I worry that this test will fail as other branches get added
-    /// let branches = browser.revision_branches(Oid::from_str("1820cb07c1a890016ca5578aa652fd4d4c38967e")?)?;
+    /// let mut branches = browser.revision_branches(Oid::from_str("1820cb07c1a890016ca5578aa652fd4d4c38967e")?)?;
+    /// branches.sort();
     /// assert_eq!(
     ///     branches,
     ///     vec![
-    ///         Branch::local("dev"),
-    ///         Branch::local("master"),
-    ///         Branch::remote("pineapple", "banana"),
     ///         Branch::remote("HEAD", "origin"),
+    ///         Branch::local("dev"),
     ///         Branch::remote("dev", "origin"),
+    ///         Branch::local("master"),
     ///         Branch::remote("master", "origin"),
+    ///         Branch::remote("pineapple", "banana"),
     ///     ]
     /// );
     ///
