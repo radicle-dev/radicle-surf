@@ -929,7 +929,7 @@ impl<'a> Browser<'a> {
     ///
     /// assert_eq!(stats.branches, 2);
     ///
-    /// assert_eq!(stats.commits, 14);
+    /// assert_eq!(stats.commits, 15);
     ///
     /// assert_eq!(stats.contributors, 4);
     ///
