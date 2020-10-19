@@ -757,7 +757,7 @@ impl<'a> Browser<'a> {
     /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
     ///
     /// // Clamp the Browser to a particular commit
-    /// let commit = Oid::from_str("223aaf87d6ea62eef0014857640fd7c8dd0f80b5")?;
+    /// let commit = Oid::from_str("a0dd9122d33dff2a35f564d564db127152c88e02")?;
     /// browser.commit(commit)?;
     ///
     /// let root_commits: Vec<Oid> = browser
@@ -768,6 +768,7 @@ impl<'a> Browser<'a> {
     ///
     /// assert_eq!(root_commits,
     ///     vec![
+    ///         Oid::from_str("a0dd9122d33dff2a35f564d564db127152c88e02")?,
     ///         Oid::from_str("223aaf87d6ea62eef0014857640fd7c8dd0f80b5")?,
     ///         Oid::from_str("80bacafba303bf0cdf6142921f430ff265f25095")?,
     ///         Oid::from_str("a57846bbc8ced6587bf8329fc4bce970eb7b757e")?,
@@ -931,7 +932,7 @@ impl<'a> Browser<'a> {
     /// assert_eq!(stats.branches, 2);
     ///
     /// // there should be 14 commits
-    /// assert_eq!(stats.commits, 14);
+    /// assert_eq!(stats.commits, 15);
     ///
     /// // 4 contributors: Alexander Simmerl, Fintan Halpenny, FintanH, Rudolfs Ošiņš
     /// assert_eq!(stats.contributors, 4);
