@@ -879,16 +879,24 @@ impl<'a> Browser<'a> {
     /// let branches = browser.revision_branches(Oid::from_str("27acd68c7504755aa11023300890bb85bbd69d45")?)?;
     /// assert_eq!(
     ///     branches,
-    ///     vec![Branch::local("dev")]
+    ///     vec![
+    ///         Branch::local("dev"),
+    ///         Branch::remote("dev", "origin"),
+    ///     ]
     /// );
     ///
     /// // TODO(finto): I worry that this test will fail as other branches get added
-    /// let branches = browser.revision_branches(Oid::from_str("1820cb07c1a890016ca5578aa652fd4d4c38967e")?)?;
+    /// let mut branches = browser.revision_branches(Oid::from_str("1820cb07c1a890016ca5578aa652fd4d4c38967e")?)?;
+    /// branches.sort();
     /// assert_eq!(
     ///     branches,
     ///     vec![
+    ///         Branch::remote("HEAD", "origin"),
     ///         Branch::local("dev"),
+    ///         Branch::remote("dev", "origin"),
     ///         Branch::local("master"),
+    ///         Branch::remote("master", "origin"),
+    ///         Branch::remote("pineapple", "banana"),
     ///     ]
     /// );
     ///
@@ -898,7 +906,10 @@ impl<'a> Browser<'a> {
     /// let branches = golden_browser.revision_branches(Oid::from_str("27acd68c7504755aa11023300890bb85bbd69d45")?)?;
     /// assert_eq!(
     ///     branches,
-    ///     vec![Branch::local("banana")]
+    ///     vec![
+    ///         Branch::local("banana"),
+    ///         Branch::remote("heelflip", "kickflip"),
+    ///     ]
     /// );
     /// #
     /// # Ok(())
