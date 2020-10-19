@@ -24,9 +24,6 @@ cargo deny check bans
 echo '--- deny: Sources'
 cargo deny check sources
 
-echo '--- Clean git-platinum'
-rm -rf ./data/git-platinum
-
 echo '--- Build'
 GIT_FIXTURES=1 cargo build -vv --all --features serialize
 

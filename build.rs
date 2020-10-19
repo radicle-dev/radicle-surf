@@ -79,12 +79,10 @@ fn setup_fixtures() {
             "refs/namespaces/golden/refs/tags/v0.2.0",
             "refs/tags/v0.2.0",
         ),
-        /*
         (
             "refs/namespaces/golden/refs/remotes/kickflip/heads/heelflip",
             "refs/heads/dev",
         ),
-        */
         (
             "refs/namespaces/golden/refs/namespaces/silver/refs/heads/master",
             "refs/heads/dev",
