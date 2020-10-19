@@ -65,6 +65,9 @@ fn setup_fixtures() {
     let master_status = checkout(curr_dir, "master");
     assert!(master_status.success(), "failed to checkout master");
 
+    let pinned = checkout(curr_dir, "223aaf87d6ea62eef0014857640fd7c8dd0f80b5");
+    assert!(pinned.success(), "failed to pin to commit");
+
     for (new_rev, rev) in [
         (
             "refs/namespaces/golden/refs/heads/master",
