@@ -24,7 +24,7 @@ cargo deny check bans
 echo '--- deny: Sources'
 cargo deny check sources
 
-echo '--- Tests'
+echo '--- Build & Test'
 GIT_FIXTURES=1 cargo test --all --features serialize
 
 echo '--- Docs'

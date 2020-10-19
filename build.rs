@@ -49,16 +49,6 @@ fn setup_fixtures() {
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("Failed to get CARGO_MANIFEST_DIR");
     let curr_dir = Path::new(&manifest_dir);
 
-    // Run `git submodule update --init`
-    let init = Command::new("git")
-        .arg("submodule")
-        .arg("update")
-        .arg("--init")
-        .current_dir(&curr_dir)
-        .status()
-        .expect("Failed to execute `git submodule update --init`");
-    assert!(init.success(), "init of submodule failed");
-
     let dev_status = checkout(curr_dir, "dev");
     assert!(dev_status.success(), "failed to checkout dev");
 

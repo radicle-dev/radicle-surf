@@ -927,13 +927,10 @@ impl<'a> Browser<'a> {
     ///
     /// let stats = browser.get_stats()?;
     ///
-    /// // there should be 2 local branches
     /// assert_eq!(stats.branches, 2);
     ///
-    /// // there should be 14 commits
-    /// assert_eq!(stats.commits, 14);
+    /// assert_eq!(stats.commits, 15);
     ///
-    /// // 4 contributors: Alexander Simmerl, Fintan Halpenny, FintanH, Rudolfs Ošiņš
     /// assert_eq!(stats.contributors, 4);
     ///
     /// # Ok(())
