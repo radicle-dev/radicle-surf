@@ -1360,7 +1360,7 @@ mod tests {
         }
 
         #[test]
-        fn backslash() {
+        fn can_get_last_commit_for_special_filenames() {
             let repo = Repository::new("./data/git-platinum")
                 .expect("Could not retrieve ./data/git-platinum as git repository");
             let mut browser =
@@ -1378,8 +1378,13 @@ mod tests {
                 .last_commit(unsound::path::new("~/special/faux\\path"))
                 .expect("Failed to get last commit")
                 .map(|commit| commit.id);
-
             assert_eq!(backslash_commit_id, Some(expected_commit_id));
+
+            let ogre_commit_id = browser
+                .last_commit(unsound::path::new("~/special/👹👹👹"))
+                .expect("Failed to get last commit")
+                .map(|commit| commit.id);
+            assert_eq!(ogre_commit_id, Some(expected_commit_id));
         }
 
         #[test]
