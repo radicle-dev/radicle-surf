@@ -9,6 +9,11 @@ homepage = "https://github.com/radicle-dev/radicle-surf"
 repository = "https://github.com/radicle-dev/radicle-surf"
 license = "GPL-3.0-or-later"
 
+include = [
+    "**/*.rs",
+    "Cargo.toml",
+]
+
 [features]
 serialize = ["serde"]
 
