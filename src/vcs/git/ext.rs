@@ -15,25 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-/// Try to strip any refs/namespaces, refs/heads, refs/remotes, and
-/// refs/tags. If this fails we return the original string.
-pub fn try_extract_refname(spec: &str) -> Result<String, String> {
-    let re = regex::Regex::new(r"(refs/namespaces/.*?/)*refs/(remotes/(.*?)/)?(heads/|tags/)?(.*)")
-        .unwrap();
-
-    re.captures(spec)
-        .and_then(|c| {
-            let mut result = String::new();
-            if let Some(remote) = c.get(3).map(|m| m.as_str()) {
-                result.push_str(remote);
-                result.push('/');
-            }
-            result.push_str(c.get(5).map(|m| m.as_str())?);
-            Some(result)
-        })
-        .ok_or_else(|| spec.to_string())
-}
-
 /// [`git2::Reference::is_tag`] just does a check for the prefix of `tags/`.
 /// The issue with that is, as soon as we're in 'namespaces' ref that
 /// is a tag it will say that it's not a tag. Instead we do a regex check on
@@ -65,47 +46,19 @@ pub fn is_remote(reference: &git2::Reference) -> bool {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_try_extract_refname() {
-        assert_eq!(try_extract_refname("refs/heads/dev"), Ok("dev".to_string()));
-
-        assert_eq!(
-            try_extract_refname("refs/heads/master"),
-            Ok("master".to_string())
-        );
-
-        assert_eq!(
-            try_extract_refname("refs/remotes/banana/pineapple"),
-            Ok("banana/pineapple".to_string())
-        );
-
-        assert_eq!(
-            try_extract_refname("refs/remotes/origin/master"),
-            Ok("origin/master".to_string())
-        );
-
-        assert_eq!(
-            try_extract_refname("refs/namespaces/golden/refs/heads/banana"),
-            Ok("banana".to_string())
-        );
-
-        assert_eq!(
-            try_extract_refname("refs/namespaces/golden/refs/tags/v0.1.0"),
-            Ok("v0.1.0".to_string())
-        );
-
-        assert_eq!(
-            try_extract_refname("refs/namespaces/golden/refs/namespaces/silver/refs/heads/master"),
-            Ok("master".to_string())
-        );
-
-        assert_eq!(
-            try_extract_refname("refs/namespaces/golden/refs/remotes/kickflip/heads/heelflip"),
-            Ok("kickflip/heelflip".to_string())
-        );
+pub fn remove_namespace(
+    reflike: radicle_git_ext::RefLike,
+) -> Result<radicle_git_ext::RefLike, radicle_git_ext::name::StripPrefixError> {
+    if !reflike.starts_with("refs/namespaces/") {
+        return Ok(reflike);
     }
+
+    let suffix = reflike.strip_prefix("refs/namespaces/")?;
+
+    let namespace = suffix
+        .components()
+        .take_while(|c| c.as_os_str() != "refs")
+        .fold(std::path::PathBuf::new(), |n, c| n.join(c.as_os_str()));
+
+    remove_namespace(suffix.strip_prefix(namespace)?)
 }

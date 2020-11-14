@@ -15,10 +15,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::vcs::git::{repo::RepositoryRef, BranchName, Namespace, TagName};
-use regex::Regex;
-use std::{fmt, str};
+use std::{convert::TryFrom, fmt, str};
 use thiserror::Error;
+
+use radicle_git_ext::{self as ext, OneLevel, Qualified, RefLike};
+
+use crate::vcs::git::{repo::RepositoryRef, Namespace};
 
 pub(super) mod glob;
 
@@ -52,19 +54,19 @@ pub enum Ref {
     /// A git tag, which can be found under `.git/refs/tags/`.
     Tag {
         /// The name of the tag, e.g. `v1.0.0`.
-        name: TagName,
+        name: OneLevel,
     },
     /// A git branch, which can be found under `.git/refs/heads/`.
     LocalBranch {
         /// The name of the branch, e.g. `master`.
-        name: BranchName,
+        name: Qualified,
     },
     /// A git branch, which can be found under `.git/refs/remotes/`.
     RemoteBranch {
         /// The remote name, e.g. `origin`.
-        remote: String,
+        remote: RefLike,
         /// The name of the branch, e.g. `master`.
-        name: BranchName,
+        name: OneLevel,
     },
     /// A git namespace, which can be found under `.git/refs/namespaces/`.
     ///
@@ -107,7 +109,7 @@ impl fmt::Display for Ref {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Tag { name } => write!(f, "refs/tags/{}", name),
-            Self::LocalBranch { name } => write!(f, "refs/heads/{}", name),
+            Self::LocalBranch { name } => write!(f, "{}", name),
             Self::RemoteBranch { remote, name } => write!(f, "refs/remotes/{}/{}", remote, name),
             Self::Namespace {
                 namespace,
@@ -117,14 +119,18 @@ impl fmt::Display for Ref {
     }
 }
 
-#[derive(Debug, PartialEq, Error)]
+#[derive(Debug, Error)]
 pub enum ParseError {
+    #[error(transparent)]
+    Name(#[from] ext::name::Error),
+    #[error(transparent)]
+    StripPrefix(#[from] ext::name::StripPrefixError),
     #[error("was able to parse 'refs/remotes' but failed to parse the remote name, perhaps you're missing 'origin/'")]
-    MissingRemote,
+    MissingRemote(RefLike),
     #[error("was able to parse 'refs/namespaces' but failed to parse the namespace name, a valid form would be 'refs/namespaces/moi/refs/heads/master'")]
     MissingNamespace,
     #[error("the ref provided '{0}' was malformed")]
-    MalformedRef(String),
+    MalformedRef(RefLike),
     #[error("while attempting to parse a commit SHA we encountered an error: {0:?}")]
     Sha(#[from] git2::Error),
 }
@@ -133,119 +139,117 @@ impl str::FromStr for Ref {
     type Err = ParseError;
 
     fn from_str(reference: &str) -> Result<Self, Self::Err> {
-        lazy_static! {
-            static ref REF: Regex = Regex::new(
-                r"^(refs/remotes/|refs/tags/|refs/heads/|refs/namespaces/)([^refs/]\w+/)?(.*)"
-            )
-            .unwrap();
+        let reference = RefLike::try_from(reference)?;
+
+        if reference.starts_with("refs/heads/") {
+            return Ok(Ref::LocalBranch {
+                name: Qualified::from(reference),
+            });
         }
-        REF.captures(reference)
-            .ok_or_else(|| ParseError::MalformedRef(reference.to_string()))
-            .and_then(|cap| {
-                // Get the capture match for the prefix, i.e. 'refs/*'.
-                // If we don't have a capture, we fall back to the reference string
-                // in case it's a commit SHA.
-                let prefix = cap
-                    .get(1)
-                    .ok_or_else(|| ParseError::MalformedRef(reference.to_string()))?
-                    .as_str();
 
-                // Get the capture match for the name, e.g. 'master'
-                let name = cap
-                    .get(3)
-                    .ok_or_else(|| ParseError::MalformedRef(reference.to_string()))?
-                    .as_str();
+        if reference.starts_with("refs/tags/") {
+            return Ok(Ref::Tag {
+                name: OneLevel::from(reference),
+            });
+        }
 
-                // Matching on the prefix and falling back to commit if we don't find a match.
-                match prefix {
-                    "refs/remotes/" => match cap.get(2) {
-                        None => Err(ParseError::MissingRemote),
-                        Some(remote_name) => Ok(Self::RemoteBranch {
-                            remote: remote_name.as_str().trim_end_matches('/').to_string(),
-                            name: BranchName::new(name),
-                        }),
-                    },
-                    "refs/heads/" => Ok(Self::LocalBranch {
-                        name: BranchName::new(name),
-                    }),
-                    "refs/tags/" => Ok(Self::Tag {
-                        name: TagName::new(name),
-                    }),
-                    "refs/namespaces/" => match cap.get(2) {
-                        None => Err(ParseError::MissingNamespace),
-                        Some(namespace) => Ok(Self::Namespace {
-                            namespace: namespace.as_str().trim_end_matches('/').to_string(),
-                            reference: Box::new(Ref::from_str(name)?),
-                        }),
-                    },
-                    _ => Err(ParseError::MalformedRef(reference.to_string())),
-                }
-            })
+        if reference.starts_with("refs/remotes/") {
+            let suffix = reference.strip_prefix("refs/remotes/")?;
+            let remote = suffix
+                .parent()
+                .ok_or(ParseError::MissingRemote(reference))?;
+            let name = suffix.strip_prefix(format!("{}/", remote.display()))?;
+            return Ok(Ref::RemoteBranch {
+                name: OneLevel::from(name),
+                remote: RefLike::try_from(remote)?,
+            });
+        }
+
+        if reference.starts_with("refs/namespaces/") {
+            let suffix = reference.strip_prefix("refs/namespaces/")?;
+            let namespace = suffix
+                .components()
+                .take_while(|c| c.as_os_str() != "refs")
+                .fold(std::path::PathBuf::new(), |n, c| n.join(c.as_os_str()));
+            let reference = Ref::from_str(
+                suffix
+                    .strip_prefix(format!("{}/", namespace.display()))?
+                    .as_str(),
+            )?;
+            return Ok(Ref::Namespace {
+                namespace: format!("{}", namespace.display()),
+                reference: Box::new(reference),
+            });
+        }
+
+        Err(ParseError::MalformedRef(reference))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::str::FromStr;
+
+    use super::*;
 
     #[test]
     fn parse_ref() -> Result<(), ParseError> {
         assert_eq!(
-            Ref::from_str("refs/remotes/origin/master"),
-            Ok(Ref::RemoteBranch {
-                remote: "origin".to_string(),
-                name: BranchName::new("master")
-            })
+            Ref::from_str("refs/remotes/origin/master").unwrap(),
+            Ref::RemoteBranch {
+                remote: reflike!("origin"),
+                name: OneLevel::from(reflike!("master")),
+            }
         );
 
         assert_eq!(
-            Ref::from_str("refs/heads/master"),
-            Ok(Ref::LocalBranch {
-                name: BranchName::new("master"),
-            })
+            Ref::from_str("refs/heads/master").unwrap(),
+            Ref::LocalBranch {
+                name: reflike!("master").into(),
+            }
         );
 
         assert_eq!(
-            Ref::from_str("refs/tags/v0.0.1"),
-            Ok(Ref::Tag {
-                name: TagName::new("v0.0.1")
-            })
+            Ref::from_str("refs/heads/xla/handle-disconnect").unwrap(),
+            Ref::LocalBranch {
+                name: reflike!("xla/handle-disconnect").into(),
+            }
         );
 
         assert_eq!(
-            Ref::from_str("refs/namespaces/moi/refs/remotes/origin/master"),
-            Ok(Ref::Namespace {
+            Ref::from_str("refs/tags/v0.0.1").unwrap(),
+            Ref::Tag {
+                name: reflike!("v0.0.1").into()
+            }
+        );
+
+        assert_eq!(
+            Ref::from_str("refs/namespaces/moi/refs/remotes/origin/master").unwrap(),
+            Ref::Namespace {
                 namespace: "moi".to_string(),
                 reference: Box::new(Ref::RemoteBranch {
-                    remote: "origin".to_string(),
-                    name: BranchName::new("master")
+                    remote: reflike!("origin"),
+                    name: reflike!("master").into()
                 })
-            })
+            }
         );
 
         assert_eq!(
-            Ref::from_str("refs/namespaces/moi/refs/namespaces/toi/refs/tags/v1.0.0"),
-            Ok(Ref::Namespace {
+            Ref::from_str("refs/namespaces/moi/refs/namespaces/toi/refs/tags/v1.0.0").unwrap(),
+            Ref::Namespace {
                 namespace: "moi".to_string(),
                 reference: Box::new(Ref::Namespace {
                     namespace: "toi".to_string(),
                     reference: Box::new(Ref::Tag {
-                        name: TagName::new("v1.0.0")
+                        name: reflike!("v1.0.0").into()
                     })
                 })
-            })
+            }
         );
 
-        assert_eq!(
-            Ref::from_str("refs/remotes/master"),
-            Err(ParseError::MissingRemote),
-        );
+        assert!(Ref::from_str("refs/remotes/master").is_err());
 
-        assert_eq!(
-            Ref::from_str("refs/namespaces/refs/remotes/origin/master"),
-            Err(ParseError::MissingNamespace),
-        );
+        assert!(Ref::from_str("refs/namespaces/refs/remotes/origin/master").is_err(),);
 
         Ok(())
     }

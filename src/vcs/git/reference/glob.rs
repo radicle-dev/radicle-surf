@@ -15,9 +15,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::vcs::git::{error, repo::RepositoryRef, BranchType};
 use either::Either;
 use std::fmt;
+
+use radicle_git_ext as ext;
+
+use crate::vcs::git::{error, repo::RepositoryRef, BranchType};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RefGlob {
@@ -34,7 +37,7 @@ pub enum RefGlob {
     RemoteBranch {
         /// If `remote` is `None` then the `**` wildcard will be used, otherwise
         /// the provided remote name will be used.
-        remote: Option<String>,
+        remote: Option<ext::RefLike>,
     },
     /// When calling [`RefGlob::references`] this will return the references via
     /// the globs `refs/heads/*` and `refs/remotes/**/*`.

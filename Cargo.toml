@@ -26,9 +26,17 @@ serde = { features = ["serde_derive"], optional = true, version = "1" }
 thiserror = "1.0"
 
 [dependencies.git2]
-version = ">= 0.12"
+version = "0.13"
 default-features = false
 features = []
+
+[dependencies.radicle-git-ext]
+git = "https://github.com/radicle-dev/radicle-link.git"
+rev = "1a7c3f48dc156c14166764b2e3f862b867cc2812"
+
+[dependencies.radicle-macros]
+git = "https://github.com/radicle-dev/radicle-link.git"
+rev = "1a7c3f48dc156c14166764b2e3f862b867cc2812"
 
 [dev-dependencies]
 pretty_assertions = "0.6"

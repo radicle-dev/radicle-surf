@@ -29,11 +29,14 @@
 //! Let's start surfing (and apologies for the `expect`s):
 //!
 //! ```
-//! use radicle_surf::vcs::git;
+//! use std::str::FromStr;
+//!
 //! use radicle_surf::file_system::{Label, Path, SystemType};
 //! use radicle_surf::file_system::unsound;
+//! use radicle_surf::reflike;
+//! use radicle_surf::vcs::git;
+//!
 //! use pretty_assertions::assert_eq;
-//! use std::str::FromStr;
 //! # use std::error::Error;
 //!
 //! # fn main() -> Result<(), Box<dyn Error>> {
@@ -41,7 +44,7 @@
 //! let repo = git::Repository::new("./data/git-platinum")?;
 //!
 //! // Here we initialise a new Broswer for a the git repo.
-//! let mut browser = git::Browser::new(&repo, git::Branch::local("master"))?;
+//! let mut browser = git::Browser::new(&repo, git::Branch::local(reflike!("master")))?;
 //!
 //! // Set the history to a particular commit
 //! let commit = git::Oid::from_str("80ded66281a4de2889cc07293a8f10947c6d57fe")?;
@@ -92,5 +95,9 @@ mod tree;
 
 pub use crate::vcs::git;
 
+pub use radicle_git_ext::{OneLevel, Qualified, RefLike};
+pub use radicle_macros::{reflike, refspec_pattern};
+
+#[cfg(test)]
 #[macro_use]
-extern crate lazy_static;
+extern crate radicle_macros;

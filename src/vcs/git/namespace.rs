@@ -15,10 +15,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::vcs::git::error::Error;
 pub use git2::Oid;
 use nonempty::NonEmpty;
 use std::{convert::TryFrom, fmt, str};
+
+use crate::vcs::git::error::Error;
 
 /// A `Namespace` value allows us to switch the git namespace of
 /// [`super::Browser`].

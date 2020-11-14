@@ -22,6 +22,7 @@ use std::{env::Args, time::Instant};
 use git2::Oid;
 use nonempty::NonEmpty;
 
+use radicle_macros::reflike;
 use radicle_surf::{
     diff::Diff,
     file_system::Directory,
@@ -31,8 +32,8 @@ use radicle_surf::{
 fn main() {
     let options = get_options_or_exit();
     let repo = init_repository_or_exit(&options.path_to_repo);
-    let mut browser =
-        git::Browser::new(&repo, git::Branch::local("master")).expect("failed to create browser:");
+    let mut browser = git::Browser::new(&repo, git::Branch::local(reflike!("master")))
+        .expect("failed to create browser:");
 
     match options.head_revision {
         HeadRevision::HEAD => {

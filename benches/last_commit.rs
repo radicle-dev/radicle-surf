@@ -16,16 +16,18 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+
 use radicle_surf::{
     file_system::{unsound, Path},
+    reflike,
     vcs::git::{Branch, Browser, Repository},
 };
 
 fn last_commit_comparison(c: &mut Criterion) {
     let repo = Repository::new("./data/git-platinum")
         .expect("Could not retrieve ./data/git-platinum as git repository");
-    let browser =
-        Browser::new(&repo, Branch::local("master")).expect("Could not initialise Browser");
+    let browser = Browser::new(&repo, Branch::local(reflike!("master")))
+        .expect("Could not initialise Browser");
 
     let mut group = c.benchmark_group("Last Commit");
     for path in [

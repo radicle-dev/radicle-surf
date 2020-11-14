@@ -16,11 +16,14 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 //! ```
+//! use std::collections::HashMap;
+//!
 //! use nonempty::NonEmpty;
+//!
 //! use radicle_surf::file_system::{Directory, File, Label, Path, SystemType};
 //! use radicle_surf::file_system::unsound;
+//! use radicle_surf::reflike;
 //! use radicle_surf::vcs::git::*;
-//! use std::collections::HashMap;
 //! # use std::error::Error;
 //!
 //! # fn main() -> Result<(), Box<dyn Error>> {
@@ -28,7 +31,7 @@
 //!
 //! // Pin the browser to a parituclar commit.
 //! let pin_commit = Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
-//! let mut browser = Browser::new(&repo, Branch::local("master"))?;
+//! let mut browser = Browser::new(&repo, Branch::local(reflike!("master")))?;
 //! browser.commit(pin_commit)?;
 //!
 //! let directory = browser.get_directory()?;
@@ -65,6 +68,8 @@
 // Re-export git2 as sub-module
 pub use git2::{self, Error as Git2Error, Oid, Time};
 
+pub use radicle_git_ext::{OneLevel, RefLike};
+
 /// Provides ways of selecting a particular reference/revision.
 mod reference;
 pub use reference::{Ref, Rev};
@@ -78,11 +83,11 @@ mod ext;
 
 /// Provides the data for talking about branches.
 pub mod branch;
-pub use branch::{Branch, BranchName, BranchType};
+pub use branch::{Branch, BranchType};
 
 /// Provides the data for talking about tags.
 pub mod tag;
-pub use tag::{Tag, TagName};
+pub use tag::Tag;
 
 /// Provides the data for talking about commits.
 pub mod commit;
@@ -135,12 +140,13 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
+    /// use radicle_surf::reflike;
     /// use radicle_surf::vcs::git::{Browser, Branch, Repository};
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let browser = Browser::new(&repo, Branch::local("master"))?;
+    /// let browser = Browser::new(&repo, Branch::local(reflike!("master")))?;
     /// #
     /// # Ok(())
     /// # }
@@ -163,8 +169,10 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Browser, Repository, Branch, BranchType, BranchName, Namespace};
     /// use std::convert::TryFrom;
+    ///
+    /// use radicle_surf::reflike;
+    /// use radicle_surf::vcs::git::{Browser, Repository, Branch, BranchType, Namespace};
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -172,7 +180,7 @@ impl<'a> Browser<'a> {
     /// let browser = Browser::new_with_namespace(
     ///     &repo,
     ///     &Namespace::try_from("golden")?,
-    ///     Branch::local("master")
+    ///     Branch::local(reflike!("master"))
     /// )?;
     ///
     /// let mut branches = browser.list_branches(Some(BranchType::Local))?;
@@ -181,8 +189,8 @@ impl<'a> Browser<'a> {
     /// assert_eq!(
     ///     branches,
     ///     vec![
-    ///         Branch::local("banana"),
-    ///         Branch::local("master"),
+    ///         Branch::local(reflike!("banana")),
+    ///         Branch::local(reflike!("master")),
     ///     ]
     /// );
     /// #
@@ -253,12 +261,13 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
+    /// use radicle_surf::reflike;
     /// use radicle_surf::vcs::git::{Browser, Repository, Branch};
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
+    /// let mut browser = Browser::new(&repo, Branch::local(reflike!("master")))?;
     ///
     /// // ensure we're at HEAD
     /// browser.head();
@@ -277,7 +286,7 @@ impl<'a> Browser<'a> {
         Ok(())
     }
 
-    /// Set the current `Browser`'s [`History`] to the given [`BranchName`]
+    /// Set the current `Browser`'s [`History`] to the given `branch`.
     /// provided.
     ///
     /// # Errors
@@ -288,15 +297,16 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
+    /// use radicle_surf::reflike;
     /// use radicle_surf::vcs::git::{Branch, Browser, Repository};
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
+    /// let mut browser = Browser::new(&repo, Branch::local(reflike!("master")))?;
     ///
     /// // ensure we're on 'master'
-    /// browser.branch(Branch::local("master"));
+    /// browser.branch(Branch::local(reflike!("master")));
     ///
     /// let directory = browser.get_directory();
     ///
@@ -308,15 +318,16 @@ impl<'a> Browser<'a> {
     /// ```
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Branch, Browser, Repository};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     /// use radicle_surf::file_system::unsound;
+    /// use radicle_surf::reflike;
+    /// use radicle_surf::vcs::git::{Branch, Browser, Repository};
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
-    /// browser.branch(Branch::remote("dev", "origin"))?;
+    /// let mut browser = Browser::new(&repo, Branch::local(reflike!("master")))?;
+    /// browser.branch(Branch::remote(reflike!("dev"), reflike!("origin")))?;
     ///
     /// let directory = browser.get_directory()?;
     /// let mut directory_contents = directory.list_directory();
@@ -330,11 +341,11 @@ impl<'a> Browser<'a> {
     /// # }
     /// ```
     pub fn branch(&mut self, branch: Branch) -> Result<(), Error> {
-        let name = BranchName(branch.name());
+        let name = branch.name.clone();
         self.set(self.repository.reference(branch, |reference| {
             let is_branch = ext::is_branch(&reference) || reference.is_remote();
             if !is_branch {
-                Some(Error::NotBranch(name))
+                Some(Error::Branch(branch::Error::NotBranch(name.into())))
             } else {
                 None
             }
@@ -342,7 +353,7 @@ impl<'a> Browser<'a> {
         Ok(())
     }
 
-    /// Set the current `Browser`'s [`History`] to the [`TagName`] provided.
+    /// Set the current `Browser`'s [`History`] to the tag provided.
     ///
     /// # Errors
     ///
@@ -354,15 +365,16 @@ impl<'a> Browser<'a> {
     /// ```
     /// use nonempty::NonEmpty;
     /// use radicle_surf::vcs::History;
-    /// use radicle_surf::vcs::git::{TagName, Branch, Browser, Oid, Repository};
+    /// use radicle_surf::vcs::git::{Branch, Browser, Oid, Repository};
+    /// use radicle_surf::reflike;
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
+    /// let mut browser = Browser::new(&repo, Branch::local(reflike!("master")))?;
     ///
     /// // Switch to "v0.3.0"
-    /// browser.tag(TagName::new("v0.3.0"))?;
+    /// browser.tag(reflike!("v0.3.0"))?;
     ///
     /// let expected_history = History(NonEmpty::from((
     ///     Oid::from_str("19bec071db6474af89c866a1bd0e4b1ff76e2b97")?,
@@ -381,11 +393,12 @@ impl<'a> Browser<'a> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn tag(&mut self, tag_name: TagName) -> Result<(), Error> {
-        let name = tag_name.clone();
-        self.set(self.repository.reference(tag_name, |reference| {
+    pub fn tag(&mut self, name: impl Into<OneLevel>) -> Result<(), Error> {
+        let name = name.into();
+        let tag = Ref::Tag { name: name.clone() };
+        self.set(self.repository.reference(tag, |reference| {
             if !ext::is_tag(&reference) {
-                Some(Error::NotTag(name))
+                Some(Error::Tag(tag::Error::NotTag(name.into())))
             } else {
                 None
             }
@@ -403,15 +416,17 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
+    /// use std::str::FromStr;
+    ///
+    /// use radicle_surf::reflike;
+    /// use radicle_surf::vcs::git::{Branch, Browser, Oid, Repository};
     /// use radicle_surf::file_system::{Label, SystemType};
     /// use radicle_surf::file_system::unsound;
-    /// use radicle_surf::vcs::git::{Branch, Browser, Oid, Repository};
-    /// use std::str::FromStr;
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
+    /// let mut browser = Browser::new(&repo, Branch::local(reflike!("master")))?;
     ///
     /// // Set to the initial commit
     /// let commit = Oid::from_str("e24124b7538658220b5aaf3b6ef53758f0a106dc")?;
@@ -449,17 +464,19 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
+    /// use std::str::FromStr;
+    ///
     /// use radicle_surf::file_system::{Label, SystemType};
     /// use radicle_surf::file_system::unsound;
+    /// use radicle_surf::reflike;
     /// use radicle_surf::vcs::git::{Browser, Branch, Oid, Repository};
-    /// use std::str::FromStr;
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
+    /// let mut browser = Browser::new(&repo, Branch::local(reflike!("master")))?;
     ///
-    /// browser.rev(Branch::remote("dev", "origin"))?;
+    /// browser.rev(Branch::remote(reflike!("dev"), reflike!("origin")))?;
     ///
     /// let directory = browser.get_directory()?;
     /// let mut directory_contents = directory.list_directory();
@@ -484,13 +501,15 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Branch, Browser, Oid, Repository};
     /// use std::str::FromStr;
+    ///
+    /// use radicle_surf::reflike;
+    /// use radicle_surf::vcs::git::{Branch, Browser, Oid, Repository};
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
+    /// let mut browser = Browser::new(&repo, Branch::local(reflike!("master")))?;
     ///
     /// // Set to the initial commit
     /// let commit = Oid::from_str("e24124b7538658220b5aaf3b6ef53758f0a106dc")?;
@@ -527,29 +546,31 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Branch, BranchType, BranchName, Browser, Namespace, Repository};
     /// use std::convert::TryFrom;
+    ///
+    /// use radicle_surf::reflike;
+    /// use radicle_surf::vcs::git::{Branch, BranchType, Browser, Namespace, Repository};
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
+    /// let mut browser = Browser::new(&repo, Branch::local(reflike!("master")))?;
     ///
     /// let branches = browser.list_branches(None)?;
     ///
     /// // 'master' exists in the list of branches
-    /// assert!(branches.contains(&Branch::local("master")));
+    /// assert!(branches.contains(&Branch::local(reflike!("master"))));
     ///
     /// // Filter the branches by `Remote` 'origin'.
     /// let mut branches = browser.list_branches(Some(BranchType::Remote {
-    ///     name: Some("origin".to_string())
+    ///     name: Some(reflike!("origin"))
     /// }))?;
     /// branches.sort();
     ///
     /// assert_eq!(branches, vec![
-    ///     Branch::remote("HEAD", "origin"),
-    ///     Branch::remote("dev", "origin"),
-    ///     Branch::remote("master", "origin"),
+    ///     Branch::remote(reflike!("HEAD"), reflike!("origin")),
+    ///     Branch::remote(reflike!("dev"), reflike!("origin")),
+    ///     Branch::remote(reflike!("master"), reflike!("origin")),
     /// ]);
     ///
     /// // Filter the branches by all `Remote`s.
@@ -559,21 +580,21 @@ impl<'a> Browser<'a> {
     /// branches.sort();
     ///
     /// assert_eq!(branches, vec![
-    ///     Branch::remote("HEAD", "origin"),
-    ///     Branch::remote("dev", "origin"),
-    ///     Branch::remote("master", "origin"),
-    ///     Branch::remote("pineapple", "banana"),
+    ///     Branch::remote(reflike!("HEAD"), reflike!("origin")),
+    ///     Branch::remote(reflike!("dev"), reflike!("origin")),
+    ///     Branch::remote(reflike!("master"), reflike!("origin")),
+    ///     Branch::remote(reflike!("pineapple"), reflike!("banana")),
     /// ]);
     ///
     /// // We can also switch namespaces and list the branches in that namespace.
-    /// let golden = browser.switch_namespace(&Namespace::try_from("golden")?, Branch::local("master"))?;
+    /// let golden = browser.switch_namespace(&Namespace::try_from("golden")?, Branch::local(reflike!("master")))?;
     ///
     /// let mut branches = golden.list_branches(Some(BranchType::Local))?;
     /// branches.sort();
     ///
     /// assert_eq!(branches, vec![
-    ///     Branch::local("banana"),
-    ///     Branch::local("master"),
+    ///     Branch::local(reflike!("banana")),
+    ///     Branch::local(reflike!("master")),
     /// ]);
     /// #
     /// # Ok(())
@@ -593,55 +614,60 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Branch, Browser, Namespace, Oid, Repository, Tag, TagName};
     /// use std::convert::TryFrom;
+    ///
+    /// use radicle_surf::reflike;
+    /// use radicle_surf::vcs::git::{Branch, Browser, Namespace, Oid, Repository, Tag};
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
+    /// let mut browser = Browser::new(&repo, Branch::local(reflike!("master")))?;
     ///
-    /// let tags = browser.list_tags()?;
+    /// let mut tags = browser.list_tags()?;
+    /// tags.sort_by_key(|tag| tag.name());
     ///
     /// assert_eq!(
     ///     tags,
     ///     vec![
-    ///         Tag::Light {
-    ///             id: Oid::from_str("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3")?,
-    ///             name: TagName::new("v0.1.0"),
-    ///         },
-    ///         Tag::Light {
-    ///             id: Oid::from_str("2429f097664f9af0c5b7b389ab998b2199ffa977")?,
-    ///             name: TagName::new("v0.2.0")
-    ///         },
-    ///         Tag::Light {
-    ///             id: Oid::from_str("19bec071db6474af89c866a1bd0e4b1ff76e2b97")?,
-    ///             name: TagName::new("v0.3.0")
-    ///         },
-    ///         Tag::Light {
-    ///             id: Oid::from_str("91b69e00cd8e5a07e20942e9e4457d83ce7a3ff1")?,
-    ///             name: TagName::new("v0.4.0")
-    ///         },
-    ///         Tag::Light {
-    ///             id: Oid::from_str("80ded66281a4de2889cc07293a8f10947c6d57fe")?,
-    ///             name: TagName::new("v0.5.0")
-    ///         },
+    ///         Tag::light(
+    ///             Oid::from_str("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3")?,
+    ///             reflike!("v0.1.0"),
+    ///         ),
+    ///         Tag::light(
+    ///             Oid::from_str("2429f097664f9af0c5b7b389ab998b2199ffa977")?,
+    ///             reflike!("v0.2.0")
+    ///         ),
+    ///         Tag::light(
+    ///             Oid::from_str("19bec071db6474af89c866a1bd0e4b1ff76e2b97")?,
+    ///             reflike!("v0.3.0")
+    ///         ),
+    ///         Tag::light(
+    ///             Oid::from_str("91b69e00cd8e5a07e20942e9e4457d83ce7a3ff1")?,
+    ///             reflike!("v0.4.0")
+    ///         ),
+    ///         Tag::light(
+    ///             Oid::from_str("80ded66281a4de2889cc07293a8f10947c6d57fe")?,
+    ///             reflike!("v0.5.0")
+    ///         ),
     ///     ]
     /// );
     ///
     /// // We can also switch namespaces and list the branches in that namespace.
-    /// let golden = browser.switch_namespace(&Namespace::try_from("golden")?, Branch::local("master"))?;
+    /// let golden = browser.switch_namespace(&Namespace::try_from("golden")?, Branch::local(reflike!("master")))?;
     ///
-    /// let branches = golden.list_tags()?;
-    /// assert_eq!(branches, vec![
-    ///     Tag::Light {
-    ///         id: Oid::from_str("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3")?,
-    ///         name: TagName::new("v0.1.0"),
-    ///     },
-    ///     Tag::Light {
-    ///         id: Oid::from_str("2429f097664f9af0c5b7b389ab998b2199ffa977")?,
-    ///         name: TagName::new("v0.2.0")
-    ///     },
+    /// let mut tags = golden.list_tags()?;
+    /// tags.sort_by_key(|tag| tag.name());
+    ///
+    /// assert_eq!(tags, vec![
+    ///     Tag::light(
+    ///         Oid::from_str("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3")?,
+    ///         reflike!("v0.1.0"),
+    ///     ),
+    ///     Tag::light(
+    ///         Oid::from_str("2429f097664f9af0c5b7b389ab998b2199ffa977")?,
+    ///         reflike!("v0.2.0")
+    ///     ),
     /// ]);
     /// #
     /// # Ok(())
@@ -661,13 +687,15 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Branch, BranchType, BranchName, Browser, Namespace, Repository};
     /// use std::convert::TryFrom;
+    ///
+    /// use radicle_surf::reflike;
+    /// use radicle_surf::vcs::git::{Branch, BranchType, Browser, Namespace, Repository};
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
+    /// let mut browser = Browser::new(&repo, Branch::local(reflike!("master")))?;
     ///
     /// let mut namespaces = browser.list_namespaces()?;
     /// namespaces.sort();
@@ -697,15 +725,17 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
+    /// use std::str::FromStr;
+    ///
+    /// use radicle_surf::reflike;
     /// use radicle_surf::vcs::git::{Branch, Browser, Oid, Repository};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     /// use radicle_surf::file_system::unsound;
-    /// use std::str::FromStr;
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
+    /// let mut browser = Browser::new(&repo, Branch::local(reflike!("master")))?;
     ///
     /// // Clamp the Browser to a particular commit
     /// let commit = Oid::from_str("d6880352fc7fda8f521ae9b7357668b17bb5bad5")?;
@@ -745,16 +775,19 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
+    /// use std::str::FromStr;
+    ///
     /// use nonempty::NonEmpty;
+    ///
+    /// use radicle_surf::reflike;
     /// use radicle_surf::vcs::git::{Branch, Browser, Oid, Repository};
     /// use radicle_surf::file_system::{Label, Path, SystemType};
     /// use radicle_surf::file_system::unsound;
-    /// use std::str::FromStr;
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
+    /// let mut browser = Browser::new(&repo, Branch::local(reflike!("master")))?;
     ///
     /// // Clamp the Browser to a particular commit
     /// let commit = Oid::from_str("223aaf87d6ea62eef0014857640fd7c8dd0f80b5")?;
@@ -816,12 +849,13 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
+    /// use radicle_surf::reflike;
     /// use radicle_surf::vcs::git::{Branch, Browser, Repository, Oid, error};
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
+    /// let mut browser = Browser::new(&repo, Branch::local(reflike!("master")))?;
     ///
     /// let commit_with_signature_oid = Oid::from_str(
     ///     "e24124b7538658220b5aaf3b6ef53758f0a106dc"
@@ -867,21 +901,23 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Browser, Repository, Branch, BranchName, Namespace, Oid};
     /// use std::convert::TryFrom;
+    ///
+    /// use radicle_surf::vcs::git::{Browser, Repository, Branch, Namespace, Oid};
+    /// use radicle_surf::reflike;
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let browser = Browser::new(&repo, Branch::local("master"))?;
+    /// let browser = Browser::new(&repo, Branch::local(reflike!("master")))?;
     ///
     ///
     /// let branches = browser.revision_branches(Oid::from_str("27acd68c7504755aa11023300890bb85bbd69d45")?)?;
     /// assert_eq!(
     ///     branches,
     ///     vec![
-    ///         Branch::local("dev"),
-    ///         Branch::remote("dev", "origin"),
+    ///         Branch::local(reflike!("dev")),
+    ///         Branch::remote(reflike!("dev"), reflike!("origin")),
     ///     ]
     /// );
     ///
@@ -891,24 +927,24 @@ impl<'a> Browser<'a> {
     /// assert_eq!(
     ///     branches,
     ///     vec![
-    ///         Branch::remote("HEAD", "origin"),
-    ///         Branch::local("dev"),
-    ///         Branch::remote("dev", "origin"),
-    ///         Branch::local("master"),
-    ///         Branch::remote("master", "origin"),
-    ///         Branch::remote("pineapple", "banana"),
+    ///         Branch::remote(reflike!("HEAD"), reflike!("origin")),
+    ///         Branch::local(reflike!("dev")),
+    ///         Branch::remote(reflike!("dev"), reflike!("origin")),
+    ///         Branch::local(reflike!("master")),
+    ///         Branch::remote(reflike!("master"), reflike!("origin")),
+    ///         Branch::remote(reflike!("pineapple"), reflike!("banana")),
     ///     ]
     /// );
     ///
     /// let golden_browser = browser.switch_namespace(&Namespace::try_from("golden")?,
-    /// Branch::local("master"))?;
+    /// Branch::local(reflike!("master")))?;
     ///
     /// let branches = golden_browser.revision_branches(Oid::from_str("27acd68c7504755aa11023300890bb85bbd69d45")?)?;
     /// assert_eq!(
     ///     branches,
     ///     vec![
-    ///         Branch::local("banana"),
-    ///         Branch::remote("heelflip", "kickflip"),
+    ///         Branch::local(reflike!("banana")),
+    ///         Branch::remote(reflike!("heelflip"), reflike!("kickflip")),
     ///     ]
     /// );
     /// #
@@ -929,12 +965,13 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
+    /// use radicle_surf::reflike;
     /// use radicle_surf::vcs::git::{Branch, Browser, Repository};
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let repo = Repository::new("./data/git-platinum")?;
-    /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
+    /// let mut browser = Browser::new(&repo, Branch::local(reflike!("master")))?;
     ///
     /// let stats = browser.get_stats()?;
     ///
@@ -1070,7 +1107,7 @@ mod tests {
     // An issue with submodules, see: https://github.com/radicle-dev/radicle-surf/issues/54
     fn test_submodule_failure() {
         let repo = Repository::new(".").unwrap();
-        let browser = Browser::new(&repo, Branch::local("master")).unwrap();
+        let browser = Browser::new(&repo, Branch::local(reflike!("master"))).unwrap();
 
         browser.get_directory().unwrap();
     }
@@ -1086,11 +1123,11 @@ mod tests {
             let mut browser = Browser::new_with_namespace(
                 &repo,
                 &Namespace::try_from("golden")?,
-                Branch::local("master"),
+                Branch::local(reflike!("master")),
             )?;
             let history = browser.history.clone();
 
-            browser.branch(Branch::local("banana"))?;
+            browser.branch(Branch::local(reflike!("banana")))?;
 
             assert_ne!(history, browser.history);
 
@@ -1100,30 +1137,35 @@ mod tests {
         #[test]
         fn golden_namespace() -> Result<(), Error> {
             let repo = Repository::new("./data/git-platinum")?;
-            let browser = Browser::new(&repo, Branch::local("master"))?;
+            let browser = Browser::new(&repo, Branch::local(reflike!("master")))?;
             let history = browser.history.clone();
 
-            assert_eq!(browser.which_namespace(), Ok(None));
+            assert_eq!(browser.which_namespace().unwrap(), None);
 
-            let golden_browser = browser
-                .switch_namespace(&Namespace::try_from("golden")?, Branch::local("master"))?;
+            let golden_browser = browser.switch_namespace(
+                &Namespace::try_from("golden")?,
+                Branch::local(reflike!("master")),
+            )?;
 
             assert_eq!(
-                golden_browser.which_namespace(),
-                Ok(Some(Namespace::try_from("golden")?))
+                golden_browser.which_namespace().unwrap(),
+                Some(Namespace::try_from("golden")?)
             );
             assert_eq!(history, golden_browser.history);
 
-            let expected_branches: Vec<Branch> =
-                vec![Branch::local("banana"), Branch::local("master")];
+            let expected_branches: Vec<Branch> = vec![
+                Branch::local(reflike!("banana")),
+                Branch::local(reflike!("master")),
+            ];
             let mut branches = golden_browser.list_branches(Some(BranchType::Local))?;
             branches.sort();
 
             assert_eq!(expected_branches, branches);
 
-            let expected_branches: Vec<Branch> = vec![Branch::remote("heelflip", "kickflip")];
+            let expected_branches: Vec<Branch> =
+                vec![Branch::remote(reflike!("heelflip"), reflike!("kickflip"))];
             let mut branches = golden_browser.list_branches(Some(BranchType::Remote {
-                name: Some("kickflip".to_string()),
+                name: Some(reflike!("kickflip")),
             }))?;
             branches.sort();
 
@@ -1135,23 +1177,23 @@ mod tests {
         #[test]
         fn silver_namespace() -> Result<(), Error> {
             let repo = Repository::new("./data/git-platinum")?;
-            let browser = Browser::new(&repo, Branch::local("master"))?;
+            let browser = Browser::new(&repo, Branch::local(reflike!("master")))?;
             let history = browser.history.clone();
 
-            assert_eq!(browser.which_namespace(), Ok(None));
+            assert_eq!(browser.which_namespace().unwrap(), None);
 
             let silver_browser = browser.switch_namespace(
                 &Namespace::try_from("golden/silver")?,
-                Branch::local("master"),
+                Branch::local(reflike!("master")),
             )?;
 
             assert_eq!(
-                silver_browser.which_namespace(),
-                Ok(Some(Namespace::try_from("golden/silver")?))
+                silver_browser.which_namespace().unwrap(),
+                Some(Namespace::try_from("golden/silver")?)
             );
             assert_ne!(history, silver_browser.history);
 
-            let expected_branches: Vec<Branch> = vec![Branch::local("master")];
+            let expected_branches: Vec<Branch> = vec![Branch::local(reflike!("master"))];
             let mut branches = silver_browser.list_branches(None)?;
             branches.sort();
 
@@ -1163,7 +1205,7 @@ mod tests {
 
     #[cfg(test)]
     mod rev {
-        use super::{Branch, Browser, Error, Oid, Repository, TagName};
+        use super::{Branch, Browser, Error, Oid, Ref, Repository};
 
         // **FIXME**: This seems to break occasionally on
         // buildkite. For some reason the commit
@@ -1179,8 +1221,8 @@ mod tests {
         #[test]
         fn _master() -> Result<(), Error> {
             let repo = Repository::new("./data/git-platinum")?;
-            let mut browser = Browser::new(&repo, Branch::local("master"))?;
-            browser.rev(Branch::remote("master", "origin"))?;
+            let mut browser = Browser::new(&repo, Branch::local(reflike!("master")))?;
+            browser.rev(Branch::remote(reflike!("master"), reflike!("origin")))?;
 
             let commit1 = Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
             assert!(
@@ -1218,7 +1260,7 @@ mod tests {
         #[test]
         fn commit() -> Result<(), Error> {
             let repo = Repository::new("./data/git-platinum")?;
-            let mut browser = Browser::new(&repo, Branch::local("master"))?;
+            let mut browser = Browser::new(&repo, Branch::local(reflike!("master")))?;
             browser.rev(Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?)?;
 
             let commit1 = Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
@@ -1237,7 +1279,7 @@ mod tests {
         #[test]
         fn commit_parents() -> Result<(), Error> {
             let repo = Repository::new("./data/git-platinum")?;
-            let mut browser = Browser::new(&repo, Branch::local("master"))?;
+            let mut browser = Browser::new(&repo, Branch::local(reflike!("master")))?;
             browser.rev(Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?)?;
             let commit = browser.history.first();
 
@@ -1252,7 +1294,7 @@ mod tests {
         #[test]
         fn commit_short() -> Result<(), Error> {
             let repo = Repository::new("./data/git-platinum")?;
-            let mut browser = Browser::new(&repo, Branch::local("master"))?;
+            let mut browser = Browser::new(&repo, Branch::local(reflike!("master")))?;
             browser.rev(browser.oid("3873745c8")?)?;
 
             let commit1 = Oid::from_str("3873745c8f6ffb45c990eb23b491d4b4b6182f95")?;
@@ -1271,8 +1313,10 @@ mod tests {
         #[test]
         fn tag() -> Result<(), Error> {
             let repo = Repository::new("./data/git-platinum")?;
-            let mut browser = Browser::new(&repo, Branch::local("master"))?;
-            browser.rev(TagName::new("v0.2.0"))?;
+            let mut browser = Browser::new(&repo, Branch::local(reflike!("master")))?;
+            browser.rev(Ref::Tag {
+                name: reflike!("v0.2.0").into(),
+            })?;
 
             let commit1 = Oid::from_str("2429f097664f9af0c5b7b389ab998b2199ffa977")?;
             assert_eq!(browser.history.first().id, commit1);
@@ -1292,8 +1336,8 @@ mod tests {
         fn readme_missing_and_memory() {
             let repo = Repository::new("./data/git-platinum")
                 .expect("Could not retrieve ./data/git-platinum as git repository");
-            let mut browser =
-                Browser::new(&repo, Branch::local("master")).expect("Could not initialise Browser");
+            let mut browser = Browser::new(&repo, Branch::local(reflike!("master")))
+                .expect("Could not initialise Browser");
 
             // Set the browser history to the initial commit
             let commit = Oid::from_str("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3")
@@ -1326,8 +1370,8 @@ mod tests {
         fn folder_svelte() {
             let repo = Repository::new("./data/git-platinum")
                 .expect("Could not retrieve ./data/git-platinum as git repository");
-            let mut browser =
-                Browser::new(&repo, Branch::local("master")).expect("Could not initialise Browser");
+            let mut browser = Browser::new(&repo, Branch::local(reflike!("master")))
+                .expect("Could not initialise Browser");
 
             // Check that last commit is the actual last commit even if head commit differs.
             let commit = Oid::from_str("19bec071db6474af89c866a1bd0e4b1ff76e2b97")
@@ -1349,8 +1393,8 @@ mod tests {
         fn nest_directory() {
             let repo = Repository::new("./data/git-platinum")
                 .expect("Could not retrieve ./data/git-platinum as git repository");
-            let mut browser =
-                Browser::new(&repo, Branch::local("master")).expect("Could not initialise Browser");
+            let mut browser = Browser::new(&repo, Branch::local(reflike!("master")))
+                .expect("Could not initialise Browser");
 
             // Check that last commit is the actual last commit even if head commit differs.
             let commit = Oid::from_str("19bec071db6474af89c866a1bd0e4b1ff76e2b97")
@@ -1374,8 +1418,8 @@ mod tests {
         fn can_get_last_commit_for_special_filenames() {
             let repo = Repository::new("./data/git-platinum")
                 .expect("Could not retrieve ./data/git-platinum as git repository");
-            let mut browser =
-                Browser::new(&repo, Branch::local("master")).expect("Could not initialise Browser");
+            let mut browser = Browser::new(&repo, Branch::local(reflike!("master")))
+                .expect("Could not initialise Browser");
 
             // Check that last commit is the actual last commit even if head commit differs.
             let commit = Oid::from_str("a0dd9122d33dff2a35f564d564db127152c88e02")
@@ -1402,8 +1446,8 @@ mod tests {
         fn root() {
             let repo = Repository::new("./data/git-platinum")
                 .expect("Could not retrieve ./data/git-platinum as git repository");
-            let browser =
-                Browser::new(&repo, Branch::local("master")).expect("Could not initialise Browser");
+            let browser = Browser::new(&repo, Branch::local(reflike!("master")))
+                .expect("Could not initialise Browser");
 
             let root_last_commit_id = browser
                 .last_commit(Path::root())
@@ -1430,7 +1474,7 @@ mod tests {
             assert!(commit.parents().count() == 0);
             assert!(commit.parent(0).is_err());
 
-            let bro = Browser::new(&repo, Branch::local("master"))?;
+            let bro = Browser::new(&repo, Branch::local(reflike!("master")))?;
             let diff = bro.initial_diff(oid)?;
 
             let expected_diff = Diff {
@@ -1459,7 +1503,7 @@ mod tests {
                 .unwrap();
             let parent = commit.parent(0)?;
 
-            let bro = Browser::new(&repo, Branch::local("master"))?;
+            let bro = Browser::new(&repo, Branch::local(reflike!("master")))?;
 
             let diff = bro.diff(parent.id(), commit.id())?;
 
@@ -1567,19 +1611,19 @@ mod tests {
         fn basic_test() -> Result<(), Error> {
             let shared_repo = Mutex::new(Repository::new("./data/git-platinum")?);
             let locked_repo: MutexGuard<Repository> = shared_repo.lock().unwrap();
-            let bro = Browser::new(&*locked_repo, Branch::local("master"))?;
+            let bro = Browser::new(&*locked_repo, Branch::local(reflike!("master")))?;
             let mut branches = bro.list_branches(None)?;
             branches.sort();
 
             assert_eq!(
                 branches,
                 vec![
-                    Branch::remote("HEAD", "origin"),
-                    Branch::remote("dev", "origin"),
-                    Branch::local("dev"),
-                    Branch::remote("master", "origin"),
-                    Branch::local("master"),
-                    Branch::remote("pineapple", "banana"),
+                    Branch::remote(reflike!("HEAD"), reflike!("origin")),
+                    Branch::remote(reflike!("dev"), reflike!("origin")),
+                    Branch::local(reflike!("dev")),
+                    Branch::remote(reflike!("master"), reflike!("origin")),
+                    Branch::local(reflike!("master")),
+                    Branch::remote(reflike!("pineapple"), reflike!("banana")),
                 ]
             );
 
