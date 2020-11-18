@@ -91,6 +91,3 @@ mod nonempty;
 mod tree;
 
 pub use crate::vcs::git;
-
-#[macro_use]
-extern crate lazy_static;

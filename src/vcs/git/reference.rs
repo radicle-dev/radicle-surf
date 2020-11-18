@@ -15,10 +15,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::vcs::git::{repo::RepositoryRef, BranchName, Namespace, TagName};
-use regex::Regex;
 use std::{fmt, str};
+
 use thiserror::Error;
+
+use crate::vcs::git::{repo::RepositoryRef, BranchName, Namespace, TagName};
 
 pub(super) mod glob;
 
@@ -119,68 +120,80 @@ impl fmt::Display for Ref {
 
 #[derive(Debug, PartialEq, Error)]
 pub enum ParseError {
-    #[error("was able to parse 'refs/remotes' but failed to parse the remote name, perhaps you're missing 'origin/'")]
-    MissingRemote,
-    #[error("was able to parse 'refs/namespaces' but failed to parse the namespace name, a valid form would be 'refs/namespaces/moi/refs/heads/master'")]
-    MissingNamespace,
     #[error("the ref provided '{0}' was malformed")]
     MalformedRef(String),
-    #[error("while attempting to parse a commit SHA we encountered an error: {0:?}")]
-    Sha(#[from] git2::Error),
+}
+
+pub mod parser {
+    use nom::{bytes, named, tag, IResult};
+
+    use crate::vcs::git::{BranchName, TagName};
+
+    use super::Ref;
+
+    const HEADS: &str = "refs/heads/";
+    const REMOTES: &str = "refs/remotes/";
+    const TAGS: &str = "refs/tags/";
+    const NAMESPACES: &str = "refs/namespaces/";
+
+    named!(heads, tag!(HEADS));
+    named!(remotes, tag!(REMOTES));
+    named!(tags, tag!(TAGS));
+    named!(namsespaces, tag!(NAMESPACES));
+
+    type Error<'a> = nom::Err<nom::error::Error<&'a str>>;
+
+    pub fn component(s: &str) -> IResult<&str, &str> {
+        bytes::complete::take_till(|c| c == '/')(s).and_then(|(rest, component)| {
+            bytes::complete::take(1u8)(rest).map(|(rest, _)| (rest, component))
+        })
+    }
+
+    pub fn local(s: &str) -> Result<Ref, Error> {
+        bytes::complete::tag(HEADS)(s).map(|(name, _)| Ref::LocalBranch {
+            name: BranchName::new(name),
+        })
+    }
+
+    pub fn remote(s: &str) -> Result<Ref, Error> {
+        bytes::complete::tag(REMOTES)(s).and_then(|(rest, _)| {
+            component(rest).map(|(rest, remote)| Ref::RemoteBranch {
+                remote: remote.to_owned(),
+                name: BranchName::new(rest),
+            })
+        })
+    }
+
+    pub fn tag(s: &str) -> Result<Ref, Error> {
+        bytes::complete::tag(TAGS)(s).map(|(name, _)| Ref::Tag {
+            name: TagName::new(name),
+        })
+    }
+
+    pub fn namespace(s: &str) -> Result<Ref, Error> {
+        bytes::complete::tag(NAMESPACES)(s).and_then(|(rest, _)| {
+            component(rest).and_then(|(rest, namespace)| {
+                Ok(Ref::Namespace {
+                    namespace: namespace.to_owned(),
+                    reference: Box::new(parse(rest)?),
+                })
+            })
+        })
+    }
+
+    pub fn parse(s: &str) -> Result<Ref, nom::Err<nom::error::Error<&str>>> {
+        local(s)
+            .or_else(|_| remote(s))
+            .or_else(|_| tag(s))
+            .or_else(|_| namespace(s))
+    }
 }
 
 impl str::FromStr for Ref {
     type Err = ParseError;
 
     fn from_str(reference: &str) -> Result<Self, Self::Err> {
-        lazy_static! {
-            static ref REF: Regex = Regex::new(
-                r"^(refs/remotes/|refs/tags/|refs/heads/|refs/namespaces/)([^refs/]\w+/)?(.*)"
-            )
-            .unwrap();
-        }
-        REF.captures(reference)
-            .ok_or_else(|| ParseError::MalformedRef(reference.to_string()))
-            .and_then(|cap| {
-                // Get the capture match for the prefix, i.e. 'refs/*'.
-                // If we don't have a capture, we fall back to the reference string
-                // in case it's a commit SHA.
-                let prefix = cap
-                    .get(1)
-                    .ok_or_else(|| ParseError::MalformedRef(reference.to_string()))?
-                    .as_str();
-
-                // Get the capture match for the name, e.g. 'master'
-                let name = cap
-                    .get(3)
-                    .ok_or_else(|| ParseError::MalformedRef(reference.to_string()))?
-                    .as_str();
-
-                // Matching on the prefix and falling back to commit if we don't find a match.
-                match prefix {
-                    "refs/remotes/" => match cap.get(2) {
-                        None => Err(ParseError::MissingRemote),
-                        Some(remote_name) => Ok(Self::RemoteBranch {
-                            remote: remote_name.as_str().trim_end_matches('/').to_string(),
-                            name: BranchName::new(name),
-                        }),
-                    },
-                    "refs/heads/" => Ok(Self::LocalBranch {
-                        name: BranchName::new(name),
-                    }),
-                    "refs/tags/" => Ok(Self::Tag {
-                        name: TagName::new(name),
-                    }),
-                    "refs/namespaces/" => match cap.get(2) {
-                        None => Err(ParseError::MissingNamespace),
-                        Some(namespace) => Ok(Self::Namespace {
-                            namespace: namespace.as_str().trim_end_matches('/').to_string(),
-                            reference: Box::new(Ref::from_str(name)?),
-                        }),
-                    },
-                    _ => Err(ParseError::MalformedRef(reference.to_string())),
-                }
-            })
+        parser::parse(reference).map_err(|_| ParseError::MalformedRef(reference.to_owned()))
     }
 }
 
@@ -203,6 +216,20 @@ mod tests {
             Ref::from_str("refs/heads/master"),
             Ok(Ref::LocalBranch {
                 name: BranchName::new("master"),
+            })
+        );
+
+        assert_eq!(
+            Ref::from_str("refs/heads/i-am-hyphenated"),
+            Ok(Ref::LocalBranch {
+                name: BranchName::new("i-am-hyphenated"),
+            })
+        );
+
+        assert_eq!(
+            Ref::from_str("refs/heads/prefix/i-am-hyphenated"),
+            Ok(Ref::LocalBranch {
+                name: BranchName::new("prefix/i-am-hyphenated"),
             })
         );
 
@@ -239,12 +266,14 @@ mod tests {
 
         assert_eq!(
             Ref::from_str("refs/remotes/master"),
-            Err(ParseError::MissingRemote),
+            Err(ParseError::MalformedRef("refs/remotes/master".to_owned())),
         );
 
         assert_eq!(
             Ref::from_str("refs/namespaces/refs/remotes/origin/master"),
-            Err(ParseError::MissingNamespace),
+            Err(ParseError::MalformedRef(
+                "refs/namespaces/refs/remotes/origin/master".to_owned()
+            )),
         );
 
         Ok(())
