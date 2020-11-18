@@ -173,8 +173,6 @@ pub mod parser {
     pub fn namespace(s: &str) -> Result<Ref, Error> {
         bytes::complete::tag(NAMESPACES)(s).and_then(|(rest, _)| {
             component(rest).and_then(|(rest, namespace)| {
-                println!("REST: {}", rest);
-                println!("namespace: {}", namespace);
                 Ok(Ref::Namespace {
                     namespace: namespace.to_owned(),
                     reference: Box::new(parse(rest)?),
