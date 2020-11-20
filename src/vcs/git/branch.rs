@@ -169,13 +169,14 @@ impl<'repo> TryFrom<git2::Reference<'repo>> for Branch {
         }
 
         if is_remote {
-            let mut split = name.0.split('/');
+            let mut split = name.0.splitn(2, '/');
             let remote_name = split
                 .next()
                 .ok_or_else(|| Error::ParseRemoteBranch(name.clone()))?;
             let name = split
                 .next()
                 .ok_or_else(|| Error::ParseRemoteBranch(name.clone()))?;
+
             Ok(Self {
                 name: BranchName(name.to_string()),
                 locality: BranchType::Remote {
