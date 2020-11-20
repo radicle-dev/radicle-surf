@@ -1579,7 +1579,6 @@ mod tests {
                     Branch::local("dev"),
                     Branch::remote("master", "origin"),
                     Branch::local("master"),
-                    Branch::remote("name/space", "origin"),
                     Branch::remote("pineapple", "banana"),
                 ]
             );
