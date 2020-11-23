@@ -70,7 +70,11 @@ fn setup_fixtures() {
             "refs/tags/v0.2.0",
         ),
         (
-            "refs/namespaces/golden/refs/remotes/kickflip/heads/heelflip/fakie",
+            "refs/namespaces/golden/refs/remotes/kickflip/heads/heelflip",
+            "refs/heads/dev",
+        ),
+        (
+            "refs/namespaces/golden/refs/remotes/kickflip/heads/fakie/bigspin",
             "refs/heads/dev",
         ),
         (
