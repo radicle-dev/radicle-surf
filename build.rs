@@ -17,6 +17,8 @@
 
 use std::{
     env,
+    fs::File,
+    io::{self, Read},
     path::Path,
     process::{Command, ExitStatus},
 };
@@ -44,6 +46,33 @@ fn update_ref(curr_dir: &Path, namespace: &str, target: &str) -> ExitStatus {
         .unwrap_or_else(|_| panic!("Failed to execute `git submodule update {}`", namespace))
 }
 
+fn read_branches(path: impl AsRef<Path>) -> io::Result<Vec<(String, String)>> {
+    let mut file = File::open(path)?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)?;
+
+    Ok(contents
+        .lines()
+        .flat_map(|pair| {
+            if pair.is_empty() {
+                None
+            } else {
+                let mut pair = pair.split(',');
+
+                println!("{:?}", pair.clone().collect::<Vec<_>>());
+                Some((
+                    pair.next()
+                        .expect("Missing first of the pair of branches")
+                        .to_owned(),
+                    pair.next()
+                        .expect("Missing second of the pair of branches")
+                        .to_owned(),
+                ))
+            }
+        })
+        .collect())
+}
+
 fn setup_fixtures() {
     // Path set up for the project directory
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("Failed to get CARGO_MANIFEST_DIR");
@@ -55,39 +84,9 @@ fn setup_fixtures() {
     let master_status = checkout(curr_dir, "master");
     assert!(master_status.success(), "failed to checkout master");
 
-    for (new_rev, rev) in [
-        (
-            "refs/namespaces/golden/refs/heads/master",
-            "refs/heads/master",
-        ),
-        ("refs/namespaces/golden/refs/heads/banana", "refs/heads/dev"),
-        (
-            "refs/namespaces/golden/refs/tags/v0.1.0",
-            "refs/tags/v0.1.0",
-        ),
-        (
-            "refs/namespaces/golden/refs/tags/v0.2.0",
-            "refs/tags/v0.2.0",
-        ),
-        (
-            "refs/namespaces/golden/refs/remotes/kickflip/heads/heelflip",
-            "refs/heads/dev",
-        ),
-        (
-            "refs/namespaces/golden/refs/remotes/kickflip/heads/fakie/bigspin",
-            "refs/heads/dev",
-        ),
-        (
-            "refs/namespaces/golden/refs/namespaces/silver/refs/heads/master",
-            "refs/heads/dev",
-        ),
-        (
-            "refs/remotes/banana/pineapple",
-            "refs/remotes/origin/master",
-        ),
-    ]
-    .iter()
-    {
+    let branches = read_branches("./data/mock-branches.txt").expect("Failed to read branches");
+
+    for (new_rev, rev) in branches.iter() {
         let update_rev = update_ref(curr_dir, new_rev, rev);
         assert!(
             update_rev.success(),
