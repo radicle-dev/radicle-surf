@@ -908,7 +908,8 @@ impl<'a> Browser<'a> {
     ///     branches,
     ///     vec![
     ///         Branch::local("banana"),
-    ///         Branch::remote("heelflip/fakie", "kickflip"),
+    ///         Branch::remote("fakie/bigspin", "kickflip"),
+    ///         Branch::remote("heelflip", "kickflip"),
     ///     ]
     /// );
     /// #
@@ -1121,7 +1122,10 @@ mod tests {
 
             assert_eq!(expected_branches, branches);
 
-            let expected_branches: Vec<Branch> = vec![Branch::remote("heelflip/fakie", "kickflip")];
+            let expected_branches: Vec<Branch> = vec![
+                Branch::remote("fakie/bigspin", "kickflip"),
+                Branch::remote("heelflip", "kickflip"),
+            ];
             let mut branches = golden_browser.list_branches(Some(BranchType::Remote {
                 name: Some("kickflip".to_string()),
             }))?;
