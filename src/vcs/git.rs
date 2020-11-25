@@ -105,7 +105,11 @@ use crate::{
     vcs::{git::error::*, VCS},
 };
 use nonempty::NonEmpty;
-use std::{collections::{BTreeSet, HashMap}, convert::TryFrom, str};
+use std::{
+    collections::{BTreeSet, HashMap},
+    convert::TryFrom,
+    str,
+};
 
 /// The signature of a commit
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
