@@ -105,7 +105,7 @@ use crate::{
     vcs::{git::error::*, VCS},
 };
 use nonempty::NonEmpty;
-use std::{collections::HashMap, convert::TryFrom, str};
+use std::{collections::{BTreeSet, HashMap}, convert::TryFrom, str};
 
 /// The signature of a commit
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -952,14 +952,12 @@ impl<'a> Browser<'a> {
         let branches = self.list_branches(Some(BranchType::Local))?.len();
         let commits = self.history.len();
 
-        let mut contributors = self
+        let contributors = self
             .history
             .iter()
             .cloned()
-            .map(|x| x.author.name)
-            .collect::<Vec<_>>();
-        contributors.sort();
-        contributors.dedup();
+            .map(|commit| (commit.author.name, commit.author.email))
+            .collect::<BTreeSet<_>>();
 
         Ok(Stats {
             branches,
