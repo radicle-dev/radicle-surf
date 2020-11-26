@@ -1118,16 +1118,13 @@ mod tests {
             );
             assert_eq!(history, browser.history);
 
-            let expected_branches: Vec<Branch> =
-                vec![Branch::local("feature/#1194")];
+            let expected_branches: Vec<Branch> = vec![Branch::local("feature/#1194")];
             let mut branches = browser.list_branches(Some(BranchType::Local))?;
             branches.sort();
 
             assert_eq!(expected_branches, branches);
 
-            let expected_branches: Vec<Branch> = vec![
-                Branch::remote("feature/#1194", "fein"),
-            ];
+            let expected_branches: Vec<Branch> = vec![Branch::remote("feature/#1194", "fein")];
             let mut branches = browser.list_branches(Some(BranchType::Remote {
                 name: Some("fein".to_string()),
             }))?;
