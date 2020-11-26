@@ -265,6 +265,27 @@ mod tests {
         );
 
         assert_eq!(
+            Ref::from_str("refs/namespaces/me/refs/heads/feature/#1194"),
+            Ok(Ref::Namespace {
+                namespace: "me".to_string(),
+                reference: Box::new(Ref::LocalBranch {
+                    name: BranchName::new("feature/#1194"),
+                })
+            })
+        );
+
+        assert_eq!(
+            Ref::from_str("refs/namespaces/me/refs/remotes/fein/heads/feature/#1194"),
+            Ok(Ref::Namespace {
+                namespace: "me".to_string(),
+                reference: Box::new(Ref::RemoteBranch {
+                    remote: "fein".to_string(),
+                    name: BranchName::new("heads/feature/#1194"),
+                })
+            })
+        );
+
+        assert_eq!(
             Ref::from_str("refs/remotes/master"),
             Err(ParseError::MalformedRef("refs/remotes/master".to_owned())),
         );
