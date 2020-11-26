@@ -679,6 +679,7 @@ impl<'a> Browser<'a> {
     /// assert_eq!(namespaces, vec![
     ///     Namespace::try_from("golden")?,
     ///     Namespace::try_from("golden/silver")?,
+    ///     Namespace::try_from("me")?,
     /// ]);
     ///
     ///
@@ -1096,6 +1097,43 @@ mod tests {
             browser.branch(Branch::local("banana"))?;
 
             assert_ne!(history, browser.history);
+
+            Ok(())
+        }
+
+        #[test]
+        fn me_namespace() -> Result<(), Error> {
+            let repo = Repository::new("./data/git-platinum")?;
+            let browser = Browser::new(&repo, Branch::local("master"))?;
+            let history = browser.history.clone();
+
+            assert_eq!(browser.which_namespace(), Ok(None));
+
+            let browser = browser
+                .switch_namespace(&Namespace::try_from("me")?, Branch::local("feature/#1194"))?;
+
+            assert_eq!(
+                browser.which_namespace(),
+                Ok(Some(Namespace::try_from("me")?))
+            );
+            assert_eq!(history, browser.history);
+
+            let expected_branches: Vec<Branch> =
+                vec![Branch::local("feature/#1194")];
+            let mut branches = browser.list_branches(Some(BranchType::Local))?;
+            branches.sort();
+
+            assert_eq!(expected_branches, branches);
+
+            let expected_branches: Vec<Branch> = vec![
+                Branch::remote("feature/#1194", "fein"),
+            ];
+            let mut branches = browser.list_branches(Some(BranchType::Remote {
+                name: Some("fein".to_string()),
+            }))?;
+            branches.sort();
+
+            assert_eq!(expected_branches, branches);
 
             Ok(())
         }
