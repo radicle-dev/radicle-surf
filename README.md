@@ -11,7 +11,7 @@ Alongside this, we will wish to take two snapshots and view their differences.
 
 ## Contributing
 
-To get started on contributing you can check out our [devloping guide](./DEVELOPMENT.md), and also
+To get started on contributing you can check out our [developing guide](./DEVELOPMENT.md), and also
 our [LICENSE](./LICENSE) file.
 
 ## The Community
