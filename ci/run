@@ -27,8 +27,11 @@ cargo deny check bans
 echo '--- deny: Sources'
 cargo deny check sources
 
+echo '--- Build'
+cargo build --verbose --workspace --all-features
+
 echo '--- Build & Test'
-GIT_FIXTURES=1 cargo test --all --features serialize
+GIT_FIXTURES=1 cargo test --workspace --all-features
 
 echo '--- Docs'
 cargo doc --no-deps
