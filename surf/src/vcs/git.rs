@@ -143,7 +143,7 @@ impl<'a> Browser<'a> {
     /// # use std::error::Error;
     ///
     /// # fn main() -> Result<(), Box<dyn Error>> {
-    /// let repo = Repository::new("./data/git-platinum")?;
+    /// let repo = Repository::new("../data/git-platinum")?;
     /// let browser = Browser::new(&repo, Branch::local("master"))?;
     /// #
     /// # Ok(())
@@ -1073,7 +1073,7 @@ mod tests {
     #[test]
     // An issue with submodules, see: https://github.com/radicle-dev/radicle-surf/issues/54
     fn test_submodule_failure() {
-        let repo = Repository::new(".").unwrap();
+        let repo = Repository::new("..").unwrap();
         let browser = Browser::new(&repo, Branch::local("master")).unwrap();
 
         browser.get_directory().unwrap();

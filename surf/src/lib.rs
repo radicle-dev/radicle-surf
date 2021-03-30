@@ -38,7 +38,7 @@
 //!
 //! # fn main() -> Result<(), Box<dyn Error>> {
 //! // We're going to point to this repo.
-//! let repo = git::Repository::new("./data/git-platinum")?;
+//! let repo = git::Repository::new("../data/git-platinum")?;
 //!
 //! // Here we initialise a new Broswer for a the git repo.
 //! let mut browser = git::Browser::new(&repo, git::Branch::local("master"))?;

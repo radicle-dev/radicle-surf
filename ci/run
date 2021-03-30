@@ -15,6 +15,9 @@ fi
 echo '--- cleanup: Tear Down Mock Branches'
 ./scripts/teardown-branches.sh
 
+echo '--- setup: Create Mock Branches'
+./scripts/setup-branches.sh
+
 echo '--- deny: Advisories'
 cargo deny check advisories
 
