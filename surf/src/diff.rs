@@ -43,7 +43,7 @@ impl From<String> for DiffError {
     derive(Serialize),
     serde(rename_all = "camelCase")
 )]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Diff {
     pub created: Vec<CreateFile>,
     pub deleted: Vec<DeleteFile>,
@@ -59,11 +59,11 @@ impl Default for Diff {
 }
 
 #[cfg_attr(feature = "serialize", derive(Serialize))]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CreateFile(pub Path);
 
 #[cfg_attr(feature = "serialize", derive(Serialize))]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DeleteFile(pub Path);
 
 #[cfg_attr(
@@ -71,7 +71,7 @@ pub struct DeleteFile(pub Path);
     derive(Serialize),
     serde(rename_all = "camelCase")
 )]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MoveFile {
     pub old_path: Path,
     pub new_path: Path,
@@ -82,7 +82,7 @@ pub struct MoveFile {
     derive(Serialize),
     serde(rename_all = "camelCase")
 )]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CopyFile {
     pub old_path: Path,
     pub new_path: Path,
@@ -93,7 +93,7 @@ pub struct CopyFile {
     derive(Serialize),
     serde(rename_all = "camelCase")
 )]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ModifiedFile {
     pub path: Path,
     pub diff: FileDiff,
@@ -105,7 +105,7 @@ pub struct ModifiedFile {
     derive(Serialize),
     serde(tag = "type", rename_all = "camelCase")
 )]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FileDiff {
     Binary,
     #[cfg_attr(feature = "serialize", serde(rename_all = "camelCase"))]
@@ -120,14 +120,14 @@ pub enum FileDiff {
     derive(Serialize),
     serde(rename_all = "camelCase")
 )]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Hunk {
     pub header: Line,
     pub lines: Vec<LineDiff>,
 }
 
 /// The content of a single line.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Line(pub(crate) Vec<u8>);
 
 impl From<Vec<u8>> for Line {
@@ -161,7 +161,7 @@ impl Serialize for Line {
     derive(Serialize),
     serde(tag = "type", rename_all = "camelCase")
 )]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LineDiff {
     /// Line added.
     #[cfg_attr(feature = "serialize", serde(rename_all = "camelCase"))]

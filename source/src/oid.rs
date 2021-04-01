@@ -15,37 +15,30 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-//! Source code related functionality.
+use std::convert::TryFrom;
 
-/// To avoid incompatible versions of `radicle-surf`, `radicle-source`
-/// re-exports the package under the `surf` alias.
-pub use radicle_surf as surf;
+use serde::{Deserialize, Serialize};
 
-pub mod branch;
-pub use branch::{branches, local_state, Branch, LocalState};
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(try_from = "&str", into = "String")]
+pub struct Oid(pub git2::Oid);
 
-pub mod commit;
-pub use commit::{commit, commits, Commit};
+impl TryFrom<&str> for Oid {
+    type Error = git2::Error;
 
-pub mod error;
-pub use error::Error;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        value.parse().map(Oid)
+    }
+}
 
-pub mod object;
-pub use object::{blob, tree, Blob, BlobContent, Info, ObjectType, Tree};
+impl From<Oid> for String {
+    fn from(oid: Oid) -> Self {
+        oid.0.to_string()
+    }
+}
 
-pub mod oid;
-pub use oid::Oid;
-
-pub mod person;
-pub use person::Person;
-
-pub mod revision;
-pub use revision::Revision;
-
-#[cfg(feature = "syntax")]
-pub mod syntax;
-#[cfg(feature = "syntax")]
-pub use syntax::SYNTAX_SET;
-
-pub mod tag;
-pub use tag::{tags, Tag};
+impl From<Oid> for git2::Oid {
+    fn from(oid: Oid) -> Self {
+        oid.0
+    }
+}

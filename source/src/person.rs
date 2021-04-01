@@ -15,37 +15,14 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-//! Source code related functionality.
+use serde::Serialize;
 
-/// To avoid incompatible versions of `radicle-surf`, `radicle-source`
-/// re-exports the package under the `surf` alias.
-pub use radicle_surf as surf;
-
-pub mod branch;
-pub use branch::{branches, local_state, Branch, LocalState};
-
-pub mod commit;
-pub use commit::{commit, commits, Commit};
-
-pub mod error;
-pub use error::Error;
-
-pub mod object;
-pub use object::{blob, tree, Blob, BlobContent, Info, ObjectType, Tree};
-
-pub mod oid;
-pub use oid::Oid;
-
-pub mod person;
-pub use person::Person;
-
-pub mod revision;
-pub use revision::Revision;
-
-#[cfg(feature = "syntax")]
-pub mod syntax;
-#[cfg(feature = "syntax")]
-pub use syntax::SYNTAX_SET;
-
-pub mod tag;
-pub use tag::{tags, Tag};
+/// Representation of a person (e.g. committer, author, signer) from a
+/// repository. Usually extracted from a signature.
+#[derive(Clone, Debug, Serialize)]
+pub struct Person {
+    /// Name part of the commit signature.
+    pub name: String,
+    /// Email part of the commit signature.
+    pub email: String,
+}
