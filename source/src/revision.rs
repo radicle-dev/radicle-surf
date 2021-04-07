@@ -30,8 +30,8 @@ use crate::{
 };
 
 pub enum Category<P, U> {
-    Local { identifier: P, user: U },
-    Remote { identifier: P, user: U },
+    Local { peer_id: P, user: U },
+    Remote { peer_id: P, user: U },
 }
 
 /// A revision selector for a `Browser`.
@@ -50,7 +50,7 @@ pub enum Revision<P> {
         /// Name of the branch.
         name: String,
         /// The remote peer, if specified.
-        identifier: Option<P>,
+        peer_id: Option<P>,
     },
     /// Select a SHA1 under the name provided.
     #[serde(rename_all = "camelCase")]
@@ -69,7 +69,7 @@ where
     fn try_from(other: Revision<P>) -> Result<Self, Self::Error> {
         match other {
             Revision::Tag { name } => Ok(git::TagName::new(&name).into()),
-            Revision::Branch { name, identifier } => Ok(match identifier {
+            Revision::Branch { name, peer_id } => Ok(match peer_id {
                 Some(peer) => {
                     git::Branch::remote(&format!("heads/{}", name), &peer.to_string()).into()
                 },
@@ -87,8 +87,8 @@ where
 /// repo.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Revisions<P, U> {
-    /// The peer identifier for the user.
-    pub identifier: P,
+    /// The peer peer_id for the user.
+    pub peer_id: P,
     /// The user who owns these revisions.
     pub user: U,
     /// List of [`git::Branch`].
@@ -97,7 +97,7 @@ pub struct Revisions<P, U> {
     pub tags: Vec<Tag>,
 }
 
-/// Provide the [`Revisions`] for the given `identifier`, looking for the
+/// Provide the [`Revisions`] for the given `peer_id`, looking for the
 /// branches as [`BranchType::Remote`].
 ///
 /// If there are no branches then this returns `None`.
@@ -107,16 +107,16 @@ pub struct Revisions<P, U> {
 ///   * If we cannot get the branches from the `Browser`
 pub fn remote<P, U>(
     browser: &Browser,
-    identifier: P,
+    peer_id: P,
     user: U,
 ) -> Result<Option<Revisions<P, U>>, Error>
 where
     P: Clone + ToString,
 {
-    let remote_branches = branches(browser, Some(into_branch_type(Some(identifier.clone()))))?;
+    let remote_branches = branches(browser, Some(into_branch_type(Some(peer_id.clone()))))?;
     Ok(
         NonEmpty::from_vec(remote_branches).map(|branches| Revisions {
-            identifier,
+            peer_id,
             user,
             branches,
             // TODO(rudolfs): implement remote peer tags once we decide how
@@ -126,7 +126,7 @@ where
     )
 }
 
-/// Provide the [`Revisions`] for the given `identifier`, looking for the
+/// Provide the [`Revisions`] for the given `peer_id`, looking for the
 /// branches as [`BranchType::Local`].
 ///
 /// If there are no branches then this returns `None`.
@@ -134,11 +134,7 @@ where
 /// # Errors
 ///
 ///   * If we cannot get the branches from the `Browser`
-pub fn local<P, U>(
-    browser: &Browser,
-    identifier: P,
-    user: U,
-) -> Result<Option<Revisions<P, U>>, Error>
+pub fn local<P, U>(browser: &Browser, peer_id: P, user: U) -> Result<Option<Revisions<P, U>>, Error>
 where
     P: Clone + ToString,
 {
@@ -146,7 +142,7 @@ where
     let tags = tags(browser)?;
     Ok(
         NonEmpty::from_vec(local_branches).map(|branches| Revisions {
-            identifier,
+            peer_id,
             user,
             branches,
             tags,
@@ -173,20 +169,20 @@ where
     P: Clone + ToString,
 {
     match peer {
-        Category::Local { identifier, user } => local(browser, identifier, user),
-        Category::Remote { identifier, user } => remote(browser, identifier, user),
+        Category::Local { peer_id, user } => local(browser, peer_id, user),
+        Category::Remote { peer_id, user } => remote(browser, peer_id, user),
     }
 }
 
 /// Turn an `Option<P>` into a [`BranchType`]. If the `P` is present then this
 /// is set as the remote of the `BranchType`. Otherwise, it's local branch.
 #[must_use]
-pub fn into_branch_type<P>(identifier: Option<P>) -> BranchType
+pub fn into_branch_type<P>(peer_id: Option<P>) -> BranchType
 where
     P: ToString,
 {
-    identifier.map_or(BranchType::Local, |identifier| BranchType::Remote {
+    peer_id.map_or(BranchType::Local, |peer_id| BranchType::Remote {
         // We qualify the remotes as the PeerId + heads, otherwise we would grab the tags too.
-        name: Some(format!("{}/heads", identifier.to_string())),
+        name: Some(format!("{}/heads", peer_id.to_string())),
     })
 }
