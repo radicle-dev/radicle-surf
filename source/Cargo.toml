@@ -1,8 +1,11 @@
 [package]
 name = "radicle-source"
+description = "A high level API for browsing source files"
 version = "0.1.0"
 authors = ["The Radicle Team <dev@radicle.xyz>"]
 edition = "2018"
+homepage = "https://github.com/radicle-dev/radicle-surf"
+repository = "https://github.com/radicle-dev/radicle-surf"
 license = "GPL-3.0-or-later"
 
 [features]
