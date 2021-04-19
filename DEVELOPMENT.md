@@ -16,28 +16,17 @@ the toolchain via the `rust-toolchain` file, and the formatting rules `.rustmt.t
 For the [Nix](https://nixos.org/) inclined there is a `default.nix` file to get all the necessary
 dependencies and it also uses the `rust-toolchain` file to pin to that version of Rust.
 
-First, if you haven't already, you should set up the submodule under `data/git-platinum`. Do this by
-the script:
-
-```bash
-$ ./scripts/submodule.sh
+You can build the project the usual way:
+```
+cargo build
 ```
 
-The `build.rs` file takes care of setting up specific references for testing purposes. So to build
-and test `radicle-surf` we need to run with the `GIT_FIXTURES` set. **Note** that it's only
-necessary to do this once.
-
-```bash
-$ GIT_FIXTURES=1 cargo build
+To run all the tests:
+```
+cargo test
 ```
 
-and
-
-```bash
-$ GIT_FIXTURES=1 cargo test
-```
-
-For the full list of commands that get executed on CI you can checkout the [ci/run](./ci/run) script.
+For the full list of checks that get executed in CI you can checkout the [ci/run](./ci/run) script.
 
 If any of this _isn't_ working, then let's work through it together and get it Working on Your
 Machine™.
