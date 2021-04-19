@@ -27,3 +27,4 @@ features = []
 [dependencies.radicle-surf]
 version = "^0.5.4"
 features = ["serialize"]
+path = "../surf"
