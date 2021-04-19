@@ -1,4 +1,0 @@
-[submodule "data/git-platinum"]
-	path = data/git-platinum
-	url = https://github.com/radicle-dev/git-platinum.git
-	branch = master

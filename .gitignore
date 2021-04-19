@@ -12,3 +12,7 @@ Cargo.lock
 # JetBrains IDE project files (Intellij, CLion, etc.)
 .idea
 *.iml
+
+# This is an inner git repo unpacked (if necessary) from the archive.
+# Git doesn't like nested repos, and we don't really want to use submodules.
+/data/git-platinum
