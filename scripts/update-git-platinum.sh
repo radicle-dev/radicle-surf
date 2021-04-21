@@ -29,8 +29,3 @@ mv git-platinum.tgz $TARBALL_PATH
 
 # Clean up.
 rm -rf git-platinum
-
-# Commit.
-git reset
-git add $TARBALL_PATH
-git commit -m "Update git-platinum"
