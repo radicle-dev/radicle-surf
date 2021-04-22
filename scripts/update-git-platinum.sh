@@ -6,7 +6,7 @@ BASE=$(basename $(pwd))
 
 if [ "${BASE}" != "radicle-surf" ]
 then
-   echo "this script should be run from the root of radicle-surf"
+   echo "ERROR: this script should be run from the root of radicle-surf"
    exit 1
 fi
 
