@@ -2,9 +2,9 @@
 set -euo pipefail
 
 # Verify that the script is run from project root.
-BASE=$(basename pwd)
+BASE=$(basename $(pwd))
 
-if [ "${BASE}" -ne "radicle-surf" ]
+if [ "${BASE}" != "radicle-surf" ]
 then
    echo "this script should be run from the root of radicle-surf"
    exit 1
