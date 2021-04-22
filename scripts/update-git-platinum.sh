@@ -1,18 +1,27 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-## This is an update script for /data/git-platinum. It's meant to be executed
-## from the root of the repo.
+# Verify that the script is run from project root.
+BASE=$(basename pwd)
+
+if [ "${BASE}" -ne "radicle-surf" ]
+then
+   echo "this script should be run from the root of radicle-surf"
+   exit 1
+fi
 
 TARBALL_PATH=data/git-platinum.tgz
+WORKDIR=.workdir
+
+# Create the workdir if needed.
+mkdir -p $WORKDIR
 
 # This is here in case the last script run failed and it never cleaned up.
-# Is there a better way to handle this?
-rm -rf git-platinum
+rm -rf $WORKDIR/git-platinum
 
 # Clone an up-to-date version of git-platinum.
-git clone https://github.com/radicle-dev/git-platinum.git
-git -C git-platinum/ checkout dev
+git clone https://github.com/radicle-dev/git-platinum.git $WORKDIR/git-platinum
+git -C $WORKDIR/git-platinum/ checkout dev
 
 # Add the necessary refs.
 input="./data/mock-branches.txt"
@@ -20,12 +29,12 @@ while IFS= read -r line
 do
     IFS=, read -a pair <<< $line
     echo "Creating branch ${pair[0]}"
-    git -C git-platinum/ update-ref ${pair[0]} ${pair[1]}
+    git -C $WORKDIR/git-platinum/ update-ref ${pair[0]} ${pair[1]}
 done < "$input"
 
 # Update the archive.
-tar -czf git-platinum.tgz git-platinum
-mv git-platinum.tgz $TARBALL_PATH
+tar -czf $WORKDIR/git-platinum.tgz $WORKDIR/git-platinum
+mv $WORKDIR/git-platinum.tgz $TARBALL_PATH
 
 # Clean up.
-rm -rf git-platinum
+rm -rf $WORKDIR/git-platinum
