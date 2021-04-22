@@ -36,6 +36,10 @@ proptest = "0.9"
 criterion = "0.3"
 serde_json = "1"
 
+[build-dependencies]
+flate2 = "1"
+tar = "0.4"
+
 [[bench]]
 name = "last_commit"
 harness = false

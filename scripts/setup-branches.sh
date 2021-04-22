@@ -11,5 +11,5 @@ while IFS= read -r line
 do
   IFS=, read -a pair <<< $line
   echo "Creating branch ${pair[0]}"
-  git submodule foreach "git update-ref ${pair[0]} ${pair[1]}"
+  git -C data/git-platinum/ update-ref ${pair[0]} ${pair[1]}
 done < "$input"
