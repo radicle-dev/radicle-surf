@@ -180,7 +180,7 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Browser, Repository, Branch, BranchType, BranchName, Namespace};
+    /// use radicle_surf::vcs::git::{Browser, Repository, Branch, BranchSelector, BranchName, Namespace};
     /// use std::convert::TryFrom;
     /// # use std::error::Error;
     ///
@@ -192,7 +192,7 @@ impl<'a> Browser<'a> {
     ///     Branch::local("master")
     /// )?;
     ///
-    /// let mut branches = browser.list_branches(Some(BranchType::Local))?;
+    /// let mut branches = browser.list_branches(BranchSelector::Local)?;
     /// branches.sort();
     ///
     /// assert_eq!(
@@ -544,7 +544,7 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Branch, BranchType, BranchName, Browser, Namespace, Repository};
+    /// use radicle_surf::vcs::git::{Branch, BranchSelector, BranchName, Browser, Namespace, Repository};
     /// use std::convert::TryFrom;
     /// # use std::error::Error;
     ///
@@ -552,15 +552,15 @@ impl<'a> Browser<'a> {
     /// let repo = Repository::new("../data/git-platinum")?;
     /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
     ///
-    /// let branches = browser.list_branches(None)?;
+    /// let branches = browser.list_branches(BranchSelector::All)?;
     ///
     /// // 'master' exists in the list of branches
     /// assert!(branches.contains(&Branch::local("master")));
     ///
     /// // Filter the branches by `Remote` 'origin'.
-    /// let mut branches = browser.list_branches(Some(BranchType::Remote {
+    /// let mut branches = browser.list_branches(BranchSelector::Remote {
     ///     name: Some("origin".to_string())
-    /// }))?;
+    /// })?;
     /// branches.sort();
     ///
     /// assert_eq!(branches, vec![
@@ -570,9 +570,9 @@ impl<'a> Browser<'a> {
     /// ]);
     ///
     /// // Filter the branches by all `Remote`s.
-    /// let mut branches = browser.list_branches(Some(BranchType::Remote {
+    /// let mut branches = browser.list_branches(BranchSelector::Remote {
     ///     name: None
-    /// }))?;
+    /// })?;
     /// branches.sort();
     ///
     /// assert_eq!(branches, vec![
@@ -585,7 +585,7 @@ impl<'a> Browser<'a> {
     /// // We can also switch namespaces and list the branches in that namespace.
     /// let golden = browser.switch_namespace(&Namespace::try_from("golden")?, Branch::local("master"))?;
     ///
-    /// let mut branches = golden.list_branches(Some(BranchType::Local))?;
+    /// let mut branches = golden.list_branches(BranchSelector::Local)?;
     /// branches.sort();
     ///
     /// assert_eq!(branches, vec![
@@ -596,7 +596,7 @@ impl<'a> Browser<'a> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn list_branches(&self, filter: Option<BranchType>) -> Result<Vec<Branch>, Error> {
+    pub fn list_branches(&self, filter: BranchSelector) -> Result<Vec<Branch>, Error> {
         self.repository.list_branches(filter)
     }
 
@@ -967,7 +967,7 @@ impl<'a> Browser<'a> {
     /// # }
     /// ```
     pub fn get_stats(&self) -> Result<Stats, Error> {
-        let branches = self.list_branches(Some(BranchType::Local))?.len();
+        let branches = self.list_branches(BranchSelector::Local)?.len();
         let commits = self.history.len();
 
         let contributors = self
@@ -1132,15 +1132,15 @@ mod tests {
             assert_eq!(history, browser.history);
 
             let expected_branches: Vec<Branch> = vec![Branch::local("feature/#1194")];
-            let mut branches = browser.list_branches(Some(BranchType::Local))?;
+            let mut branches = browser.list_branches(BranchSelector::Local)?;
             branches.sort();
 
             assert_eq!(expected_branches, branches);
 
             let expected_branches: Vec<Branch> = vec![Branch::remote("feature/#1194", "fein")];
-            let mut branches = browser.list_branches(Some(BranchType::Remote {
+            let mut branches = browser.list_branches(BranchSelector::Remote {
                 name: Some("fein".to_string()),
-            }))?;
+            })?;
             branches.sort();
 
             assert_eq!(expected_branches, branches);
@@ -1167,7 +1167,7 @@ mod tests {
 
             let expected_branches: Vec<Branch> =
                 vec![Branch::local("banana"), Branch::local("master")];
-            let mut branches = golden_browser.list_branches(Some(BranchType::Local))?;
+            let mut branches = golden_browser.list_branches(BranchSelector::Local)?;
             branches.sort();
 
             assert_eq!(expected_branches, branches);
@@ -1176,9 +1176,9 @@ mod tests {
                 Branch::remote("fakie/bigspin", "kickflip"),
                 Branch::remote("heelflip", "kickflip"),
             ];
-            let mut branches = golden_browser.list_branches(Some(BranchType::Remote {
+            let mut branches = golden_browser.list_branches(BranchSelector::Remote {
                 name: Some("kickflip".to_string()),
-            }))?;
+            })?;
             branches.sort();
 
             assert_eq!(expected_branches, branches);
@@ -1206,7 +1206,7 @@ mod tests {
             assert_ne!(history, silver_browser.history);
 
             let expected_branches: Vec<Branch> = vec![Branch::local("master")];
-            let mut branches = silver_browser.list_branches(None)?;
+            let mut branches = silver_browser.list_branches(BranchSelector::All)?;
             branches.sort();
 
             assert_eq!(expected_branches, branches);
@@ -1622,7 +1622,7 @@ mod tests {
             let shared_repo = Mutex::new(Repository::new("../data/git-platinum")?);
             let locked_repo: MutexGuard<Repository> = shared_repo.lock().unwrap();
             let bro = Browser::new(&*locked_repo, Branch::local("master"))?;
-            let mut branches = bro.list_branches(None)?;
+            let mut branches = bro.list_branches(BranchSelector::All)?;
             branches.sort();
 
             assert_eq!(

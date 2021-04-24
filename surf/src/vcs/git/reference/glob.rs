@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::vcs::git::{error, repo::RepositoryRef, BranchType};
+use crate::vcs::git::{error, repo::RepositoryRef, BranchSelector};
 use either::Either;
 use std::fmt;
 
@@ -43,11 +43,12 @@ pub enum RefGlob {
     Namespace,
 }
 
-impl From<BranchType> for RefGlob {
-    fn from(other: BranchType) -> Self {
+impl From<BranchSelector> for RefGlob {
+    fn from(other: BranchSelector) -> Self {
         match other {
-            BranchType::Remote { name } => Self::RemoteBranch { remote: name },
-            BranchType::Local => Self::LocalBranch,
+            BranchSelector::All => Self::Branch,
+            BranchSelector::Remote { name } => Self::RemoteBranch { remote: name },
+            BranchSelector::Local => Self::LocalBranch,
         }
     }
 }

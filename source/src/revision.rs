@@ -20,7 +20,7 @@ use std::convert::TryFrom;
 use nonempty::NonEmpty;
 use serde::{Deserialize, Serialize};
 
-use radicle_surf::vcs::git::{self, BranchType, Browser, Rev};
+use radicle_surf::vcs::git::{self, BranchSelector, Browser, Rev};
 
 use crate::{
     branch::{branches, Branch},
@@ -98,7 +98,7 @@ pub struct Revisions<P, U> {
 }
 
 /// Provide the [`Revisions`] for the given `peer_id`, looking for the
-/// branches as [`BranchType::Remote`].
+/// branches as [`BranchSelector::Remote`].
 ///
 /// If there are no branches then this returns `None`.
 ///
@@ -113,7 +113,7 @@ pub fn remote<P, U>(
 where
     P: Clone + ToString,
 {
-    let remote_branches = branches(browser, Some(into_branch_type(Some(peer_id.clone()))))?;
+    let remote_branches = branches(browser, into_branch_selector(Some(peer_id.clone())))?;
     Ok(
         NonEmpty::from_vec(remote_branches).map(|branches| Revisions {
             peer_id,
@@ -138,7 +138,7 @@ pub fn local<P, U>(browser: &Browser, peer_id: P, user: U) -> Result<Option<Revi
 where
     P: Clone + ToString,
 {
-    let local_branches = branches(browser, Some(BranchType::Local))?;
+    let local_branches = branches(browser, BranchSelector::Local)?;
     let tags = tags(browser)?;
     Ok(
         NonEmpty::from_vec(local_branches).map(|branches| Revisions {
@@ -174,14 +174,15 @@ where
     }
 }
 
-/// Turn an `Option<P>` into a [`BranchType`]. If the `P` is present then this
-/// is set as the remote of the `BranchType`. Otherwise, it's local branch.
+/// Turn an `Option<P>` into a [`BranchSelector`]. If the `P` is present then
+/// this is set as the remote of the `BranchSelector`. Otherwise, it's local
+/// branch.
 #[must_use]
-pub fn into_branch_type<P>(peer_id: Option<P>) -> BranchType
+pub fn into_branch_selector<P>(peer_id: Option<P>) -> BranchSelector
 where
     P: ToString,
 {
-    peer_id.map_or(BranchType::Local, |peer_id| BranchType::Remote {
+    peer_id.map_or(BranchSelector::Local, |peer_id| BranchSelector::Remote {
         // We qualify the remotes as the PeerId + heads, otherwise we would grab the tags too.
         name: Some(format!("{}/heads", peer_id.to_string())),
     })
