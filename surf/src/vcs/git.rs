@@ -134,6 +134,21 @@ pub enum BranchSelector {
     },
 }
 
+/// Turn an `Option<P>` into a [`BranchSelector`]. If the `P` is present then
+/// this is set as the remote of the `BranchSelector`. Otherwise, it's local
+/// branch.
+impl<P> From<Option<P>> for BranchSelector
+where
+    P: ToString,
+{
+    fn from(peer_id: Option<P>) -> Self {
+        peer_id.map_or(BranchSelector::Local, |peer_id| BranchSelector::Remote {
+            // We qualify the remotes as the PeerId + heads, otherwise we would grab the tags too.
+            name: Some(format!("{}/heads", peer_id.to_string())),
+        })
+    }
+}
+
 /// A [`crate::vcs::Browser`] that uses [`Repository`] as the underlying
 /// repository backend, [`git2::Commit`] as the artifact, and [`Error`] for
 /// error reporting.

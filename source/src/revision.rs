@@ -113,7 +113,7 @@ pub fn remote<P, U>(
 where
     P: Clone + ToString,
 {
-    let remote_branches = branches(browser, into_branch_selector(Some(peer_id.clone())))?;
+    let remote_branches = branches(browser, Some(peer_id.clone()).into())?;
     Ok(
         NonEmpty::from_vec(remote_branches).map(|branches| Revisions {
             peer_id,
@@ -172,18 +172,4 @@ where
         Category::Local { peer_id, user } => local(browser, peer_id, user),
         Category::Remote { peer_id, user } => remote(browser, peer_id, user),
     }
-}
-
-/// Turn an `Option<P>` into a [`BranchSelector`]. If the `P` is present then
-/// this is set as the remote of the `BranchSelector`. Otherwise, it's local
-/// branch.
-#[must_use]
-pub fn into_branch_selector<P>(peer_id: Option<P>) -> BranchSelector
-where
-    P: ToString,
-{
-    peer_id.map_or(BranchSelector::Local, |peer_id| BranchSelector::Remote {
-        // We qualify the remotes as the PeerId + heads, otherwise we would grab the tags too.
-        name: Some(format!("{}/heads", peer_id.to_string())),
-    })
 }
