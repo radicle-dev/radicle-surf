@@ -121,6 +121,19 @@ impl From<git2::Buf> for Signature {
     }
 }
 
+/// Select the branches to be listed.
+pub enum BranchSelector {
+    /// List all branches by default.
+    All,
+    /// List only local branches.
+    Local,
+    /// List only remote branches.
+    Remote {
+        /// Name of the remote.
+        name: Option<String>,
+    },
+}
+
 /// A [`crate::vcs::Browser`] that uses [`Repository`] as the underlying
 /// repository backend, [`git2::Commit`] as the artifact, and [`Error`] for
 /// error reporting.
