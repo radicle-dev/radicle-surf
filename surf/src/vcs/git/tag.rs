@@ -75,6 +75,8 @@ pub enum Tag {
     Annotated {
         /// The Object ID for the `Tag`, i.e the SHA1 digest.
         id: Oid,
+        /// The Object ID for the object that is tagged.
+        target_id: Oid,
         /// The name that references this `Tag`.
         name: TagName,
         /// The named author of this `Tag`, if the `Tag` was annotated.
@@ -108,6 +110,8 @@ impl<'repo> TryFrom<git2::Tag<'repo>> for Tag {
     fn try_from(tag: git2::Tag) -> Result<Self, Self::Error> {
         let id = tag.id();
 
+        let target_id = tag.target_id();
+
         let name = TagName::try_from(tag.name_bytes())?;
 
         let tagger = tag.tagger().map(Author::try_from).transpose()?;
@@ -120,6 +124,7 @@ impl<'repo> TryFrom<git2::Tag<'repo>> for Tag {
 
         Ok(Tag::Annotated {
             id,
+            target_id,
             name,
             tagger,
             message,
