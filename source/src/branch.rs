@@ -33,6 +33,12 @@ impl From<String> for Branch {
     }
 }
 
+impl From<git::Branch> for Branch {
+    fn from(branch: git::Branch) -> Self {
+        Self(branch.name.to_string())
+    }
+}
+
 impl fmt::Display for Branch {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)

@@ -27,7 +27,7 @@ use radicle_surf::{
     vcs::git::{self, Browser, Rev},
 };
 
-use crate::{error::Error, person::Person, revision::Revision};
+use crate::{branch::Branch, error::Error, person::Person, revision::Revision};
 
 /// Commit statistics.
 #[derive(Clone, Serialize)]
@@ -47,6 +47,8 @@ pub struct Commit {
     pub stats: Stats,
     /// The changeset introduced by this commit.
     pub diff: diff::Diff,
+    /// The list of branches this commit belongs to.
+    pub branches: Vec<Branch>,
 }
 
 /// Representation of a code commit.
@@ -159,6 +161,12 @@ pub fn commit(browser: &mut Browser<'_>, sha1: git2::Oid) -> Result<Commit, Erro
         }
     }
 
+    let branches = browser
+        .revision_branches(sha1)?
+        .into_iter()
+        .map(Branch::from)
+        .collect();
+
     Ok(Commit {
         header: Header::from(commit),
         stats: Stats {
@@ -166,6 +174,7 @@ pub fn commit(browser: &mut Browser<'_>, sha1: git2::Oid) -> Result<Commit, Erro
             deletions,
         },
         diff,
+        branches,
     })
 }
 
