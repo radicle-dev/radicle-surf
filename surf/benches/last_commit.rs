@@ -22,8 +22,8 @@ use radicle_surf::{
 };
 
 fn last_commit_comparison(c: &mut Criterion) {
-    let repo = Repository::new("./data/git-platinum")
-        .expect("Could not retrieve ./data/git-platinum as git repository");
+    let repo = Repository::new("../data/git-platinum")
+        .expect("Could not retrieve ../data/git-platinum as git repository");
     let browser =
         Browser::new(&repo, Branch::local("master")).expect("Could not initialise Browser");
 
