@@ -18,4 +18,4 @@ Cargo.lock
 
 # This is an inner git repo unpacked (if necessary) from the archive.
 # Git doesn't like nested repos, and we don't really want to use submodules.
-/data/git-platinum
+/surf/data/git-platinum

@@ -15,14 +15,46 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{fs::File, path::Path};
+use std::{
+    env,
+    fs::File,
+    io,
+    path::{Path, PathBuf},
+};
 
 use flate2::read::GzDecoder;
 use tar::Archive;
 
+enum Command {
+    Build(PathBuf),
+    Publish(PathBuf),
+}
+
+impl Command {
+    fn new() -> io::Result<Self> {
+        let current = env::current_dir()?;
+        Ok(if current.ends_with("surf") {
+            Self::Build(current)
+        } else {
+            Self::Publish(PathBuf::from(
+                env::var("OUT_DIR").map_err(|err| io::Error::new(io::ErrorKind::Other, err))?,
+            ))
+        })
+    }
+
+    fn target(&self) -> PathBuf {
+        match self {
+            Self::Build(path) => path.join("data"),
+            Self::Publish(path) => path.join("data"),
+        }
+    }
+}
+
 fn main() {
-    let git_platinum_tarball = "../data/git-platinum.tgz";
-    let target = "../data/";
+    let target = Command::new()
+        .expect("could not determine the cargo command")
+        .target();
+    let git_platinum_tarball = "./data/git-platinum.tgz";
 
     unpack(git_platinum_tarball, target).expect("Failed to unpack git-platinum");
 

@@ -12,6 +12,7 @@ license = "GPL-3.0-or-later"
 include = [
     "**/*.rs",
     "Cargo.toml",
+    "data/git-platinum.tgz",
 ]
 
 [features]

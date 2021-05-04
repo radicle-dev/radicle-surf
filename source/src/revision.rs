@@ -127,7 +127,7 @@ where
 }
 
 /// Provide the [`Revisions`] for the given `peer_id`, looking for the
-/// branches as [`BranchType::Local`].
+/// branches as [`BranchSelector::Local`].
 ///
 /// If there are no branches then this returns `None`.
 ///

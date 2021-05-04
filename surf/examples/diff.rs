@@ -35,7 +35,7 @@ fn main() {
         git::Browser::new(&repo, git::Branch::local("master")).expect("failed to create browser:");
 
     match options.head_revision {
-        HeadRevision::HEAD => {
+        HeadRevision::Head => {
             reset_browser_to_head_or_exit(&mut browser);
         },
         HeadRevision::Commit(id) => {
@@ -148,7 +148,7 @@ struct Options {
 }
 
 enum HeadRevision {
-    HEAD,
+    Head,
     Commit(String),
 }
 
@@ -168,7 +168,7 @@ impl Options {
         let base_revision = args[2].clone();
         let head_revision = {
             if args[3].eq_ignore_ascii_case("HEAD") {
-                HeadRevision::HEAD
+                HeadRevision::Head
             } else {
                 HeadRevision::Commit(args[3].clone())
             }

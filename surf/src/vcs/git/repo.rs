@@ -78,11 +78,10 @@ impl<'a> From<&'a git2::Repository> for RepositoryRef<'a> {
 impl<'a> RepositoryRef<'a> {
     /// What is the current namespace we're browsing in.
     pub fn which_namespace(&self) -> Result<Option<Namespace>, Error> {
-        Ok(self
-            .repo_ref
+        self.repo_ref
             .namespace_bytes()
             .map(Namespace::try_from)
-            .transpose()?)
+            .transpose()
     }
 
     /// List the branches within a repository, filtering out ones that do not
@@ -152,7 +151,7 @@ impl<'a> RepositoryRef<'a> {
             return Err(err);
         }
 
-        Ok(self.to_history(&reference)?)
+        self.to_history(&reference)
     }
 
     /// Get the [`Diff`] between two commits.
