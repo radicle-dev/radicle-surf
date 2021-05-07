@@ -19,7 +19,7 @@ use std::fmt;
 
 use serde::Serialize;
 
-use radicle_surf::vcs::git::Browser;
+use radicle_surf::{git::RefScope, vcs::git::Browser};
 
 use crate::error::Error;
 
@@ -48,7 +48,7 @@ impl fmt::Display for Tag {
 /// Will return [`Error`] if the project doesn't exist or the surf interaction
 /// fails.
 pub fn tags(browser: &Browser<'_>) -> Result<Vec<Tag>, Error> {
-    let tag_names = browser.list_tags()?;
+    let tag_names = browser.list_tags(RefScope::Local)?;
     let mut tags: Vec<Tag> = tag_names
         .into_iter()
         .map(|tag_name| Tag(tag_name.name().to_string()))

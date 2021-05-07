@@ -19,7 +19,7 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use radicle_surf::vcs::git::{self, BranchSelector, Browser};
+use radicle_surf::vcs::git::{self, Browser, RefScope};
 
 use crate::error::Error;
 
@@ -51,7 +51,7 @@ impl fmt::Display for Branch {
 ///
 /// Will return [`Error`] if the project doesn't exist or the surf interaction
 /// fails.
-pub fn branches(browser: &Browser<'_>, filter: BranchSelector) -> Result<Vec<Branch>, Error> {
+pub fn branches(browser: &Browser<'_>, filter: RefScope) -> Result<Vec<Branch>, Error> {
     let mut branches = browser
         .list_branches(filter)?
         .into_iter()
@@ -97,7 +97,7 @@ pub fn local_state(repo_path: &str, default_branch: &str) -> Result<LocalState, 
     };
 
     let mut branches = browser
-        .list_branches(BranchSelector::Local)?
+        .list_branches(RefScope::Local)?
         .into_iter()
         .map(|b| Branch(b.name.name().to_string()))
         .collect::<Vec<Branch>>();

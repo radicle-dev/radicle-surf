@@ -121,28 +121,29 @@ impl From<git2::Buf> for Signature {
     }
 }
 
-/// Select the branches to be listed.
-pub enum BranchSelector {
+/// Determines whether to look for local or remote references or both.
+pub enum RefScope {
     /// List all branches by default.
     All,
     /// List only local branches.
     Local,
     /// List only remote branches.
     Remote {
-        /// Name of the remote.
+        /// Name of the remote. If `None`, then get the reference from all
+        /// remotes.
         name: Option<String>,
     },
 }
 
-/// Turn an `Option<P>` into a [`BranchSelector`]. If the `P` is present then
-/// this is set as the remote of the `BranchSelector`. Otherwise, it's local
+/// Turn an `Option<P>` into a [`RefScope`]. If the `P` is present then
+/// this is set as the remote of the `RefScope`. Otherwise, it's local
 /// branch.
-impl<P> From<Option<P>> for BranchSelector
+impl<P> From<Option<P>> for RefScope
 where
     P: ToString,
 {
     fn from(peer_id: Option<P>) -> Self {
-        peer_id.map_or(BranchSelector::Local, |peer_id| BranchSelector::Remote {
+        peer_id.map_or(RefScope::Local, |peer_id| RefScope::Remote {
             // We qualify the remotes as the PeerId + heads, otherwise we would grab the tags too.
             name: Some(format!("{}/heads", peer_id.to_string())),
         })
@@ -195,7 +196,7 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Browser, Repository, Branch, BranchSelector, BranchName, Namespace};
+    /// use radicle_surf::vcs::git::{Browser, Repository, Branch, RefScope, BranchName, Namespace};
     /// use std::convert::TryFrom;
     /// # use std::error::Error;
     ///
@@ -207,7 +208,7 @@ impl<'a> Browser<'a> {
     ///     Branch::local("master")
     /// )?;
     ///
-    /// let mut branches = browser.list_branches(BranchSelector::Local)?;
+    /// let mut branches = browser.list_branches(RefScope::Local)?;
     /// branches.sort();
     ///
     /// assert_eq!(
@@ -558,7 +559,7 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Branch, BranchSelector, BranchName, Browser, Namespace, Repository};
+    /// use radicle_surf::vcs::git::{Branch, RefScope, BranchName, Browser, Namespace, Repository};
     /// use std::convert::TryFrom;
     /// # use std::error::Error;
     ///
@@ -566,13 +567,13 @@ impl<'a> Browser<'a> {
     /// let repo = Repository::new("./data/git-platinum")?;
     /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
     ///
-    /// let branches = browser.list_branches(BranchSelector::All)?;
+    /// let branches = browser.list_branches(RefScope::All)?;
     ///
     /// // 'master' exists in the list of branches
     /// assert!(branches.contains(&Branch::local("master")));
     ///
     /// // Filter the branches by `Remote` 'origin'.
-    /// let mut branches = browser.list_branches(BranchSelector::Remote {
+    /// let mut branches = browser.list_branches(RefScope::Remote {
     ///     name: Some("origin".to_string())
     /// })?;
     /// branches.sort();
@@ -584,7 +585,7 @@ impl<'a> Browser<'a> {
     /// ]);
     ///
     /// // Filter the branches by all `Remote`s.
-    /// let mut branches = browser.list_branches(BranchSelector::Remote {
+    /// let mut branches = browser.list_branches(RefScope::Remote {
     ///     name: None
     /// })?;
     /// branches.sort();
@@ -600,7 +601,7 @@ impl<'a> Browser<'a> {
     /// // We can also switch namespaces and list the branches in that namespace.
     /// let golden = browser.switch_namespace(&Namespace::try_from("golden")?, Branch::local("master"))?;
     ///
-    /// let mut branches = golden.list_branches(BranchSelector::Local)?;
+    /// let mut branches = golden.list_branches(RefScope::Local)?;
     /// branches.sort();
     ///
     /// assert_eq!(branches, vec![
@@ -611,7 +612,7 @@ impl<'a> Browser<'a> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn list_branches(&self, filter: BranchSelector) -> Result<Vec<Branch>, Error> {
+    pub fn list_branches(&self, filter: RefScope) -> Result<Vec<Branch>, Error> {
         self.repository.list_branches(filter)
     }
 
@@ -625,7 +626,7 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Branch, Browser, Namespace, Oid, Repository, Tag, TagName, Author, Time};
+    /// use radicle_surf::vcs::git::{Branch, RefScope, Browser, Namespace, Oid, Repository, Tag, TagName, Author, Time};
     /// use std::convert::TryFrom;
     /// # use std::error::Error;
     ///
@@ -633,7 +634,7 @@ impl<'a> Browser<'a> {
     /// let repo = Repository::new("./data/git-platinum")?;
     /// let mut browser = Browser::new(&repo, Branch::local("master"))?;
     ///
-    /// let tags = browser.list_tags()?;
+    /// let tags = browser.list_tags(RefScope::Local)?;
     ///
     /// assert_eq!(
     ///     tags,
@@ -641,27 +642,33 @@ impl<'a> Browser<'a> {
     ///         Tag::Light {
     ///             id: Oid::from_str("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3")?,
     ///             name: TagName::new("v0.1.0"),
+    ///             remote: None,
     ///         },
     ///         Tag::Light {
     ///             id: Oid::from_str("2429f097664f9af0c5b7b389ab998b2199ffa977")?,
-    ///             name: TagName::new("v0.2.0")
+    ///             name: TagName::new("v0.2.0"),
+    ///             remote: None,
     ///         },
     ///         Tag::Light {
     ///             id: Oid::from_str("19bec071db6474af89c866a1bd0e4b1ff76e2b97")?,
-    ///             name: TagName::new("v0.3.0")
+    ///             name: TagName::new("v0.3.0"),
+    ///             remote: None,
     ///         },
     ///         Tag::Light {
     ///             id: Oid::from_str("91b69e00cd8e5a07e20942e9e4457d83ce7a3ff1")?,
-    ///             name: TagName::new("v0.4.0")
+    ///             name: TagName::new("v0.4.0"),
+    ///             remote: None,
     ///         },
     ///         Tag::Light {
     ///             id: Oid::from_str("80ded66281a4de2889cc07293a8f10947c6d57fe")?,
-    ///             name: TagName::new("v0.5.0")
+    ///             name: TagName::new("v0.5.0"),
+    ///             remote: None,
     ///         },
     ///         Tag::Annotated {
     ///             id: Oid::from_str("4d1f4af2703074d37cb877f4fdbe36322c8e541d")?,
     ///             target_id: Oid::from_str("d6880352fc7fda8f521ae9b7357668b17bb5bad5")?,
     ///             name: TagName::new("v0.6.0"),
+    ///             remote: None,
     ///             tagger: Some(Author {
     ///               name: "Thomas Scholtes".to_string(),
     ///               email: "thomas@monadic.xyz".to_string(),
@@ -675,23 +682,35 @@ impl<'a> Browser<'a> {
     /// // We can also switch namespaces and list the branches in that namespace.
     /// let golden = browser.switch_namespace(&Namespace::try_from("golden")?, Branch::local("master"))?;
     ///
-    /// let branches = golden.list_tags()?;
+    /// let branches = golden.list_tags(RefScope::Local)?;
     /// assert_eq!(branches, vec![
     ///     Tag::Light {
     ///         id: Oid::from_str("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3")?,
     ///         name: TagName::new("v0.1.0"),
+    ///         remote: None,
     ///     },
     ///     Tag::Light {
     ///         id: Oid::from_str("2429f097664f9af0c5b7b389ab998b2199ffa977")?,
-    ///         name: TagName::new("v0.2.0")
+    ///         name: TagName::new("v0.2.0"),
+    ///         remote: None,
+    ///     },
+    /// ]);
+    /// let golden = golden.switch_namespace(&Namespace::try_from("golden")?, Branch::local("master"))?;
+    ///
+    /// let branches = golden.list_tags(RefScope::Remote { name: Some("kickflip".to_string()) })?;
+    /// assert_eq!(branches, vec![
+    ///     Tag::Light {
+    ///         id: Oid::from_str("d3464e33d75c75c99bfb90fa2e9d16efc0b7d0e3")?,
+    ///         name: TagName::new("v0.1.0"),
+    ///         remote: Some("kickflip".to_string()),
     ///     },
     /// ]);
     /// #
     /// # Ok(())
     /// # }
     /// ```
-    pub fn list_tags(&self) -> Result<Vec<Tag>, Error> {
-        self.repository.list_tags()
+    pub fn list_tags(&self, scope: RefScope) -> Result<Vec<Tag>, Error> {
+        self.repository.list_tags(scope)
     }
 
     /// List the namespaces within a `Browser`, filtering out ones that do not
@@ -994,7 +1013,7 @@ impl<'a> Browser<'a> {
     /// # }
     /// ```
     pub fn get_stats(&self) -> Result<Stats, Error> {
-        let branches = self.list_branches(BranchSelector::Local)?.len();
+        let branches = self.list_branches(RefScope::Local)?.len();
         let commits = self.history.len();
 
         let contributors = self
@@ -1175,13 +1194,13 @@ mod tests {
             assert_eq!(history, browser.history);
 
             let expected_branches: Vec<Branch> = vec![Branch::local("feature/#1194")];
-            let mut branches = browser.list_branches(BranchSelector::Local)?;
+            let mut branches = browser.list_branches(RefScope::Local)?;
             branches.sort();
 
             assert_eq!(expected_branches, branches);
 
             let expected_branches: Vec<Branch> = vec![Branch::remote("feature/#1194", "fein")];
-            let mut branches = browser.list_branches(BranchSelector::Remote {
+            let mut branches = browser.list_branches(RefScope::Remote {
                 name: Some("fein".to_string()),
             })?;
             branches.sort();
@@ -1210,7 +1229,7 @@ mod tests {
 
             let expected_branches: Vec<Branch> =
                 vec![Branch::local("banana"), Branch::local("master")];
-            let mut branches = golden_browser.list_branches(BranchSelector::Local)?;
+            let mut branches = golden_browser.list_branches(RefScope::Local)?;
             branches.sort();
 
             assert_eq!(expected_branches, branches);
@@ -1218,8 +1237,9 @@ mod tests {
             let expected_branches: Vec<Branch> = vec![
                 Branch::remote("fakie/bigspin", "kickflip"),
                 Branch::remote("heelflip", "kickflip"),
+                Branch::remote("v0.1.0", "kickflip"),
             ];
-            let mut branches = golden_browser.list_branches(BranchSelector::Remote {
+            let mut branches = golden_browser.list_branches(RefScope::Remote {
                 name: Some("kickflip".to_string()),
             })?;
             branches.sort();
@@ -1249,7 +1269,7 @@ mod tests {
             assert_ne!(history, silver_browser.history);
 
             let expected_branches: Vec<Branch> = vec![Branch::local("master")];
-            let mut branches = silver_browser.list_branches(BranchSelector::All)?;
+            let mut branches = silver_browser.list_branches(RefScope::All)?;
             branches.sort();
 
             assert_eq!(expected_branches, branches);
@@ -1665,7 +1685,7 @@ mod tests {
             let shared_repo = Mutex::new(Repository::new("./data/git-platinum")?);
             let locked_repo: MutexGuard<Repository> = shared_repo.lock().unwrap();
             let bro = Browser::new(&*locked_repo, Branch::local("master"))?;
-            let mut branches = bro.list_branches(BranchSelector::All)?;
+            let mut branches = bro.list_branches(RefScope::All)?;
             branches.sort();
 
             assert_eq!(

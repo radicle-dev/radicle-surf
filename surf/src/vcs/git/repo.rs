@@ -24,9 +24,9 @@ use crate::{
             error::*,
             reference::{glob::RefGlob, Ref, Rev},
             Branch,
-            BranchSelector,
             Commit,
             Namespace,
+            RefScope,
             Signature,
             Tag,
         },
@@ -90,8 +90,8 @@ impl<'a> RepositoryRef<'a> {
     /// # Errors
     ///
     /// * [`Error::Git`]
-    pub fn list_branches(&self, filter: BranchSelector) -> Result<Vec<Branch>, Error> {
-        RefGlob::from(filter)
+    pub fn list_branches(&self, scope: RefScope) -> Result<Vec<Branch>, Error> {
+        RefGlob::branch(scope)
             .references(&self)?
             .iter()
             .try_fold(vec![], |mut acc, reference| {
@@ -107,8 +107,8 @@ impl<'a> RepositoryRef<'a> {
     /// # Errors
     ///
     /// * [`Error::Git`]
-    pub fn list_tags(&self) -> Result<Vec<Tag>, Error> {
-        RefGlob::Tag
+    pub fn list_tags(&self, scope: RefScope) -> Result<Vec<Tag>, Error> {
+        RefGlob::tag(scope)
             .references(&self)?
             .iter()
             .try_fold(vec![], |mut acc, reference| {

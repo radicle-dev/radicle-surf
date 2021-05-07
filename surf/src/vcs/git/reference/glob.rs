@@ -15,15 +15,18 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::vcs::git::{error, repo::RepositoryRef, BranchSelector};
+use crate::{
+    git::RefScope,
+    vcs::git::{error, repo::RepositoryRef},
+};
 use either::Either;
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RefGlob {
     /// When calling [`RefGlob::references`] this will return the references via
-    /// the glob `refs/tags/*`.
-    Tag,
+    /// the globs `refs/heads/*` and `refs/remotes/**/*`.
+    Branch,
     /// When calling [`RefGlob::references`] this will return the references via
     /// the glob `refs/heads/*`.
     LocalBranch,
@@ -37,20 +40,22 @@ pub enum RefGlob {
         remote: Option<String>,
     },
     /// When calling [`RefGlob::references`] this will return the references via
-    /// the globs `refs/heads/*` and `refs/remotes/**/*`.
-    Branch,
+    /// the globs `refs/tags/*` and `refs/remotes/*/tags`
+    Tag,
+    /// When calling [`RefGlob::references`] this will return the references via
+    /// the glob `refs/tags/*`.
+    LocalTag,
+    /// When calling [`RefGlob::references`] this will return the references via
+    /// either of the following globs:
+    ///     * `refs/remotes/*/tags/*`
+    ///     * `refs/remotes/{remote}/tags/*`
+    RemoteTag {
+        /// If `remote` is `None` then the `*` wildcard will be used, otherwise
+        /// the provided remote name will be used.
+        remote: Option<String>,
+    },
     /// refs/namespaces/**
     Namespace,
-}
-
-impl From<BranchSelector> for RefGlob {
-    fn from(other: BranchSelector) -> Self {
-        match other {
-            BranchSelector::All => Self::Branch,
-            BranchSelector::Remote { name } => Self::RemoteBranch { remote: name },
-            BranchSelector::Local => Self::LocalBranch,
-        }
-    }
 }
 
 /// Iterator chaining multiple [`git2::References`]
@@ -66,6 +71,22 @@ impl<'a> References<'a> {
 }
 
 impl RefGlob {
+    pub fn branch(scope: RefScope) -> Self {
+        match scope {
+            RefScope::All => Self::Branch,
+            RefScope::Local => Self::LocalBranch,
+            RefScope::Remote { name } => Self::RemoteBranch { remote: name },
+        }
+    }
+
+    pub fn tag(scope: RefScope) -> Self {
+        match scope {
+            RefScope::All => Self::Tag,
+            RefScope::Local => Self::LocalTag,
+            RefScope::Remote { name } => Self::RemoteTag { remote: name },
+        }
+    }
+
     pub fn references<'a>(&self, repo: &RepositoryRef<'a>) -> Result<References<'a>, error::Error> {
         let namespace = repo
             .which_namespace()?
@@ -102,6 +123,22 @@ impl RefGlob {
                     inner: vec![remotes, locals],
                 }
             },
+            Self::Tag => {
+                let remotes = repo.repo_ref.references_glob(&format!(
+                    "{}{}",
+                    namespace_glob,
+                    Self::RemoteTag { remote: None }.to_string()
+                ))?;
+
+                let locals = repo.repo_ref.references_glob(&format!(
+                    "{}{}",
+                    namespace_glob,
+                    &Self::LocalTag.to_string()
+                ))?;
+                References {
+                    inner: vec![remotes, locals],
+                }
+            },
             other => References {
                 inner: vec![repo.repo_ref.references_glob(&format!(
                     "{}{}",
@@ -116,7 +153,6 @@ impl RefGlob {
 impl fmt::Display for RefGlob {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Tag => write!(f, "refs/tags/*"),
             Self::LocalBranch => write!(f, "refs/heads/*"),
             Self::RemoteBranch { remote } => {
                 write!(f, "refs/remotes/")?;
@@ -125,14 +161,22 @@ impl fmt::Display for RefGlob {
                     Some(remote) => write!(f, "{}/*", remote),
                 }
             },
+            Self::LocalTag => write!(f, "refs/tags/*"),
+            Self::RemoteTag { remote } => {
+                let remote = match remote {
+                    Some(remote) => remote.as_ref(),
+                    None => "*",
+                };
+                write!(f, "refs/remotes/{}/tags/*", remote)
+            },
             // Note: the glob below would be used, but libgit doesn't care for union globs.
             // write!(f, "refs/{{remotes/**/*,heads/*}}")
-            Self::Branch => {
+            Self::Branch | Self::Tag => {
                 panic!("{}",
-                "fatal: `Display` should not be called on `RefGlob::Branch`. Since this `enum` is
-                private to the repository, it should not be called from the outside.
-                Unfortunately, libgit does not support union of globs
-                otherwise this would display refs/{remotes/**/*,heads/*}"
+                "fatal: `Display` should not be called on `RefGlob::Branch` or `RefGlob::Tag` Since
+                this `enum` is private to the repository, it should not be called from the outside.
+                Unfortunately, libgit does not support union of globs otherwise this would display
+                refs/{remotes/**/*,heads/*}"
             )
             },
             Self::Namespace => write!(f, "refs/namespaces/**"),

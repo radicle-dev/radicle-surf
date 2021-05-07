@@ -70,6 +70,8 @@ pub enum Tag {
         id: Oid,
         /// The name that references this `Tag`.
         name: TagName,
+        /// If the tag is provided this holds the remote’s name.
+        remote: Option<String>,
     },
     /// An annotated git tag.
     Annotated {
@@ -83,6 +85,8 @@ pub enum Tag {
         tagger: Option<Author>,
         /// The message with this `Tag`, if the `Tag` was annotated.
         message: Option<String>,
+        /// If the tag is provided this holds the remote’s name.
+        remote: Option<String>,
     },
 }
 
@@ -128,6 +132,7 @@ impl<'repo> TryFrom<git2::Tag<'repo>> for Tag {
             name,
             tagger,
             message,
+            remote: None,
         })
     }
 }
@@ -138,9 +143,14 @@ impl<'repo> TryFrom<git2::Reference<'repo>> for Tag {
     fn try_from(reference: git2::Reference) -> Result<Self, Self::Error> {
         let name = TagName::try_from(reference.name_bytes())?;
 
-        if !git::ext::is_tag(&reference) {
-            return Err(Error::NotTag(name));
-        }
+        let (remote, name) = if git::ext::is_remote(&reference) {
+            let mut split = name.0.splitn(2, '/');
+            let remote = split.next().map(|x| x.to_owned());
+            let name = split.next().unwrap();
+            (remote, TagName(name.to_owned()))
+        } else {
+            (None, name)
+        };
 
         match reference.peel_to_tag() {
             Ok(tag) => Ok(Tag::try_from(tag)?),
@@ -155,6 +165,7 @@ impl<'repo> TryFrom<git2::Reference<'repo>> for Tag {
                     Ok(Tag::Light {
                         id: commit.id(),
                         name,
+                        remote,
                     })
                 } else {
                     Err(err.into())

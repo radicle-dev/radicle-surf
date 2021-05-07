@@ -20,7 +20,7 @@ use std::convert::TryFrom;
 use nonempty::NonEmpty;
 use serde::{Deserialize, Serialize};
 
-use radicle_surf::vcs::git::{self, BranchSelector, Browser, Rev};
+use radicle_surf::vcs::git::{self, Browser, RefScope, Rev};
 
 use crate::{
     branch::{branches, Branch},
@@ -98,7 +98,7 @@ pub struct Revisions<P, U> {
 }
 
 /// Provide the [`Revisions`] for the given `peer_id`, looking for the
-/// branches as [`BranchSelector::Remote`].
+/// branches as [`RefScope::Remote`].
 ///
 /// If there are no branches then this returns `None`.
 ///
@@ -127,7 +127,7 @@ where
 }
 
 /// Provide the [`Revisions`] for the given `peer_id`, looking for the
-/// branches as [`BranchSelector::Local`].
+/// branches as [`RefScope::Local`].
 ///
 /// If there are no branches then this returns `None`.
 ///
@@ -138,7 +138,7 @@ pub fn local<P, U>(browser: &Browser, peer_id: P, user: U) -> Result<Option<Revi
 where
     P: Clone + ToString,
 {
-    let local_branches = branches(browser, BranchSelector::Local)?;
+    let local_branches = branches(browser, RefScope::Local)?;
     let tags = tags(browser)?;
     Ok(
         NonEmpty::from_vec(local_branches).map(|branches| Revisions {
