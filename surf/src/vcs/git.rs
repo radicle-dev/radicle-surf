@@ -1046,6 +1046,22 @@ impl<'a> Browser<'a> {
         file_paths_or_error
     }
 
+    /// Find the best common ancestor between two commits if it exists.
+    ///
+    /// See [`git2::Repository::merge_base`] for details.
+    pub fn merge_base(&self, one: Oid, two: Oid) -> Result<Option<Oid>, Error> {
+        match self.repository.repo_ref.merge_base(one, two) {
+            Ok(merge_base) => Ok(Some(merge_base)),
+            Err(err) => {
+                if err.code() == git2::ErrorCode::NotFound {
+                    Ok(None)
+                } else {
+                    Err(Error::Git(err))
+                }
+            },
+        }
+    }
+
     fn update_file_map(
         path: file_system::Path,
         name: file_system::Label,
