@@ -624,7 +624,7 @@ impl<'a> Browser<'a> {
     /// # Examples
     ///
     /// ```
-    /// use radicle_surf::vcs::git::{Branch, Browser, Namespace, Oid, Repository, Tag, TagName};
+    /// use radicle_surf::vcs::git::{Branch, Browser, Namespace, Oid, Repository, Tag, TagName, Author, Time};
     /// use std::convert::TryFrom;
     /// # use std::error::Error;
     ///
@@ -656,6 +656,17 @@ impl<'a> Browser<'a> {
     ///         Tag::Light {
     ///             id: Oid::from_str("80ded66281a4de2889cc07293a8f10947c6d57fe")?,
     ///             name: TagName::new("v0.5.0")
+    ///         },
+    ///         Tag::Annotated {
+    ///             id: Oid::from_str("4d1f4af2703074d37cb877f4fdbe36322c8e541d")?,
+    ///             target_id: Oid::from_str("d6880352fc7fda8f521ae9b7357668b17bb5bad5")?,
+    ///             name: TagName::new("v0.6.0"),
+    ///             tagger: Some(Author {
+    ///               name: "Thomas Scholtes".to_string(),
+    ///               email: "thomas@monadic.xyz".to_string(),
+    ///               time: Time::new(1620740737, 120),
+    ///             }),
+    ///             message: Some("An annotated tag message for v0.6.0\n".to_string())
     ///         },
     ///     ]
     /// );

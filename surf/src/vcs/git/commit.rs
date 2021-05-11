@@ -32,11 +32,17 @@ pub struct Author {
 
 impl std::fmt::Debug for Author {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Signature {{ name: {}, email: {} }}",
-            self.name, self.email
-        )
+        use std::cmp::Ordering;
+        let time = match self.time.offset_minutes().cmp(&0) {
+            Ordering::Equal => format!("{}", self.time.seconds()),
+            Ordering::Greater => format!("{}+{}", self.time.seconds(), self.time.offset_minutes()),
+            Ordering::Less => format!("{}{}", self.time.seconds(), self.time.offset_minutes()),
+        };
+        f.debug_struct("Author")
+            .field("name", &self.name)
+            .field("email", &self.email)
+            .field("time", &time)
+            .finish()
     }
 }
 
