@@ -1,11 +1,20 @@
-# Updating [git-platinum](https://github.com/radicle-dev/git-platinum) Just `cd`
-into the repo root, then run `scripts/update-git-platinum.sh`.  This will update
-the tarball and it's necessary to commit the change. We provide a template below
-so that we can easily identify changes to `git-platinum`. Please fill in the
-details that follow a comment (`#`):
+# Updating [git-platinum][]
+
+1. Push your changes to [`radicle-dev/git-platinum`][git-platinum] and/or update
+   `surf/data/mock-branches.txt`.
+2. Run `scripts/update-git-platinum.sh` from the repo root. This updates
+   `surf/data/git-platinum.tgz`.
+3. Run the tests
+4. Commit your changes. We provide a template below so that we can easily
+   identify changes to `git-platinum`. Please fill in the details that follow a
+   comment (`#`):
+   ```
+   data/git-platinum: # short reason for updating
+
+   # provide a longer reason for making changes to git-platinum
+   # as well as what has changed.
+   ```
 
 
-    data/git-platinum: # short reason for updating
 
-    # provide a longer reason for making changes to git-platinum
-    # as well as what has changed.
+[git-platinum]: https://github.com/radicle-dev/git-platinum
