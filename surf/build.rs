@@ -17,6 +17,7 @@
 
 use std::{
     env,
+    fs,
     fs::File,
     io,
     path::{Path, PathBuf},
@@ -62,6 +63,10 @@ fn main() {
 }
 
 fn unpack(archive_path: impl AsRef<Path>, target: impl AsRef<Path>) -> Result<(), std::io::Error> {
+    let content = target.as_ref().join("git-platinum");
+    if content.exists() {
+        fs::remove_dir_all(content)?;
+    }
     let tar_gz = File::open(archive_path.as_ref())?;
     let tar = GzDecoder::new(tar_gz);
     let mut archive = Archive::new(tar);
