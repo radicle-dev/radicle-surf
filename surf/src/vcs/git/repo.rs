@@ -30,7 +30,7 @@ use crate::{
             Signature,
             Tag,
         },
-        VCS,
+        Vcs,
     },
 };
 use git2::Oid;
@@ -355,7 +355,7 @@ impl<'a> RepositoryRef<'a> {
     }
 }
 
-impl<'a> VCS<Commit, Error> for RepositoryRef<'a> {
+impl<'a> Vcs<Commit, Error> for RepositoryRef<'a> {
     type HistoryId = Rev;
     type ArtefactId = Oid;
 
@@ -422,7 +422,7 @@ impl<'a> From<&'a Repository> for RepositoryRef<'a> {
     }
 }
 
-impl vcs::GetVCS<Error> for Repository {
+impl vcs::GetVcs<Error> for Repository {
     type RepoId = String;
 
     fn get_repo(repo_id: Self::RepoId) -> Result<Self, Error> {

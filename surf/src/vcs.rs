@@ -16,7 +16,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 //! A model of a general VCS. The components consist of a [`History`], a
-//! [`Browser`], and a [`VCS`] trait.
+//! [`Browser`], and a [`Vcs`] trait.
 
 use crate::file_system::directory::Directory;
 use nonempty::NonEmpty;
@@ -186,9 +186,9 @@ impl<Repo, A, Error> Browser<Repo, A, Error> {
     }
 }
 
-impl<Repo, A, Error> VCS<A, Error> for Browser<Repo, A, Error>
+impl<Repo, A, Error> Vcs<A, Error> for Browser<Repo, A, Error>
 where
-    Repo: VCS<A, Error>,
+    Repo: Vcs<A, Error>,
 {
     type HistoryId = Repo::HistoryId;
     type ArtefactId = Repo::ArtefactId;
@@ -206,7 +206,7 @@ where
     }
 }
 
-pub(crate) trait GetVCS<Error>
+pub(crate) trait GetVcs<Error>
 where
     Self: Sized,
 {
@@ -220,7 +220,7 @@ where
 /// The `VCS` trait encapsulates the minimal amount of information for
 /// interacting with some notion of `History` from a given
 /// Version-Control-System.
-pub trait VCS<A, Error> {
+pub trait Vcs<A, Error> {
     /// The way to identify a History.
     type HistoryId;
 

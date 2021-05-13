@@ -102,7 +102,7 @@ use crate::{
     file_system,
     file_system::directory,
     vcs,
-    vcs::{git::error::*, VCS},
+    vcs::{git::error::*, Vcs},
 };
 use nonempty::NonEmpty;
 use std::{
