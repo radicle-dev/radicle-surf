@@ -593,6 +593,7 @@ impl<'a> Browser<'a> {
     ///     Branch::remote("HEAD", "origin"),
     ///     Branch::remote("dev", "origin"),
     ///     Branch::remote("master", "origin"),
+    ///     Branch::remote("orange/pineapple", "banana"),
     ///     Branch::remote("pineapple", "banana"),
     /// ]);
     ///
@@ -939,6 +940,7 @@ impl<'a> Browser<'a> {
     ///         Branch::remote("dev", "origin"),
     ///         Branch::local("master"),
     ///         Branch::remote("master", "origin"),
+    ///         Branch::remote("orange/pineapple", "banana"),
     ///         Branch::remote("pineapple", "banana"),
     ///     ]
     /// );
@@ -1674,6 +1676,7 @@ mod tests {
                     Branch::local("dev"),
                     Branch::remote("master", "origin"),
                     Branch::local("master"),
+                    Branch::remote("orange/pineapple", "banana"),
                     Branch::remote("pineapple", "banana"),
                 ]
             );
