@@ -581,6 +581,7 @@ impl<'a> Browser<'a> {
     ///     Branch::remote("HEAD", "origin"),
     ///     Branch::remote("dev", "origin"),
     ///     Branch::remote("master", "origin"),
+    ///     Branch::remote("with/slashes", "origin"),
     /// ]);
     ///
     /// // Filter the branches by all `Remote`s.
@@ -940,6 +941,7 @@ impl<'a> Browser<'a> {
     ///         Branch::local("master"),
     ///         Branch::remote("master", "origin"),
     ///         Branch::remote("pineapple", "banana"),
+    ///         Branch::remote("with/slashes", "origin"),
     ///     ]
     /// );
     ///
@@ -1675,6 +1677,7 @@ mod tests {
                     Branch::remote("master", "origin"),
                     Branch::local("master"),
                     Branch::remote("pineapple", "banana"),
+                    Branch::remote("with/slashes", "origin"),
                 ]
             );
 

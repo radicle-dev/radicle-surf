@@ -8,3 +8,4 @@ refs/namespaces/golden/refs/namespaces/silver/refs/heads/master,refs/heads/dev
 refs/remotes/banana/pineapple,refs/remotes/origin/master
 refs/namespaces/me/refs/heads/feature/#1194,refs/heads/master
 refs/namespaces/me/refs/remotes/fein/heads/feature/#1194,refs/heads/dev
+refs/remotes/origin/with/slashes,refs/remotes/origin/master
