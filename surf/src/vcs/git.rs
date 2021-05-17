@@ -595,6 +595,7 @@ impl<'a> Browser<'a> {
     ///     Branch::remote("dev", "origin"),
     ///     Branch::remote("master", "origin"),
     ///     Branch::remote("pineapple", "banana"),
+    ///     Branch::remote("with/slashes", "origin"),
     /// ]);
     ///
     /// // We can also switch namespaces and list the branches in that namespace.
