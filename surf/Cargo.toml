@@ -2,7 +2,7 @@
 name = "radicle-surf"
 description = "A code surfing library for VCS file systems"
 readme = "README.md"
-version = "0.5.5"
+version = "0.6.0"
 authors = ["The Radicle Team <dev@radicle.xyz>"]
 edition = "2018"
 homepage = "https://github.com/radicle-dev/radicle-surf"
