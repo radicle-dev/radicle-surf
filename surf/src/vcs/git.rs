@@ -238,7 +238,7 @@ impl<'a> Browser<'a> {
 
     fn init(repository: RepositoryRef<'a>, history: History) -> Self {
         let snapshot = Box::new(|repository: &RepositoryRef<'a>, history: &History| {
-            let tree = Self::get_tree(&repository.repo_ref, history.0.first())?;
+            let tree = Self::get_tree(repository.repo_ref, history.0.first())?;
             Ok(directory::Directory::from_hash_map(tree))
         });
         vcs::Browser {
@@ -364,7 +364,7 @@ impl<'a> Browser<'a> {
     pub fn branch(&mut self, branch: Branch) -> Result<(), Error> {
         let name = BranchName(branch.name());
         self.set(self.repository.reference(branch, |reference| {
-            let is_branch = ext::is_branch(&reference) || reference.is_remote();
+            let is_branch = ext::is_branch(reference) || reference.is_remote();
             if !is_branch {
                 Some(Error::NotBranch(name))
             } else {
@@ -416,7 +416,7 @@ impl<'a> Browser<'a> {
     pub fn tag(&mut self, tag_name: TagName) -> Result<(), Error> {
         let name = tag_name.clone();
         self.set(self.repository.reference(tag_name, |reference| {
-            if !ext::is_tag(&reference) {
+            if !ext::is_tag(reference) {
                 Some(Error::NotTag(name))
             } else {
                 None
@@ -1051,7 +1051,7 @@ impl<'a> Browser<'a> {
             |s, entry| match Self::tree_entry_to_file_and_path(repo, s, entry) {
                 Ok((path, name, file)) => {
                     match file_paths_or_error.as_mut() {
-                        Ok(mut files) => Self::update_file_map(path, name, file, &mut files),
+                        Ok(files) => Self::update_file_map(path, name, file, files),
 
                         // We don't need to update, we want to keep the error.
                         Err(_err) => {},

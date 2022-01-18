@@ -92,7 +92,7 @@ impl<'a> RepositoryRef<'a> {
     /// * [`Error::Git`]
     pub fn list_branches(&self, scope: RefScope) -> Result<Vec<Branch>, Error> {
         RefGlob::branch(scope)
-            .references(&self)?
+            .references(self)?
             .iter()
             .try_fold(vec![], |mut acc, reference| {
                 let branch = Branch::try_from(reference?)?;
@@ -109,7 +109,7 @@ impl<'a> RepositoryRef<'a> {
     /// * [`Error::Git`]
     pub fn list_tags(&self, scope: RefScope) -> Result<Vec<Tag>, Error> {
         RefGlob::tag(scope)
-            .references(&self)?
+            .references(self)?
             .iter()
             .try_fold(vec![], |mut acc, reference| {
                 let tag = Tag::try_from(reference?)?;
@@ -126,7 +126,7 @@ impl<'a> RepositoryRef<'a> {
     /// * [`Error::Git`]
     pub fn list_namespaces(&self) -> Result<Vec<Namespace>, Error> {
         let namespaces: Result<HashSet<Namespace>, Error> = RefGlob::Namespace
-            .references(&self)?
+            .references(self)?
             .iter()
             .try_fold(HashSet::new(), |mut acc, reference| {
                 let namespace = Namespace::try_from(reference?)?;
@@ -145,7 +145,7 @@ impl<'a> RepositoryRef<'a> {
             None => reference.into(),
             Some(namespace) => reference.into().namespaced(namespace),
         }
-        .find_ref(&self)?;
+        .find_ref(self)?;
 
         if let Some(err) = check(&reference) {
             return Err(err);
@@ -173,7 +173,7 @@ impl<'a> RepositoryRef<'a> {
     pub(super) fn rev_to_commit(&self, rev: &Rev) -> Result<git2::Commit, Error> {
         match rev {
             Rev::Oid(oid) => Ok(self.repo_ref.find_commit(*oid)?),
-            Rev::Ref(reference) => Ok(reference.find_ref(&self)?.peel_to_commit()?),
+            Rev::Ref(reference) => Ok(reference.find_ref(self)?.peel_to_commit()?),
         }
     }
 
@@ -264,7 +264,7 @@ impl<'a> RepositoryRef<'a> {
 
         references.try_for_each(|reference| {
             let reference = reference?;
-            self.reachable_from(&reference, &oid).and_then(|contains| {
+            self.reachable_from(&reference, oid).and_then(|contains| {
                 if contains {
                     let branch = Branch::try_from(reference)?;
                     contained_branches.push(branch);

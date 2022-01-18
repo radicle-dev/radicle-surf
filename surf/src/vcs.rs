@@ -111,7 +111,7 @@ impl<A> History<A> {
     {
         self.iter()
             .find(|artifact| {
-                let current_id = id_of(&artifact);
+                let current_id = id_of(artifact);
                 *identifier == current_id
             })
             .cloned()

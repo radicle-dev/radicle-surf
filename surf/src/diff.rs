@@ -217,7 +217,8 @@ impl Diff {
 
     // TODO: Direction of comparison is not obvious with this signature.
     // For now using conventional approach with the right being "newer".
-    pub fn diff(left: Directory, right: Directory) -> Result<Diff, DiffError> {
+    #[allow(clippy::self_named_constructors)]
+    pub fn diff(left: Directory, right: Directory) -> Result<Self, DiffError> {
         let mut diff = Diff::new();
         let path = Rc::new(RefCell::new(Path::from_labels(right.current(), &[])));
         Diff::collect_diff(&left, &right, &path, &mut diff)?;
@@ -437,7 +438,7 @@ impl Diff {
         parent_path: &Rc<RefCell<Path>>,
     ) -> Result<(), String> {
         let mut new_files: Vec<CreateFile> =
-            Diff::collect_files_from_entry(dc, &parent_path, CreateFile)?;
+            Diff::collect_files_from_entry(dc, parent_path, CreateFile)?;
         self.created.append(&mut new_files);
         Ok(())
     }
@@ -452,7 +453,7 @@ impl Diff {
         parent_path: &Rc<RefCell<Path>>,
     ) -> Result<(), String> {
         let mut new_files: Vec<DeleteFile> =
-            Diff::collect_files_from_entry(dc, &parent_path, DeleteFile)?;
+            Diff::collect_files_from_entry(dc, parent_path, DeleteFile)?;
         self.deleted.append(&mut new_files);
         Ok(())
     }
