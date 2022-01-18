@@ -96,7 +96,7 @@ impl From<&git::Commit> for Header {
                 name: commit.committer.name.clone(),
                 email: commit.committer.email.clone(),
             },
-            committer_time: commit.author.time,
+            committer_time: commit.committer.time,
         }
     }
 }
