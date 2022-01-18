@@ -111,13 +111,13 @@ impl RefGlob {
                 let remotes = repo.repo_ref.references_glob(&format!(
                     "{}{}",
                     namespace_glob,
-                    Self::RemoteBranch { remote: None }.to_string()
+                    Self::RemoteBranch { remote: None }
                 ))?;
 
                 let locals = repo.repo_ref.references_glob(&format!(
                     "{}{}",
                     namespace_glob,
-                    &Self::LocalBranch.to_string()
+                    &Self::LocalBranch
                 ))?;
                 References {
                     inner: vec![remotes, locals],
@@ -127,24 +127,22 @@ impl RefGlob {
                 let remotes = repo.repo_ref.references_glob(&format!(
                     "{}{}",
                     namespace_glob,
-                    Self::RemoteTag { remote: None }.to_string()
+                    Self::RemoteTag { remote: None }
                 ))?;
 
                 let locals = repo.repo_ref.references_glob(&format!(
                     "{}{}",
                     namespace_glob,
-                    &Self::LocalTag.to_string()
+                    &Self::LocalTag
                 ))?;
                 References {
                     inner: vec![remotes, locals],
                 }
             },
             other => References {
-                inner: vec![repo.repo_ref.references_glob(&format!(
-                    "{}{}",
-                    namespace_glob,
-                    other.to_string()
-                ))?],
+                inner: vec![repo
+                    .repo_ref
+                    .references_glob(&format!("{}{}", namespace_glob, other,))?],
             },
         })
     }

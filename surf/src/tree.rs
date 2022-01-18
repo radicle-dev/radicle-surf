@@ -101,14 +101,14 @@ impl<K, A> SubTree<K, A> {
                 SubTree::Node {
                     value: other_value, ..
                 },
-            ) => f(&value, &other_value),
+            ) => f(value, other_value),
             (SubTree::Branch { forest, .. }, SubTree::Node { value, .. }) => {
                 let max_forest = forest.maximum_by(f);
-                f(&max_forest, &value)
+                f(max_forest, value)
             },
             (SubTree::Node { value, .. }, SubTree::Branch { forest, .. }) => {
                 let max_forest = &forest.maximum_by(f);
-                f(&value, &max_forest)
+                f(value, max_forest)
             },
             (
                 SubTree::Branch { forest, .. },
@@ -119,7 +119,7 @@ impl<K, A> SubTree<K, A> {
             ) => {
                 let max_forest = forest.maximum_by(f);
                 let max_other_forest = other_forest.maximum_by(f);
-                f(&max_forest, &max_other_forest)
+                f(max_forest, max_other_forest)
             },
         }
     }
