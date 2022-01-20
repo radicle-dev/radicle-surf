@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -eoux pipefail
+
+cargo build --workspace
+GIT_FIXTURES=1 cargo test --workspace --features serialize --features gh-actions

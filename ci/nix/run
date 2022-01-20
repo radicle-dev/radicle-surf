@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eou pipefail
 
-./ci/fmt
+./ci/nix/fmt
 ./ci/lint
 ./ci/build-test
 ./ci/docs
