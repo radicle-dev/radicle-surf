@@ -1489,6 +1489,7 @@ mod tests {
         }
 
         #[test]
+        #[cfg(not(windows))]
         fn can_get_last_commit_for_special_filenames() {
             let repo = Repository::new("./data/git-platinum")
                 .expect("Could not retrieve ./data/git-platinum as git repository");
