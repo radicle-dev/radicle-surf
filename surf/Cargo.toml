@@ -17,6 +17,11 @@ include = [
 
 [features]
 serialize = ["serde"]
+# NOTE: testing `test_submodule_failure` on GH actions
+# is painful since it uses this specific repo and expects
+# certain branches to be setup. So we use this feature flag
+# to ignore the test on CI.
+gh-actions = []
 
 [dependencies]
 either = "1.5"

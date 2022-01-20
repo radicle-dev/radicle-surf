@@ -1145,6 +1145,7 @@ impl<'a> Browser<'a> {
 mod tests {
     use super::*;
 
+    #[cfg(not(feature = "gh-actions"))]
     #[test]
     // An issue with submodules, see: https://github.com/radicle-dev/radicle-surf/issues/54
     fn test_submodule_failure() {
