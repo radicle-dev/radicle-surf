@@ -23,6 +23,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use anyhow::Context as _;
 use flate2::read::GzDecoder;
 use tar::Archive;
 
@@ -62,15 +63,19 @@ fn main() {
     println!("cargo:rerun-if-changed={}", git_platinum_tarball);
 }
 
-fn unpack(archive_path: impl AsRef<Path>, target: impl AsRef<Path>) -> Result<(), std::io::Error> {
+fn unpack(archive_path: impl AsRef<Path>, target: impl AsRef<Path>) -> anyhow::Result<()> {
     let content = target.as_ref().join("git-platinum");
     if content.exists() {
-        fs::remove_dir_all(content)?;
+        fs::remove_dir_all(content).context("attempting to remove git-platinum")?;
     }
-    let tar_gz = File::open(archive_path.as_ref())?;
+    let archive_path = archive_path.as_ref();
+    let tar_gz = File::open(archive_path).context(format!(
+        "attempting to open file: {}",
+        archive_path.display()
+    ))?;
     let tar = GzDecoder::new(tar_gz);
     let mut archive = Archive::new(tar);
-    archive.unpack(target)?;
+    archive.unpack(target).context("attempting to unpack")?;
 
     Ok(())
 }
