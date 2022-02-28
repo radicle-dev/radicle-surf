@@ -94,9 +94,22 @@ pub struct CopyFile {
     serde(rename_all = "camelCase")
 )]
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub enum EofNewLine {
+    OldMissing,
+    NewMissing,
+    BothMissing,
+}
+
+#[cfg_attr(
+    feature = "serialize",
+    derive(Serialize),
+    serde(rename_all = "camelCase")
+)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ModifiedFile {
     pub path: Path,
     pub diff: FileDiff,
+    pub eof: Option<EofNewLine>,
 }
 
 /// A set of changes belonging to one file.
@@ -274,7 +287,7 @@ impl Diff {
                                     let mut path = parent_path.borrow().clone();
                                     path.push(new_file_name.clone());
 
-                                    diff.add_modified_file(path, vec![]);
+                                    diff.add_modified_file(path, vec![], None);
                                 }
                                 old_entry_opt = old_iter.next();
                                 new_entry_opt = new_iter.next();
@@ -403,13 +416,19 @@ impl Diff {
         Ok(())
     }
 
-    pub(crate) fn add_modified_file(&mut self, path: Path, hunks: Vec<Hunk>) {
+    pub(crate) fn add_modified_file(
+        &mut self,
+        path: Path,
+        hunks: Vec<Hunk>,
+        eof: Option<EofNewLine>,
+    ) {
         // TODO: file diff can be calculated at this point
         // Use pijul's transaction diff as an inspiration?
         // https://nest.pijul.com/pijul_org/pijul:master/1468b7281a6f3785e9#anesp4Qdq3V
         self.modified.push(ModifiedFile {
             path,
             diff: FileDiff::Plain { hunks },
+            eof,
         });
     }
 
@@ -425,6 +444,7 @@ impl Diff {
         self.modified.push(ModifiedFile {
             path,
             diff: FileDiff::Binary,
+            eof: None,
         });
     }
 
@@ -544,6 +564,7 @@ mod tests {
             modified: vec![ModifiedFile {
                 path: Path::with_root(&[unsound::label::new("banana.rs")]),
                 diff: FileDiff::Plain { hunks: vec![] },
+                eof: None,
             }],
         };
 
@@ -629,6 +650,7 @@ mod tests {
                     unsound::label::new("banana.rs"),
                 ]),
                 diff: FileDiff::Plain { hunks: vec![] },
+                eof: None,
             }],
         };
 

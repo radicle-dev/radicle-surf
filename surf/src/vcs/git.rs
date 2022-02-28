@@ -1598,7 +1598,8 @@ mod tests {
                                 LineDiff::addition(b"[`radicle-surf`](https://github.com/radicle-dev/git-platinum) unit tests.\n".to_vec(), 2),
                             ]
                         }]
-                    }
+                    },
+                    eof: None,
                 }]
             };
             assert_eq!(expected_diff, diff);
@@ -1633,10 +1634,12 @@ mod tests {
                                 LineDiff::context(b"\n".to_vec(), 3, 4),
                             ]
                         }]
-                    }
+                    },
+                    eof: None,
                 }]
             };
 
+            let eof: Option<u8> = None;
             let json = serde_json::json!({
                 "created": ["LICENSE"],
                 "deleted": [],
@@ -1667,7 +1670,8 @@ mod tests {
                                 }
                             ]
                         }]
-                    }
+                    },
+                    "eof" : eof,
                 }]
             });
             assert_eq!(serde_json::to_value(&diff).unwrap(), json);

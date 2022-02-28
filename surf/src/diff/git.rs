@@ -20,7 +20,7 @@ use std::convert::TryFrom;
 use thiserror::Error;
 
 use crate::{
-    diff::{self, Diff, Hunk, Line, LineDiff},
+    diff::{self, Diff, EofNewLine, Hunk, Line, LineDiff},
     file_system::Path,
     vcs,
 };
@@ -89,6 +89,8 @@ impl<'a> TryFrom<git2::Diff<'a>> for Diff {
 
                     if let Some(patch) = patch {
                         let mut hunks: Vec<Hunk> = Vec::new();
+                        let mut old_missing_eof = false;
+                        let mut new_missing_eof = false;
 
                         for h in 0..patch.num_hunks() {
                             let (hunk, hunk_lines) = patch.hunk(h)?;
@@ -97,12 +99,34 @@ impl<'a> TryFrom<git2::Diff<'a>> for Diff {
 
                             for l in 0..hunk_lines {
                                 let line = patch.line_in_hunk(h, l)?;
+                                match line.origin_value() {
+                                    git2::DiffLineType::ContextEOFNL => {
+                                        new_missing_eof = true;
+                                        old_missing_eof = true;
+                                        continue;
+                                    },
+                                    git2::DiffLineType::AddEOFNL => {
+                                        old_missing_eof = true;
+                                        continue;
+                                    },
+                                    git2::DiffLineType::DeleteEOFNL => {
+                                        new_missing_eof = true;
+                                        continue;
+                                    },
+                                    _ => {},
+                                }
                                 let line = LineDiff::try_from(line)?;
                                 lines.push(line);
                             }
                             hunks.push(Hunk { header, lines });
                         }
-                        diff.add_modified_file(path, hunks);
+                        let eof = match (old_missing_eof, new_missing_eof) {
+                            (true, true) => Some(EofNewLine::BothMissing),
+                            (true, false) => Some(EofNewLine::OldMissing),
+                            (false, true) => Some(EofNewLine::NewMissing),
+                            (false, false) => None,
+                        };
+                        diff.add_modified_file(path, hunks, eof);
                     } else if diff_file.is_binary() {
                         diff.add_modified_binary_file(path);
                     } else {
@@ -146,5 +170,80 @@ impl<'a> TryFrom<git2::Diff<'a>> for Diff {
         }
 
         Ok(diff)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_both_missing_eof_newline() {
+        let buf = r#"
+diff --git a/.env b/.env
+index f89e4c0..7c56eb7 100644
+--- a/.env
++++ b/.env
+@@ -1 +1 @@
+-hello=123
+\ No newline at end of file
++hello=1234
+\ No newline at end of file
+"#;
+        let diff = git2::Diff::from_buffer(buf.as_bytes()).unwrap();
+        let diff = Diff::try_from(diff).unwrap();
+        assert_eq!(diff.modified[0].eof, Some(EofNewLine::BothMissing));
+    }
+
+    #[test]
+    fn test_none_missing_eof_newline() {
+        let buf = r#"
+diff --git a/.env b/.env
+index f89e4c0..7c56eb7 100644
+--- a/.env
++++ b/.env
+@@ -1 +1 @@
+-hello=123
++hello=1234
+"#;
+        let diff = git2::Diff::from_buffer(buf.as_bytes()).unwrap();
+        let diff = Diff::try_from(diff).unwrap();
+        assert_eq!(diff.modified[0].eof, None);
+    }
+
+    // TODO(xphoniex): uncomment once libgit2 has fixed the bug
+    //#[test]
+    fn test_old_missing_eof_newline() {
+        let buf = r#"
+diff --git a/.env b/.env
+index f89e4c0..7c56eb7 100644
+--- a/.env
++++ b/.env
+@@ -1 +1 @@
+-hello=123
+\ No newline at end of file
++hello=1234
+"#;
+        let diff = git2::Diff::from_buffer(buf.as_bytes()).unwrap();
+        let diff = Diff::try_from(diff).unwrap();
+        assert_eq!(diff.modified[0].eof, Some(EofNewLine::OldMissing));
+    }
+
+    // TODO(xphoniex): uncomment once libgit2 has fixed the bug
+    //#[test]
+    fn test_new_missing_eof_newline() {
+        let buf = r#"
+diff --git a/.env b/.env
+index f89e4c0..7c56eb7 100644
+--- a/.env
++++ b/.env
+@@ -1 +1 @@
+-hello=123
++hello=1234
+\ No newline at end of file
+"#;
+        let diff = git2::Diff::from_buffer(buf.as_bytes()).unwrap();
+        let diff = Diff::try_from(diff).unwrap();
+        assert_eq!(diff.modified[0].eof, Some(EofNewLine::NewMissing));
     }
 }
