@@ -177,8 +177,7 @@ impl git2::IntoCString for Path {
                 // If we have a label such as 'faux\path' we need to double escape it for
                 // `git2::DiffOptions::pathspec` to work properly. As far as we're aware this is
                 // the only use of IntoCString for Path.
-                let label = p.label.replace("\\", "\\\\");
-
+                let label = p.label.replace('\\', "\\\\");
                 pathspec.push_str(&format!("{}/", label));
             }
             let pathspec = pathspec.trim_end_matches('/');
