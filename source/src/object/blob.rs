@@ -82,8 +82,8 @@ impl Serialize for Blob {
 /// Variants of blob content.
 #[derive(PartialEq)]
 pub enum BlobContent {
-    /// Content is ASCII and can be passed as a string.
-    Ascii(String),
+    /// Content is plain text and can be passed as a string.
+    Plain(String),
     /// Content is syntax-highlighted HTML.
     ///
     /// Note that is necessary to enable the `syntax` feature flag for this
@@ -100,7 +100,7 @@ impl Serialize for BlobContent {
         S: Serializer,
     {
         match self {
-            Self::Ascii(content) | Self::Html(content) => serializer.serialize_str(content),
+            Self::Plain(content) | Self::Html(content) => serializer.serialize_str(content),
             Self::Binary => serializer.serialize_none(),
         }
     }
@@ -120,7 +120,7 @@ pub fn blob<P>(
 where
     P: ToString,
 {
-    make_blob(browser, maybe_revision, path, ascii)
+    make_blob(browser, maybe_revision, path, content)
 }
 
 fn make_blob<P, C>(
@@ -166,11 +166,10 @@ where
     })
 }
 
-/// Return a [`BlobContent`] given a file path, content and theme. Attempts to
-/// perform syntax highlighting when the theme is `Some`.
-fn ascii(content: &[u8]) -> BlobContent {
+/// Return a [`BlobContent`] given a byte slice.
+fn content(content: &[u8]) -> BlobContent {
     match str::from_utf8(content) {
-        Ok(content) => BlobContent::Ascii(content.to_owned()),
+        Ok(utf8) => BlobContent::Plain(utf8.to_owned()),
         Err(_) => BlobContent::Binary,
     }
 }
@@ -208,9 +207,9 @@ pub mod highlighting {
         };
 
         match theme_name {
-            None => BlobContent::Ascii(content.to_owned()),
+            None => BlobContent::Plain(content.to_owned()),
             Some(theme) => syntax::highlight(path, content, theme)
-                .map_or_else(|| BlobContent::Ascii(content.to_owned()), BlobContent::Html),
+                .map_or_else(|| BlobContent::Plain(content.to_owned()), BlobContent::Html),
         }
     }
 }
