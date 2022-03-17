@@ -12,6 +12,7 @@ license = "GPL-3.0-or-later"
 syntax = ["syntect"]
 
 [dependencies]
+base64 = "0.13"
 log = "0.4"
 lazy_static = "1.4"
 nonempty = "0.6"

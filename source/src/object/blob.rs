@@ -54,7 +54,7 @@ impl Blob {
     /// Indicates if the content of the [`Blob`] is binary.
     #[must_use]
     pub fn is_binary(&self) -> bool {
-        self.content == BlobContent::Binary
+        matches!(self.content, BlobContent::Binary(_))
     }
 
     /// Indicates if the content of the [`Blob`] is HTML.
@@ -91,7 +91,7 @@ pub enum BlobContent {
     /// [`blob`] to get highlighted content.
     Html(String),
     /// Content is binary and needs special treatment.
-    Binary,
+    Binary(Vec<u8>),
 }
 
 impl Serialize for BlobContent {
@@ -101,7 +101,10 @@ impl Serialize for BlobContent {
     {
         match self {
             Self::Plain(content) | Self::Html(content) => serializer.serialize_str(content),
-            Self::Binary => serializer.serialize_none(),
+            Self::Binary(bytes) => {
+                let encoded = base64::encode(bytes);
+                serializer.serialize_str(&encoded)
+            },
         }
     }
 }
@@ -170,7 +173,7 @@ where
 fn content(content: &[u8]) -> BlobContent {
     match str::from_utf8(content) {
         Ok(utf8) => BlobContent::Plain(utf8.to_owned()),
-        Err(_) => BlobContent::Binary,
+        Err(_) => BlobContent::Binary(content.to_owned()),
     }
 }
 
@@ -203,7 +206,7 @@ pub mod highlighting {
     fn content(path: &str, content: &[u8], theme_name: Option<&str>) -> BlobContent {
         let content = match str::from_utf8(content) {
             Ok(content) => content,
-            Err(_) => return BlobContent::Binary,
+            Err(_) => return BlobContent::Binary(content.to_owned()),
         };
 
         match theme_name {
