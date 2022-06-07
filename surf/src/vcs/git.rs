@@ -1553,9 +1553,17 @@ mod tests {
             let diff = bro.initial_diff(oid)?;
 
             let expected_diff = Diff {
-                created: vec![CreateFile(Path::with_root(&[unsound::label::new(
-                    "README.md",
-                )]))],
+                created: vec![CreateFile {
+                    path: Path::with_root(&[unsound::label::new("README.md")]),
+                    diff: FileDiff::Plain {
+                        hunks: vec![Hunk {
+                            header: Line(b"@@ -0,0 +1 @@\n".to_vec()),
+                            lines: vec![
+                                LineDiff::addition(b"This repository is a data source for the Upstream front-end tests.\n".to_vec(), 1),
+                            ]
+                        }]
+                    },
+                }],
                 deleted: vec![],
                 moved: vec![],
                 copied: vec![],
@@ -1613,7 +1621,7 @@ mod tests {
             use file_system::*;
 
             let diff = Diff {
-                created: vec![CreateFile(unsound::path::new("LICENSE"))],
+                created: vec![CreateFile{path: unsound::path::new("LICENSE"), diff: FileDiff::Plain { hunks: vec![] }}],
                 deleted: vec![],
                 moved: vec![
                     MoveFile {
@@ -1641,7 +1649,11 @@ mod tests {
 
             let eof: Option<u8> = None;
             let json = serde_json::json!({
-                "created": ["LICENSE"],
+                "created": [{"path": "LICENSE", "diff": {
+                        "type": "plain",
+                        "hunks": []
+                    },
+                }],
                 "deleted": [],
                 "moved": [{ "oldPath": "CONTRIBUTING", "newPath": "CONTRIBUTING.md" }],
                 "copied": [],
