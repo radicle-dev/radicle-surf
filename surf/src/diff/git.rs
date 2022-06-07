@@ -71,14 +71,52 @@ impl<'a> TryFrom<git2::Diff<'a>> for Diff {
                     let path = diff_file.path().ok_or(diff::git::Error::PathUnavailable)?;
                     let path = Path::try_from(path.to_path_buf())?;
 
-                    diff.add_created_file(path);
+                    let patch = Patch::from_diff(&git_diff, idx)?;
+                    if let Some(patch) = patch {
+                        let mut hunks: Vec<Hunk> = Vec::new();
+
+                        for h in 0..patch.num_hunks() {
+                            let (hunk, hunk_lines) = patch.hunk(h)?;
+                            let header = Line(hunk.header().to_owned());
+                            let mut lines: Vec<LineDiff> = Vec::new();
+
+                            for l in 0..hunk_lines {
+                                let line = patch.line_in_hunk(h, l)?;
+                                let line = LineDiff::try_from(line)?;
+                                lines.push(line);
+                            }
+                            hunks.push(Hunk { header, lines });
+                        }
+                        diff.add_created_file(path, diff::FileDiff::Plain { hunks });
+                    } else {
+                        diff.add_created_file(path, diff::FileDiff::Plain { hunks: vec![] });
+                    }
                 },
                 Delta::Deleted => {
                     let diff_file = delta.old_file();
                     let path = diff_file.path().ok_or(diff::git::Error::PathUnavailable)?;
                     let path = Path::try_from(path.to_path_buf())?;
 
-                    diff.add_deleted_file(path);
+                    let patch = Patch::from_diff(&git_diff, idx)?;
+                    if let Some(patch) = patch {
+                        let mut hunks: Vec<Hunk> = Vec::new();
+
+                        for h in 0..patch.num_hunks() {
+                            let (hunk, hunk_lines) = patch.hunk(h)?;
+                            let header = Line(hunk.header().to_owned());
+                            let mut lines: Vec<LineDiff> = Vec::new();
+
+                            for l in 0..hunk_lines {
+                                let line = patch.line_in_hunk(h, l)?;
+                                let line = LineDiff::try_from(line)?;
+                                lines.push(line);
+                            }
+                            hunks.push(Hunk { header, lines });
+                        }
+                        diff.add_deleted_file(path, diff::FileDiff::Plain { hunks });
+                    } else {
+                        diff.add_deleted_file(path, diff::FileDiff::Plain { hunks: vec![] });
+                    }
                 },
                 Delta::Modified => {
                     let diff_file = delta.new_file();

@@ -161,6 +161,30 @@ pub fn commit(browser: &mut Browser<'_>, sha1: git2::Oid) -> Result<Commit, Erro
         }
     }
 
+    for file in &diff.created {
+        if let diff::FileDiff::Plain { ref hunks } = file.diff {
+            for hunk in hunks.iter() {
+                for line in &hunk.lines {
+                    if let diff::LineDiff::Addition { .. } = line {
+                        additions += 1
+                    }
+                }
+            }
+        }
+    }
+
+    for file in &diff.deleted {
+        if let diff::FileDiff::Plain { ref hunks } = file.diff {
+            for hunk in hunks.iter() {
+                for line in &hunk.lines {
+                    if let diff::LineDiff::Deletion { .. } = line {
+                        deletions += 1
+                    }
+                }
+            }
+        }
+    }
+
     let branches = browser
         .revision_branches(sha1)?
         .into_iter()

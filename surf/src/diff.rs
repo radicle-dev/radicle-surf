@@ -60,11 +60,17 @@ impl Default for Diff {
 
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CreateFile(pub Path);
+pub struct CreateFile {
+    pub path: Path,
+    pub diff: FileDiff,
+}
 
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DeleteFile(pub Path);
+pub struct DeleteFile {
+    pub path: Path,
+    pub diff: FileDiff,
+}
 
 #[cfg_attr(
     feature = "serialize",
@@ -302,7 +308,7 @@ impl Diff {
                                 let mut path = parent_path.borrow().clone();
                                 path.push(new_file_name.clone());
 
-                                diff.add_created_file(path);
+                                diff.add_created_file(path, FileDiff::Plain { hunks: vec![] });
                                 diff.add_deleted_files(old_entry, parent_path)?;
 
                                 old_entry_opt = old_iter.next();
@@ -319,7 +325,7 @@ impl Diff {
                                 path.push(old_file_name.clone());
 
                                 diff.add_created_files(new_entry, parent_path)?;
-                                diff.add_deleted_file(path);
+                                diff.add_deleted_file(path, FileDiff::Plain { hunks: vec![] });
 
                                 old_entry_opt = old_iter.next();
                                 new_entry_opt = new_iter.next();
@@ -448,8 +454,8 @@ impl Diff {
         });
     }
 
-    pub(crate) fn add_created_file(&mut self, path: Path) {
-        self.created.push(CreateFile(path));
+    pub(crate) fn add_created_file(&mut self, path: Path, diff: FileDiff) {
+        self.created.push(CreateFile { path, diff });
     }
 
     fn add_created_files(
@@ -458,13 +464,16 @@ impl Diff {
         parent_path: &Rc<RefCell<Path>>,
     ) -> Result<(), String> {
         let mut new_files: Vec<CreateFile> =
-            Diff::collect_files_from_entry(dc, parent_path, CreateFile)?;
+            Diff::collect_files_from_entry(dc, parent_path, |path| CreateFile {
+                path,
+                diff: FileDiff::Plain { hunks: vec![] },
+            })?;
         self.created.append(&mut new_files);
         Ok(())
     }
 
-    pub(crate) fn add_deleted_file(&mut self, path: Path) {
-        self.deleted.push(DeleteFile(path));
+    pub(crate) fn add_deleted_file(&mut self, path: Path, diff: FileDiff) {
+        self.deleted.push(DeleteFile { path, diff });
     }
 
     fn add_deleted_files(
@@ -473,7 +482,10 @@ impl Diff {
         parent_path: &Rc<RefCell<Path>>,
     ) -> Result<(), String> {
         let mut new_files: Vec<DeleteFile> =
-            Diff::collect_files_from_entry(dc, parent_path, DeleteFile)?;
+            Diff::collect_files_from_entry(dc, parent_path, |path| DeleteFile {
+                path,
+                diff: FileDiff::Plain { hunks: vec![] },
+            })?;
         self.deleted.append(&mut new_files);
         Ok(())
     }
@@ -497,9 +509,10 @@ mod tests {
         let diff = Diff::diff(directory, new_directory).expect("diff failed");
 
         let expected_diff = Diff {
-            created: vec![CreateFile(Path::with_root(&[unsound::label::new(
-                "banana.rs",
-            )]))],
+            created: vec![CreateFile {
+                path: Path::with_root(&[unsound::label::new("banana.rs")]),
+                diff: FileDiff::Plain { hunks: vec![] },
+            }],
             deleted: vec![],
             copied: vec![],
             moved: vec![],
@@ -520,9 +533,10 @@ mod tests {
 
         let expected_diff = Diff {
             created: vec![],
-            deleted: vec![DeleteFile(Path::with_root(&[unsound::label::new(
-                "banana.rs",
-            )]))],
+            deleted: vec![DeleteFile {
+                path: Path::with_root(&[unsound::label::new("banana.rs")]),
+                diff: FileDiff::Plain { hunks: vec![] },
+            }],
             moved: vec![],
             copied: vec![],
             modified: vec![],
@@ -584,10 +598,13 @@ mod tests {
         let diff = Diff::diff(directory, new_directory).expect("diff failed");
 
         let expected_diff = Diff {
-            created: vec![CreateFile(Path::with_root(&[
-                unsound::label::new("src"),
-                unsound::label::new("banana.rs"),
-            ]))],
+            created: vec![CreateFile {
+                path: Path::with_root(&[
+                    unsound::label::new("src"),
+                    unsound::label::new("banana.rs"),
+                ]),
+                diff: FileDiff::Plain { hunks: vec![] },
+            }],
             deleted: vec![],
             moved: vec![],
             copied: vec![],
@@ -611,10 +628,13 @@ mod tests {
 
         let expected_diff = Diff {
             created: vec![],
-            deleted: vec![DeleteFile(Path::with_root(&[
-                unsound::label::new("src"),
-                unsound::label::new("banana.rs"),
-            ]))],
+            deleted: vec![DeleteFile {
+                path: Path::with_root(&[
+                    unsound::label::new("src"),
+                    unsound::label::new("banana.rs"),
+                ]),
+                diff: FileDiff::Plain { hunks: vec![] },
+            }],
             moved: vec![],
             copied: vec![],
             modified: vec![],

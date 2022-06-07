@@ -122,10 +122,10 @@ fn get_directory_or_exit(browser: &git::Browser) -> Directory {
 
 fn print_diff_summary(diff: &Diff, elapsed_nanos: u128) {
     diff.created.iter().for_each(|created| {
-        println!("+++ {}", created.0);
+        println!("+++ {}", created.path);
     });
     diff.deleted.iter().for_each(|deleted| {
-        println!("--- {}", deleted.0);
+        println!("--- {}", deleted.path);
     });
     diff.modified.iter().for_each(|modified| {
         println!("mod {}", modified.path);
@@ -133,8 +133,8 @@ fn print_diff_summary(diff: &Diff, elapsed_nanos: u128) {
 
     println!(
         "created {} / deleted {} / modified {} / total {}",
-        diff.created.len(),
-        diff.deleted.len(),
+        diff.created.len() + diff.created.len(),
+        diff.deleted.len() + diff.deleted.len(),
         diff.modified.len(),
         diff.created.len() + diff.deleted.len() + diff.modified.len()
     );
