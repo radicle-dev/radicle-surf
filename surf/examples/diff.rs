@@ -48,16 +48,9 @@ fn main() {
     let base_directory = get_directory_or_exit(&browser);
 
     let now = Instant::now();
-    match Diff::diff(base_directory, head_directory) {
-        Ok(diff) => {
-            let elapsed_nanos = now.elapsed().as_nanos();
-            print_diff_summary(&diff, elapsed_nanos);
-        },
-        Err(e) => {
-            println!("Failed to build diff: {:?}", e);
-            std::process::exit(1);
-        },
-    };
+    let elapsed_nanos = now.elapsed().as_nanos();
+    let diff = Diff::diff(base_directory, head_directory);
+    print_diff_summary(&diff, elapsed_nanos);
 }
 
 fn get_options_or_exit() -> Options {
