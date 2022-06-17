@@ -157,12 +157,13 @@ impl<'a> RepositoryRef<'a> {
     /// Get the [`Diff`] between two commits.
     pub fn diff(&self, from: Oid, to: Oid) -> Result<Diff, Error> {
         self.diff_commits(None, Some(from), to)
-            .and_then(Diff::try_from)
+            .and_then(|diff| Diff::try_from(diff).map_err(Error::from))
     }
 
     /// Get the [`Diff`] of a commit with no parents.
     pub fn initial_diff(&self, oid: Oid) -> Result<Diff, Error> {
-        self.diff_commits(None, None, oid).and_then(Diff::try_from)
+        self.diff_commits(None, None, oid)
+            .and_then(|diff| Diff::try_from(diff).map_err(Error::from))
     }
 
     /// Parse an [`Oid`] from the given string.

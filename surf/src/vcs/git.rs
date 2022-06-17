@@ -1561,7 +1561,7 @@ mod tests {
                             lines: vec![
                                 LineDiff::addition(b"This repository is a data source for the Upstream front-end tests.\n".to_vec(), 1),
                             ]
-                        }]
+                        }].into()
                     },
                 }],
                 deleted: vec![],
@@ -1605,7 +1605,7 @@ mod tests {
                                 LineDiff::addition(b"This repository is a data source for the Upstream front-end tests and the\n".to_vec(), 1),
                                 LineDiff::addition(b"[`radicle-surf`](https://github.com/radicle-dev/git-platinum) unit tests.\n".to_vec(), 2),
                             ]
-                        }]
+                        }].into()
                     },
                     eof: None,
                 }]
@@ -1621,7 +1621,7 @@ mod tests {
             use file_system::*;
 
             let diff = Diff {
-                created: vec![CreateFile{path: unsound::path::new("LICENSE"), diff: FileDiff::Plain { hunks: vec![] }}],
+                created: vec![CreateFile{path: unsound::path::new("LICENSE"), diff: FileDiff::Plain { hunks: Hunks::default() }}],
                 deleted: vec![],
                 moved: vec![
                     MoveFile {
@@ -1641,7 +1641,7 @@ mod tests {
                                 LineDiff::addition(b"[`radicle-surf`](https://github.com/radicle-dev/git-platinum) unit tests.\n".to_vec(), 2),
                                 LineDiff::context(b"\n".to_vec(), 3, 4),
                             ]
-                        }]
+                        }].into()
                     },
                     eof: None,
                 }]

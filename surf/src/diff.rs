@@ -17,15 +17,14 @@
 
 #![allow(dead_code, unused_variables, missing_docs)]
 
-use crate::file_system::{Directory, DirectoryContents, Path};
-use std::{cell::RefCell, cmp::Ordering, ops::Deref, rc::Rc};
-use thiserror::Error;
+use std::{cell::RefCell, cmp::Ordering, convert::TryFrom, ops::Deref, rc::Rc, slice};
 
 #[cfg(feature = "serialize")]
 use serde::{ser, Serialize, Serializer};
 
-pub mod git;
+use crate::file_system::{Directory, DirectoryContents, Path};
 
+pub mod git;
 
 #[cfg_attr(
     feature = "serialize",
@@ -118,7 +117,7 @@ pub enum FileDiff {
     Binary,
     #[cfg_attr(feature = "serialize", serde(rename_all = "camelCase"))]
     Plain {
-        hunks: Vec<Hunk>,
+        hunks: Hunks,
     },
 }
 
@@ -132,6 +131,58 @@ pub enum FileDiff {
 pub struct Hunk {
     pub header: Line,
     pub lines: Vec<LineDiff>,
+}
+
+/// A set of [`Hunk`]s.
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Hunks(pub Vec<Hunk>);
+
+pub struct IterHunks<'a> {
+    inner: slice::Iter<'a, Hunk>,
+}
+
+impl Hunks {
+    pub fn iter(&self) -> IterHunks<'_> {
+        IterHunks {
+            inner: self.0.iter(),
+        }
+    }
+}
+
+impl From<Vec<Hunk>> for Hunks {
+    fn from(hunks: Vec<Hunk>) -> Self {
+        Self(hunks)
+    }
+}
+
+impl<'a> Iterator for IterHunks<'a> {
+    type Item = &'a Hunk;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+
+impl TryFrom<git2::Patch<'_>> for Hunks {
+    type Error = git::error::Hunk;
+
+    fn try_from(patch: git2::Patch) -> Result<Self, Self::Error> {
+        let mut hunks = Vec::new();
+        for h in 0..patch.num_hunks() {
+            let (hunk, hunk_lines) = patch.hunk(h)?;
+            let header = Line(hunk.header().to_owned());
+            let mut lines: Vec<LineDiff> = Vec::new();
+
+            for l in 0..hunk_lines {
+                let line = patch.line_in_hunk(h, l)?;
+                let line = LineDiff::try_from(line)?;
+                lines.push(line);
+            }
+            hunks.push(Hunk { header, lines });
+        }
+        Ok(Hunks(hunks))
+    }
 }
 
 /// The content of a single line.
@@ -297,7 +348,12 @@ impl Diff {
                                 let mut path = parent_path.borrow().clone();
                                 path.push(new_file_name.clone());
 
-                                diff.add_created_file(path, FileDiff::Plain { hunks: vec![] });
+                                diff.add_created_file(
+                                    path,
+                                    FileDiff::Plain {
+                                        hunks: Hunks::default(),
+                                    },
+                                );
                                 diff.add_deleted_files(old_entry, parent_path);
 
                                 old_entry_opt = old_iter.next();
@@ -314,7 +370,12 @@ impl Diff {
                                 path.push(old_file_name.clone());
 
                                 diff.add_created_files(new_entry, parent_path);
-                                diff.add_deleted_file(path, FileDiff::Plain { hunks: vec![] });
+                                diff.add_deleted_file(
+                                    path,
+                                    FileDiff::Plain {
+                                        hunks: Hunks::default(),
+                                    },
+                                );
 
                                 old_entry_opt = old_iter.next();
                                 new_entry_opt = new_iter.next();
@@ -407,7 +468,7 @@ impl Diff {
     pub(crate) fn add_modified_file(
         &mut self,
         path: Path,
-        hunks: Vec<Hunk>,
+        hunks: impl Into<Hunks>,
         eof: Option<EofNewLine>,
     ) {
         // TODO: file diff can be calculated at this point
@@ -415,7 +476,9 @@ impl Diff {
         // https://nest.pijul.com/pijul_org/pijul:master/1468b7281a6f3785e9#anesp4Qdq3V
         self.modified.push(ModifiedFile {
             path,
-            diff: FileDiff::Plain { hunks },
+            diff: FileDiff::Plain {
+                hunks: hunks.into(),
+            },
             eof,
         });
     }
@@ -444,7 +507,9 @@ impl Diff {
         let mut new_files: Vec<CreateFile> =
             Diff::collect_files_from_entry(dc, parent_path, |path| CreateFile {
                 path,
-                diff: FileDiff::Plain { hunks: vec![] },
+                diff: FileDiff::Plain {
+                    hunks: Hunks::default(),
+                },
             });
         self.created.append(&mut new_files);
     }
@@ -457,7 +522,9 @@ impl Diff {
         let mut new_files: Vec<DeleteFile> =
             Diff::collect_files_from_entry(dc, parent_path, |path| DeleteFile {
                 path,
-                diff: FileDiff::Plain { hunks: vec![] },
+                diff: FileDiff::Plain {
+                    hunks: Hunks::default(),
+                },
             });
         self.deleted.append(&mut new_files);
     }
@@ -483,7 +550,9 @@ mod tests {
         let expected_diff = Diff {
             created: vec![CreateFile {
                 path: Path::with_root(&[unsound::label::new("banana.rs")]),
-                diff: FileDiff::Plain { hunks: vec![] },
+                diff: FileDiff::Plain {
+                    hunks: Hunks::default(),
+                },
             }],
             deleted: vec![],
             copied: vec![],
@@ -507,7 +576,9 @@ mod tests {
             created: vec![],
             deleted: vec![DeleteFile {
                 path: Path::with_root(&[unsound::label::new("banana.rs")]),
-                diff: FileDiff::Plain { hunks: vec![] },
+                diff: FileDiff::Plain {
+                    hunks: Hunks::default(),
+                },
             }],
             moved: vec![],
             copied: vec![],
@@ -549,7 +620,9 @@ mod tests {
             copied: vec![],
             modified: vec![ModifiedFile {
                 path: Path::with_root(&[unsound::label::new("banana.rs")]),
-                diff: FileDiff::Plain { hunks: vec![] },
+                diff: FileDiff::Plain {
+                    hunks: Hunks::default(),
+                },
                 eof: None,
             }],
         };
@@ -575,7 +648,9 @@ mod tests {
                     unsound::label::new("src"),
                     unsound::label::new("banana.rs"),
                 ]),
-                diff: FileDiff::Plain { hunks: vec![] },
+                diff: FileDiff::Plain {
+                    hunks: Hunks::default(),
+                },
             }],
             deleted: vec![],
             moved: vec![],
@@ -605,7 +680,9 @@ mod tests {
                     unsound::label::new("src"),
                     unsound::label::new("banana.rs"),
                 ]),
-                diff: FileDiff::Plain { hunks: vec![] },
+                diff: FileDiff::Plain {
+                    hunks: Hunks::default(),
+                },
             }],
             moved: vec![],
             copied: vec![],
@@ -641,7 +718,9 @@ mod tests {
                     unsound::label::new("src"),
                     unsound::label::new("banana.rs"),
                 ]),
-                diff: FileDiff::Plain { hunks: vec![] },
+                diff: FileDiff::Plain {
+                    hunks: Hunks::default(),
+                },
                 eof: None,
             }],
         };
