@@ -84,7 +84,7 @@ pub enum Error {
     PathNotFound(file_system::Path),
     /// An error that comes from performing a *diff* operations.
     #[error(transparent)]
-    Diff(#[from] diff::git::Error),
+    Diff(#[from] diff::git::error::Diff),
     /// A wrapper around the generic [`git2::Error`].
     #[error(transparent)]
     Git(#[from] git2::Error),
