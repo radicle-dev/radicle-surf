@@ -13,11 +13,13 @@ with pkgs;
 mkShell {
     name = "radicle-surf";
     buildInputs = [
+        clang
         cargo-deny
         cargo-expand
         cargo-watch
         # gnuplot for benchmark purposes
         gnuplot
+        lld
         pkgconfig
         openssl
         pkgs.rust-bin.nightly."2021-12-02".rustfmt
