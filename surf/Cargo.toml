@@ -27,7 +27,7 @@ gh-actions = []
 either = "1.5"
 nom = "6"
 nonempty = "0.5"
-regex = "1.3"
+regex = ">= 1.5.5"
 serde = { features = ["serde_derive"], optional = true, version = "1" }
 thiserror = "1.0"
 
