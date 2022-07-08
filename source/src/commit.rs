@@ -29,22 +29,13 @@ use radicle_surf::{
 
 use crate::{branch::Branch, error::Error, person::Person, revision::Revision};
 
-/// Commit statistics.
-#[derive(Clone, Serialize)]
-pub struct Stats {
-    /// Additions.
-    pub additions: u64,
-    /// Deletions.
-    pub deletions: u64,
-}
-
 /// Representation of a changeset between two revs.
 #[derive(Clone, Serialize)]
 pub struct Commit {
     /// The commit header.
     pub header: Header,
     /// The change statistics for this commit.
-    pub stats: Stats,
+    pub stats: diff::Stats,
     /// The changeset introduced by this commit.
     pub diff: diff::Diff,
     /// The list of branches this commit belongs to.
@@ -144,47 +135,6 @@ pub fn commit(browser: &mut Browser<'_>, sha1: git2::Oid) -> Result<Commit, Erro
         browser.initial_diff(sha1)?
     };
 
-    let mut deletions = 0;
-    let mut additions = 0;
-
-    for file in &diff.modified {
-        if let diff::FileDiff::Plain { ref hunks } = file.diff {
-            for hunk in hunks.iter() {
-                for line in &hunk.lines {
-                    match line {
-                        diff::LineDiff::Addition { .. } => additions += 1,
-                        diff::LineDiff::Deletion { .. } => deletions += 1,
-                        _ => {},
-                    }
-                }
-            }
-        }
-    }
-
-    for file in &diff.created {
-        if let diff::FileDiff::Plain { ref hunks } = file.diff {
-            for hunk in hunks.iter() {
-                for line in &hunk.lines {
-                    if let diff::LineDiff::Addition { .. } = line {
-                        additions += 1
-                    }
-                }
-            }
-        }
-    }
-
-    for file in &diff.deleted {
-        if let diff::FileDiff::Plain { ref hunks } = file.diff {
-            for hunk in hunks.iter() {
-                for line in &hunk.lines {
-                    if let diff::LineDiff::Deletion { .. } = line {
-                        deletions += 1
-                    }
-                }
-            }
-        }
-    }
-
     let branches = browser
         .revision_branches(sha1)?
         .into_iter()
@@ -193,10 +143,7 @@ pub fn commit(browser: &mut Browser<'_>, sha1: git2::Oid) -> Result<Commit, Erro
 
     Ok(Commit {
         header: Header::from(commit),
-        stats: Stats {
-            additions,
-            deletions,
-        },
+        stats: diff.stats(),
         diff,
         branches,
     })

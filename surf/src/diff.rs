@@ -26,6 +26,30 @@ use crate::file_system::{Directory, DirectoryContents, Path};
 
 pub mod git;
 
+/// Commit statistics.
+#[derive(Clone, Serialize, Debug, PartialEq, Eq)]
+pub struct Stats {
+    /// Additions.
+    pub additions: u64,
+    /// Deletions.
+    pub deletions: u64,
+}
+
+impl Default for Stats {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Stats {
+    pub fn new() -> Self {
+        Self {
+            additions: 0,
+            deletions: 0,
+        }
+    }
+}
+
 #[cfg_attr(
     feature = "serialize",
     derive(Serialize),
@@ -38,11 +62,62 @@ pub struct Diff {
     pub moved: Vec<MoveFile>,
     pub copied: Vec<CopyFile>,
     pub modified: Vec<ModifiedFile>,
+    pub stats: Stats,
 }
 
 impl Default for Diff {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Diff {
+    pub fn stats(&self) -> Stats {
+        let mut deletions = 0;
+        let mut additions = 0;
+
+        for file in &self.modified {
+            if let FileDiff::Plain { ref hunks } = file.diff {
+                for hunk in hunks.iter() {
+                    for line in &hunk.lines {
+                        match line {
+                            LineDiff::Addition { .. } => additions += 1,
+                            LineDiff::Deletion { .. } => deletions += 1,
+                            _ => {},
+                        }
+                    }
+                }
+            }
+        }
+
+        for file in &self.created {
+            if let FileDiff::Plain { ref hunks } = file.diff {
+                for hunk in hunks.iter() {
+                    for line in &hunk.lines {
+                        if let LineDiff::Addition { .. } = line {
+                            additions += 1
+                        }
+                    }
+                }
+            }
+        }
+
+        for file in &self.deleted {
+            if let FileDiff::Plain { ref hunks } = file.diff {
+                for hunk in hunks.iter() {
+                    for line in &hunk.lines {
+                        if let LineDiff::Deletion { .. } = line {
+                            deletions += 1
+                        }
+                    }
+                }
+            }
+        }
+
+        Stats {
+            additions,
+            deletions,
+        }
     }
 }
 
@@ -271,6 +346,7 @@ impl Diff {
             moved: Vec::new(),
             copied: Vec::new(),
             modified: Vec::new(),
+            stats: Stats::new(),
         }
     }
 
@@ -558,6 +634,7 @@ mod tests {
             copied: vec![],
             moved: vec![],
             modified: vec![],
+            stats: Stats::new(),
         };
 
         assert_eq!(diff, expected_diff)
@@ -583,6 +660,7 @@ mod tests {
             moved: vec![],
             copied: vec![],
             modified: vec![],
+            stats: Stats::new(),
         };
 
         assert_eq!(diff, expected_diff)
@@ -625,6 +703,7 @@ mod tests {
                 },
                 eof: None,
             }],
+            stats: Stats::new(),
         };
 
         assert_eq!(diff, expected_diff)
@@ -656,6 +735,7 @@ mod tests {
             moved: vec![],
             copied: vec![],
             modified: vec![],
+            stats: Stats::new(),
         };
 
         assert_eq!(diff, expected_diff)
@@ -687,6 +767,7 @@ mod tests {
             moved: vec![],
             copied: vec![],
             modified: vec![],
+            stats: Stats::new(),
         };
 
         assert_eq!(diff, expected_diff)
@@ -723,6 +804,7 @@ mod tests {
                 },
                 eof: None,
             }],
+            stats: Stats::new(),
         };
 
         assert_eq!(diff, expected_diff)

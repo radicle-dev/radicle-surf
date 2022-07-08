@@ -96,7 +96,7 @@ pub use namespace::Namespace;
 pub mod stats;
 pub use stats::Stats;
 
-pub use crate::diff::Diff;
+pub use crate::diff;
 
 use crate::{
     file_system,
@@ -539,13 +539,13 @@ impl<'a> Browser<'a> {
         self.repository.oid(oid)
     }
 
-    /// Get the [`Diff`] between two commits.
-    pub fn diff(&self, from: Oid, to: Oid) -> Result<Diff, Error> {
+    /// Get the [`diff::Diff`] between two commits.
+    pub fn diff(&self, from: Oid, to: Oid) -> Result<diff::Diff, Error> {
         self.repository.diff(from, to)
     }
 
-    /// Get the [`Diff`] of a commit with no parents.
-    pub fn initial_diff(&self, oid: Oid) -> Result<Diff, Error> {
+    /// Get the [`diff::Diff`] of a commit with no parents.
+    pub fn initial_diff(&self, oid: Oid) -> Result<diff::Diff, Error> {
         self.repository.initial_diff(oid)
     }
 
@@ -1568,6 +1568,7 @@ mod tests {
                 moved: vec![],
                 copied: vec![],
                 modified: vec![],
+                stats: diff::Stats::new(),
             };
             assert_eq!(expected_diff, diff);
 
@@ -1608,7 +1609,8 @@ mod tests {
                         }].into()
                     },
                     eof: None,
-                }]
+                }],
+                stats: diff::Stats::new(),
             };
             assert_eq!(expected_diff, diff);
 
@@ -1644,7 +1646,8 @@ mod tests {
                         }].into()
                     },
                     eof: None,
-                }]
+                }],
+                stats: diff::Stats::new(),
             };
 
             let eof: Option<u8> = None;
@@ -1684,7 +1687,8 @@ mod tests {
                         }]
                     },
                     "eof" : eof,
-                }]
+                }],
+                "stats": diff::Stats::new(),
             });
             assert_eq!(serde_json::to_value(&diff).unwrap(), json);
 
