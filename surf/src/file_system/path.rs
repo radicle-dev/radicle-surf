@@ -15,6 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+use std::fmt::Write as _;
+
 use crate::{file_system::error, nonempty::split_last};
 use nonempty::NonEmpty;
 use std::{convert::TryFrom, ffi::CString, fmt, ops::Deref, path, str::FromStr};
@@ -178,7 +180,7 @@ impl git2::IntoCString for Path {
                 // `git2::DiffOptions::pathspec` to work properly. As far as we're aware this is
                 // the only use of IntoCString for Path.
                 let label = p.label.replace('\\', "\\\\");
-                pathspec.push_str(&format!("{}/", label));
+                let _ = write!(pathspec, "{label}/");
             }
             let pathspec = pathspec.trim_end_matches('/');
             pathspec.into_c_string()

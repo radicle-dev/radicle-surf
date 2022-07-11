@@ -20,7 +20,7 @@ use crate::{
     vcs::git::{error, repo::RepositoryRef},
 };
 use either::Either;
-use std::fmt;
+use std::fmt::{self, Write as _};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RefGlob {
@@ -103,7 +103,7 @@ impl RefGlob {
     ) -> Result<References<'a>, error::Error> {
         let mut namespace_glob = "".to_string();
         for n in namespace {
-            namespace_glob.push_str(&format!("refs/namespaces/{}/", n));
+            let _ = write!(namespace_glob, "refs/namespaces/{n}/");
         }
 
         Ok(match self {
