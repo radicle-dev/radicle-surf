@@ -18,7 +18,11 @@
 use crate::vcs::git::{self, error::Error, ext, reference::Ref};
 use std::{cmp::Ordering, convert::TryFrom, fmt, str};
 
+#[cfg(feature = "serialize")]
+use serde::Serialize;
+
 /// The branch type we want to filter on.
+#[cfg_attr(feature = "serialize", derive(Serialize))]
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub enum BranchType {
     /// Local branches that are under `refs/heads/*`
@@ -51,6 +55,7 @@ impl From<git2::BranchType> for BranchType {
 
 /// A newtype wrapper over `String` to separate out the fact that a caller wants
 /// to fetch a branch.
+#[cfg_attr(feature = "serialize", derive(Serialize))]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BranchName(pub(crate) String);
 
@@ -89,6 +94,7 @@ impl BranchName {
 ///
 /// **Note**: The `PartialOrd` and `Ord` implementations compare on `BranchName`
 /// only.
+#[cfg_attr(feature = "serialize", derive(Serialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Branch {
     /// Name identifier of the `Branch`.
