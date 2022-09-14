@@ -19,6 +19,9 @@ use crate::vcs::git::error::Error;
 use git2::Oid;
 use std::{convert::TryFrom, str};
 
+#[cfg(feature = "serialize")]
+use serde::{ser::SerializeSeq, Serialize, Serializer};
+
 /// `Author` is the static information of a [`git2::Signature`].
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Author {
@@ -61,9 +64,11 @@ impl<'repo> TryFrom<git2::Signature<'repo>> for Author {
 /// `Commit` is the static information of a [`git2::Commit`]. To get back the
 /// original `Commit` in the repository we can use the [`Oid`] to retrieve
 /// it.
+#[cfg_attr(feature = "serialize", derive(Serialize))]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Commit {
     /// Object ID of the Commit, i.e. the SHA1 digest.
+    #[serde(serialize_with = "serialize_oid")]
     pub id: Oid,
     /// The author of the commit.
     pub author: Author,
@@ -74,7 +79,28 @@ pub struct Commit {
     /// The summary message of the commit.
     pub summary: String,
     /// The parents of this commit.
+    #[serde(serialize_with = "serialize_vec_oid")]
     pub parents: Vec<Oid>,
+}
+
+#[cfg(feature = "serialize")]
+fn serialize_oid<S>(oid: &Oid, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&oid.to_string())
+}
+
+#[cfg(feature = "serialize")]
+fn serialize_vec_oid<S>(oids: &Vec<Oid>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let mut seq = serializer.serialize_seq(Some(oids.len()))?;
+    for oid in oids {
+        seq.serialize_element(&oid.to_string())?;
+    }
+    seq.end()
 }
 
 impl<'repo> TryFrom<git2::Commit<'repo>> for Commit {
