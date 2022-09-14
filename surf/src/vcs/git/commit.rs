@@ -23,6 +23,7 @@ use std::{convert::TryFrom, str};
 use serde::{ser::SerializeSeq, Serialize, Serializer};
 
 /// `Author` is the static information of a [`git2::Signature`].
+#[cfg_attr(feature = "serialize", derive(Serialize))]
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Author {
     /// Name of the author.
@@ -30,7 +31,16 @@ pub struct Author {
     /// Email of the author.
     pub email: String,
     /// Time the action was taken, e.g. time of commit.
+    #[serde(serialize_with = "serialize_time")]
     pub time: git2::Time,
+}
+
+#[cfg(feature = "serialize")]
+fn serialize_time<S>(t: &git2::Time, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_i64(t.seconds())
 }
 
 impl std::fmt::Debug for Author {
