@@ -80,7 +80,7 @@ impl Serialize for Blob {
 }
 
 /// Variants of blob content.
-#[derive(PartialEq)]
+#[derive(Eq, PartialEq)]
 pub enum BlobContent {
     /// Content is plain text and can be passed as a string.
     Plain(String),

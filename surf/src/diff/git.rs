@@ -27,7 +27,7 @@ pub mod error {
 
     use crate::file_system::{self, Path};
 
-    #[derive(Debug, Error, PartialEq)]
+    #[derive(Debug, Eq, Error, PartialEq)]
     #[non_exhaustive]
     pub enum LineDiff {
         /// A Git `DiffLine` is invalid.

@@ -118,7 +118,7 @@ impl fmt::Display for Ref {
     }
 }
 
-#[derive(Debug, PartialEq, Error)]
+#[derive(Debug, Eq, Error, PartialEq)]
 pub enum ParseError {
     #[error("the ref provided '{0}' was malformed")]
     MalformedRef(String),
