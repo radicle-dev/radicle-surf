@@ -197,3 +197,28 @@ impl<'repo> TryFrom<git2::Reference<'repo>> for Branch {
         }
     }
 }
+
+#[cfg(feature = "serialize")]
+#[test]
+fn test_branch_serde() -> Result<(), Error> {
+    let branch = Branch {
+        name: BranchName::new("feature-1"),
+        /// Whether the `Branch` is `Remote` or `Local`.
+        locality: BranchType::Remote {
+            name: Some(
+                "cloudhead@hynyu9w9c6tt3xjeeudm7jhx5pcippimzxduie98cn4661d7p7yees".to_string(),
+            ),
+        },
+    };
+    let json = serde_json::json!({
+        "name": "feature-1",
+        "locality": {
+            "Remote": {
+                "name":  "cloudhead@hynyu9w9c6tt3xjeeudm7jhx5pcippimzxduie98cn4661d7p7yees"
+            }
+        }
+    });
+    assert_eq!(serde_json::to_value(&branch).unwrap(), json);
+
+    Ok(())
+}

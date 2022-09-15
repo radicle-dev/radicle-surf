@@ -136,3 +136,43 @@ impl<'repo> TryFrom<git2::Commit<'repo>> for Commit {
         })
     }
 }
+
+#[cfg(feature = "serialize")]
+#[test]
+fn test_commit_serde() -> Result<(), Error> {
+    let commit = Commit {
+        id: Oid::from_str("b85d2183d786e5fa447aab9d2f420a32f1061bfa")?,
+        author: Author {
+            name: "John Doe".to_string(),
+            email: "doe@radicle.xyz".to_string(),
+            time: git2::Time::new(1663168285, 0),
+        },
+        committer: Author {
+            name: "Jane Example".to_string(),
+            email: "jane@radicle.xyz".to_string(),
+            time: git2::Time::new(1663168450, 0),
+        },
+        message: "Serialize instances for `Author` nSigned-off-by: Sebastian Martinez <me@sebastinez.dev>".to_string(),
+        summary: "Serialize instances for `Author` nSigned-off-by: Sebastian Martinez <me@sebastinez.dev>".to_string(),
+        parents: vec![git2::Oid::from_str("b85d2183d786e5fa447aab9d2f420a32f1061bfa")?, git2::Oid::from_str("b85d2183d786e5fa447aab9d2f420a32f1061bfa")?],
+    };
+    let json = serde_json::json!({
+        "id": "b85d2183d786e5fa447aab9d2f420a32f1061bfa",
+        "author": {
+            "email": "doe@radicle.xyz",
+            "name": "John Doe",
+            "time": 1663168285
+        },
+        "committer": {
+            "email": "jane@radicle.xyz",
+            "name": "Jane Example",
+            "time": 1663168450
+        },
+        "message": "Serialize instances for `Author` nSigned-off-by: Sebastian Martinez <me@sebastinez.dev>",
+        "summary": "Serialize instances for `Author` nSigned-off-by: Sebastian Martinez <me@sebastinez.dev>",
+        "parents": ["b85d2183d786e5fa447aab9d2f420a32f1061bfa", "b85d2183d786e5fa447aab9d2f420a32f1061bfa"]
+    });
+    assert_eq!(serde_json::to_value(&commit).unwrap(), json);
+
+    Ok(())
+}
