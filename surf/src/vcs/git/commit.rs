@@ -20,10 +20,10 @@ use git2::Oid;
 use std::{convert::TryFrom, str};
 
 #[cfg(feature = "serialize")]
-use serde::{ser::SerializeSeq, Serialize, Serializer};
+use serde::{de, ser::SerializeSeq, Deserialize, Deserializer, Serialize, Serializer};
 
 /// `Author` is the static information of a [`git2::Signature`].
-#[cfg_attr(feature = "serialize", derive(Serialize))]
+#[cfg_attr(feature = "serialize", derive(Deserialize, Serialize))]
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Author {
     /// Name of the author.
@@ -31,8 +31,20 @@ pub struct Author {
     /// Email of the author.
     pub email: String,
     /// Time the action was taken, e.g. time of commit.
-    #[serde(serialize_with = "serialize_time")]
+    #[serde(
+        serialize_with = "serialize_time",
+        deserialize_with = "deserialize_time"
+    )]
     pub time: git2::Time,
+}
+
+#[cfg(feature = "serialize")]
+fn deserialize_time<'de, D>(deserializer: D) -> Result<git2::Time, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let seconds: i64 = Deserialize::deserialize(deserializer)?;
+    Ok(git2::Time::new(seconds, 0))
 }
 
 #[cfg(feature = "serialize")]
@@ -74,11 +86,11 @@ impl<'repo> TryFrom<git2::Signature<'repo>> for Author {
 /// `Commit` is the static information of a [`git2::Commit`]. To get back the
 /// original `Commit` in the repository we can use the [`Oid`] to retrieve
 /// it.
-#[cfg_attr(feature = "serialize", derive(Serialize))]
+#[cfg_attr(feature = "serialize", derive(Deserialize, Serialize))]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Commit {
     /// Object ID of the Commit, i.e. the SHA1 digest.
-    #[serde(serialize_with = "serialize_oid")]
+    #[serde(serialize_with = "serialize_oid", deserialize_with = "deserialize_oid")]
     pub id: Oid,
     /// The author of the commit.
     pub author: Author,
@@ -89,16 +101,35 @@ pub struct Commit {
     /// The summary message of the commit.
     pub summary: String,
     /// The parents of this commit.
-    #[serde(serialize_with = "serialize_vec_oid")]
+    #[serde(
+        serialize_with = "serialize_vec_oid",
+        deserialize_with = "deserialize_vec_oid"
+    )]
     pub parents: Vec<Oid>,
 }
 
+// TODO: Remove Oid serialization once migrated to `radicle-git` in favor of the
+// usage of `git-ext::Oid`
 #[cfg(feature = "serialize")]
 fn serialize_oid<S>(oid: &Oid, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
     serializer.serialize_str(&oid.to_string())
+}
+
+#[cfg(feature = "serialize")]
+fn deserialize_oid<'de, D>(deserializer: D) -> Result<Oid, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let oid: &str = Deserialize::deserialize(deserializer)?;
+    Oid::from_str(oid).map_err(|_| {
+        serde::de::Error::invalid_type(
+            serde::de::Unexpected::Str(oid),
+            &"a SHA1 hash not longer than 40 hex characters",
+        )
+    })
 }
 
 #[cfg(feature = "serialize")]
@@ -111,6 +142,18 @@ where
         seq.serialize_element(&oid.to_string())?;
     }
     seq.end()
+}
+
+#[cfg(feature = "serialize")]
+fn deserialize_vec_oid<'de, D>(deserializer: D) -> Result<Vec<Oid>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let oids: Vec<&str> = Deserialize::deserialize(deserializer)?;
+    oids.iter()
+        .map(|key| Oid::from_str(key))
+        .collect::<Result<Vec<Oid>, _>>()
+        .map_err(de::Error::custom)
 }
 
 impl<'repo> TryFrom<git2::Commit<'repo>> for Commit {
@@ -137,42 +180,37 @@ impl<'repo> TryFrom<git2::Commit<'repo>> for Commit {
     }
 }
 
-#[cfg(feature = "serialize")]
-#[test]
-fn test_commit_serde() -> Result<(), Error> {
-    let commit = Commit {
-        id: Oid::from_str("b85d2183d786e5fa447aab9d2f420a32f1061bfa")?,
-        author: Author {
-            name: "John Doe".to_string(),
-            email: "doe@radicle.xyz".to_string(),
-            time: git2::Time::new(1663168285, 0),
-        },
-        committer: Author {
-            name: "Jane Example".to_string(),
-            email: "jane@radicle.xyz".to_string(),
-            time: git2::Time::new(1663168450, 0),
-        },
-        message: "Serialize instances for `Author` nSigned-off-by: Sebastian Martinez <me@sebastinez.dev>".to_string(),
-        summary: "Serialize instances for `Author` nSigned-off-by: Sebastian Martinez <me@sebastinez.dev>".to_string(),
-        parents: vec![git2::Oid::from_str("b85d2183d786e5fa447aab9d2f420a32f1061bfa")?, git2::Oid::from_str("b85d2183d786e5fa447aab9d2f420a32f1061bfa")?],
-    };
-    let json = serde_json::json!({
-        "id": "b85d2183d786e5fa447aab9d2f420a32f1061bfa",
-        "author": {
-            "email": "doe@radicle.xyz",
-            "name": "John Doe",
-            "time": 1663168285
-        },
-        "committer": {
-            "email": "jane@radicle.xyz",
-            "name": "Jane Example",
-            "time": 1663168450
-        },
-        "message": "Serialize instances for `Author` nSigned-off-by: Sebastian Martinez <me@sebastinez.dev>",
-        "summary": "Serialize instances for `Author` nSigned-off-by: Sebastian Martinez <me@sebastinez.dev>",
-        "parents": ["b85d2183d786e5fa447aab9d2f420a32f1061bfa", "b85d2183d786e5fa447aab9d2f420a32f1061bfa"]
-    });
-    assert_eq!(serde_json::to_value(&commit).unwrap(), json);
+#[cfg(test)]
+pub mod tests {
+    use git2::Oid;
+    use proptest::prelude::*;
 
-    Ok(())
+    use super::{Author, Commit};
+
+    #[cfg(feature = "serialize")]
+    proptest! {
+        #[test]
+        fn prop_test_commits(commit in commits_strategy()) {
+            prop_assert_eq!(serde_json::from_str::<Commit>(&serde_json::to_string(&commit).unwrap()).unwrap(), commit);
+        }
+    }
+
+    fn commits_strategy() -> impl Strategy<Value = Commit> {
+        ("[a-fA-F0-9]{40}", any::<String>(), any::<i64>()).prop_map(|(id, text, time)| Commit {
+            id: Oid::from_str(&id).unwrap(),
+            author: Author {
+                name: text.clone(),
+                email: text.clone(),
+                time: git2::Time::new(time, 0),
+            },
+            committer: Author {
+                name: text.clone(),
+                email: text.clone(),
+                time: git2::Time::new(time, 0),
+            },
+            message: text.clone(),
+            summary: text,
+            parents: vec![Oid::from_str(&id).unwrap(), Oid::from_str(&id).unwrap()],
+        })
+    }
 }
